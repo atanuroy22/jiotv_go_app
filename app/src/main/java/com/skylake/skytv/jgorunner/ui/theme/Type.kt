@@ -1,4 +1,4 @@
-package com.skylake.sky7t.jgo.ui.theme
+package com.skylake.skytv.jgorunner.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
