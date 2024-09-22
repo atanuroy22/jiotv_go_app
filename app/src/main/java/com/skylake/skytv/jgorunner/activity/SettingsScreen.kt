@@ -137,6 +137,19 @@ fun SettingsScreen(context: Context) {
                 )
             }
 
+            if (false) {
+                item {
+                    SettingSwitchItem(
+                        icon = Icons.Filled.Info,
+                        title = "Enabel EPG",
+                        subtitle = "Electronic program guide generation",
+                        isChecked = isSwitchOnForEPG,
+                        onCheckedChange = { isChecked -> isSwitchOnForEPG = isChecked }
+                    )
+                }
+            }
+
+
             item {
                 SettingSwitchItem(
                     icon = Icons.Filled.Info,
