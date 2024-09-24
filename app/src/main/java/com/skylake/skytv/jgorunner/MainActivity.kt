@@ -29,6 +29,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import android.Manifest
+import android.net.ConnectivityManager
+import android.net.LinkProperties
+import android.net.NetworkCapabilities
+import android.net.wifi.WifiManager
 import android.os.Build
 import androidx.activity.OnBackPressedCallback
 import androidx.annotation.RequiresApi
@@ -54,7 +58,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.net.HttpURLConnection
+import java.net.Inet4Address
 import java.net.URL
+import java.util.Formatter
 import java.util.concurrent.Executors
 
 
@@ -266,6 +272,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
 
+        val wifiIpAddress = getWifiIpAddress(this)
 
         val nekoFirstTime = preferenceManager.getKey("nekoFirstTime")
 
@@ -415,6 +422,35 @@ class MainActivity : ComponentActivity() {
 
     }
 
+
+    private fun getWifiIpAddress(context: Context): String? {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+
+        val activeNetwork = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            connectivityManager.activeNetwork
+        } else {
+            // For older versions, use the first available network
+            val networks = connectivityManager.allNetworks
+            if (networks.isNotEmpty()) networks[0] else null
+        }
+
+        if (activeNetwork != null) {
+            val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
+            if (networkCapabilities != null && networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                val linkProperties: LinkProperties? = connectivityManager.getLinkProperties(activeNetwork)
+                val ipAddresses = linkProperties?.linkAddresses
+                    ?.filter { it.address is Inet4Address } // Filter for IPv4 addresses
+                    ?.map { it.address.hostAddress }
+                return ipAddresses?.firstOrNull() // Return the first IPv4 address
+            }
+        }
+        return null // Return null if not connected to Wi-Fi
+    }
+
+
+
+
+
     @Composable
     fun RedirectPopup(isVisible: Boolean, countdownTime: Int, onDismiss: () -> Unit) {
         var currentTime by remember { mutableIntStateOf(countdownTime) }
@@ -561,6 +597,9 @@ class MainActivity : ComponentActivity() {
             Text(text = selectedBinaryName)
             Spacer(modifier = Modifier.height(16.dp))
             Text(text = "✨")
+            Spacer(modifier = Modifier.height(12.dp))
+            val wifiIpAddress = getWifiIpAddress(this@MainActivity)
+            Text(text = wifiIpAddress ?: "Not connected to Wi-Fi")
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(

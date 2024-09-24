@@ -52,6 +52,7 @@ public class BinaryExecutor {
 
                 commandBuilder.append(" run").append(__Port).append(__Public);
 
+
                 //commandBuilder.append(" run").append(__EPG).append(__Port).append(__Public);
 
                 preferenceManager.setKey("__MasterArgs", commandBuilder.toString() );
