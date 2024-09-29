@@ -91,7 +91,7 @@ public class BinaryService extends Service {
                     out.write(buffer, 0, bytesRead);
                 }
 
-                binaryFile.setExecutable(true, false); // Set executable permissions
+                binaryFile.setExecutable(true, false);
 
             } catch (Exception e) {
                 Log.e("BinaryService", "Failed to handle default binary", e);
@@ -110,31 +110,35 @@ public class BinaryService extends Service {
         // Create the Stop Binary intent and PendingIntent
         Intent stopIntent = new Intent(this, BinaryService.class);
         stopIntent.setAction(ACTION_STOP_BINARY);
+
         PendingIntent stopPendingIntent = PendingIntent.getService(
                 this, 0, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         Notification notification;
 
+        // Check for Android O and above for notification channel
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder notificationBuilder = new Notification.Builder(this, CHANNEL_ID)
                     .setContentTitle("JGO Service Running")
                     .setContentText("The server is running in the background.")
-                    .setSmallIcon(R.drawable.notifications_24px) // Replace with your icon
-                    .setOngoing(true) // Makes the notification non-clearable
+                    .setSmallIcon(R.drawable.notifications_24px)
+                    .setOngoing(true)
                     .addAction(R.drawable.cancel_24px, "Stop Server", stopPendingIntent);
             notification = notificationBuilder.build();
         } else {
             NotificationCompat.Builder notificationBuilder = new NotificationCompat.Builder(this)
                     .setContentTitle("JGO Service Running")
                     .setContentText("The server is running in the background.")
-                    .setSmallIcon(R.drawable.notifications_24px) // Replace with your icon
-                    .setOngoing(true) // Makes the notification non-clearable
+                    .setSmallIcon(R.drawable.notifications_24px)
+                    .setOngoing(true)
                     .addAction(R.drawable.cancel_24px, "Stop Server", stopPendingIntent);
             notification = notificationBuilder.build();
         }
 
         return notification;
     }
+
+
     @Override
     public void onDestroy() {
         super.onDestroy();
@@ -142,7 +146,7 @@ public class BinaryService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
-        return null; // This is a started service, not bound
+        return null;
     }
 
     private void createNotificationChannel() {
