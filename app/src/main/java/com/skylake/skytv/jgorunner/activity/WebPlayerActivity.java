@@ -16,6 +16,7 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.Nullable;
 
 import com.skylake.skytv.jgorunner.R;
+import com.skylake.skytv.jgorunner.data.SkySharedPref;
 
 import java.util.List;
 
@@ -37,8 +38,13 @@ public class WebPlayerActivity extends ComponentActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_web_player);
 
-        // Default URL for the WebView
-        DEFAULT_URL = "http://localhost:5350";
+        int savedPortNumber = 5350;
+        SkySharedPref preferenceManager = new SkySharedPref(WebPlayerActivity.this);
+        String portString = preferenceManager.getKey("isCustomSetForPORT");
+        savedPortNumber = Integer.parseInt(portString);
+
+        final String DEFAULT_URL = "http://localhost:" + savedPortNumber;
+
         Log.d(TAG, "URL: " + DEFAULT_URL);
 
 
