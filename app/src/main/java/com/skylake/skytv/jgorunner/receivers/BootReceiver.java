@@ -22,6 +22,8 @@ public class BootReceiver extends BroadcastReceiver {
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
+
+
     @Override
     public void onReceive(Context context, Intent intent) {
         if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
@@ -100,7 +102,14 @@ public class BootReceiver extends BroadcastReceiver {
     // Placeholder method for checking server status
     public boolean checkServerStatus() {
         try {
-            URL url = new URL("http://localhost:5350");
+
+            int savedPortNumber = 5350;
+            //String portString = preferenceManager.getKey("isCustomSetForPORT");
+            savedPortNumber = Integer.parseInt(String.valueOf(savedPortNumber));
+
+            final String DEFAULT_URL = "http://localhost:" + savedPortNumber;
+            URL url = new URL(DEFAULT_URL);
+
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("HEAD");
             connection.setConnectTimeout(5000); // 5 seconds timeout
