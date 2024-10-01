@@ -32,29 +32,18 @@ import android.Manifest
 import android.net.ConnectivityManager
 import android.net.LinkProperties
 import android.net.NetworkCapabilities
-import android.net.wifi.WifiManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import androidx.activity.OnBackPressedCallback
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.LiveTv
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.ResetTv
-import androidx.compose.material.icons.filled.Sailing
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.StopCircle
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Settings
@@ -66,21 +55,13 @@ import androidx.compose.material.icons.twotone.Sailing
 import androidx.compose.material.icons.twotone.Stop
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.window.DialogProperties
-import com.skylake.skytv.jgorunner.activity.Button1
-import com.skylake.skytv.jgorunner.activity.Button2
-import com.skylake.skytv.jgorunner.activity.Button3
-import com.skylake.skytv.jgorunner.activity.Button4
-import com.skylake.skytv.jgorunner.activity.Button5
-import com.skylake.skytv.jgorunner.activity.Button6
 import com.skylake.skytv.jgorunner.activity.DemoScreen
+import com.skylake.skytv.jgorunner.activity.InfoScreen
 import com.skylake.skytv.jgorunner.activity.SettingsScreen
 import com.skylake.skytv.jgorunner.activity.WebPlayerActivity
 import com.skylake.skytv.jgorunner.services.BinaryExecutor
@@ -89,11 +70,13 @@ import com.skylake.skytv.jgorunner.utils.ConfigUtil
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.data.applyConfigurations
 import com.skylake.skytv.jgorunner.ui.theme.JGOTheme
+import com.skylake.skytv.jgorunner.utils.Config2DL
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.Inet4Address
 import java.net.URL
@@ -104,7 +87,8 @@ class MainActivity : ComponentActivity() {
 
     private var selectedBinaryUri: Uri? = null
     private var isBinaryRunning by mutableStateOf(false)
-    private var selectedBinaryName by mutableStateOf("JGO Runner")
+    private var isOutputShowing by mutableStateOf(false)
+    private var selectedBinaryName by mutableStateOf("JGO Server")
 
     // SharedPreferences for saving binary selection
     private lateinit var preferenceManager: SkySharedPref
@@ -154,11 +138,15 @@ class MainActivity : ComponentActivity() {
 
 
 
-    private var outputText by mutableStateOf("ℹ️ JioTV GO")
+    private var outputText by mutableStateOf("ℹ️ Output logs")
     private var currentScreen by mutableStateOf("Home") // Manage current screen
     private lateinit var backPressedCallback: OnBackPressedCallback
 
     private val executor = Executors.newSingleThreadExecutor()
+
+    private var showCustUpdatePopup by mutableStateOf(false)
+    private var showCustENDPopup by mutableStateOf(false)
+    private var showAutoUpdatePopup by mutableStateOf(false)
 
     private var showRedirectPopup by mutableStateOf(false)
     private var shouldLaunchIPTV by mutableStateOf(false)
@@ -211,6 +199,9 @@ class MainActivity : ComponentActivity() {
                     "DEMOv" -> {
                         currentScreen = "Home"
                     }
+                    "Info" -> {
+                        currentScreen = "Home"
+                    }
                     else -> {
                         // Let the system handle the back press
                         isEnabled = false
@@ -223,17 +214,51 @@ class MainActivity : ComponentActivity() {
         onBackPressedDispatcher.addCallback(this, backPressedCallback)
 
 
+        fun getFileSizeAndSave(context: Context, fileName: String) {
+            val fileDir = context.filesDir // Get the app's internal files directory
+            val file = File(fileDir, fileName) // Create a File object with the specified filename
+
+            if (file.exists()) {
+                val fileSize = file.length() // Get the file size in bytes
+                Log.d("DIX", "File size of $fileName: $fileSize bytes")
+
+                // Save the file size to SharedPreferences
+                preferenceManager.setKey("expectedFileSize", fileSize.toString())
+            } else {
+                Log.e("DIX", "File not found: $fileName")
+                preferenceManager.setKey("expectedFileSize", "69")
+            }
+        }
+
+        getFileSizeAndSave(this@MainActivity,"majorbin")
+        val expectedFileSize: Int? = preferenceManager.getKey("expectedFileSize")?.toIntOrNull()
+        Config2DL.isFileSizeSame(expectedFileSize) { result ->
+            if (result) {
+                if (expectedFileSize == 69){
+                    isOutputShowing = true
+                    Config2DL.startDownloadAndSave(this@MainActivity) { output ->
+                        Handler(Looper.getMainLooper()).post {
+                            outputText += "\n$output"
+                        }
+                    }
+                } else {
+                    showAutoUpdatePopup = true
+                }
+
+            }
+        }
+
 
         setContent {
             JGOTheme {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     bottomBar = { BottomNavigationBar(selectBinaryLauncher) },
-                    floatingActionButton = {
-                        FloatingActionButton(onClick = {  }) {
-                            Icon(Icons.Default.Add, contentDescription = "Add")
-                        }
-                    }
+//                    floatingActionButton = {
+//                        FloatingActionButton(onClick = {  }) {
+//                            Icon(Icons.Default.Add, contentDescription = "Add")
+//                        }
+//                    }
                 ) { innerPadding ->
                     Column(
                         modifier = Modifier
@@ -278,6 +303,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                             "Settings" -> SettingsScreen(context = this@MainActivity)
+                            "Info" -> InfoScreen(context = this@MainActivity)
                             "DEMOv" -> DemoScreen(context = this@MainActivity)
                         }
 
@@ -295,18 +321,66 @@ class MainActivity : ComponentActivity() {
                             }
                         )
 
+                        CustPopup(
+                            isVisible = showCustUpdatePopup,
+                            xtitle ="Update Available",
+                            xsubtitle="A new version of the app is available. Please update to the latest version for improved features and performance.",
+                            xokbtn="Update!",
+                            xendbtn="Dismiss",
+                            onOk = { showCustUpdatePopup = false },
+                            onDismiss = { showCustUpdatePopup = false }
+                        )
+
+                        CustPopup(
+                            isVisible = showCustENDPopup,
+                            xtitle = "App Not Supported",
+                            xsubtitle = "This app is no longer supported. Please exit.",
+                            xokbtn = "Exit",
+                            xendbtn = "Dismiss",
+                            onOk = { showCustENDPopup = false },
+                            onDismiss = {
+                                showCustENDPopup = false
+                                finishAffinity()
+                                return@CustPopup
+                            }
+                        )
+
+                        CustPopup(
+                            isVisible = showAutoUpdatePopup,
+                            xtitle = "Binary Update Available",
+                            xsubtitle = "A new version of the Binary is available.",
+                            xokbtn = "Update!",
+                            xendbtn = "Dismiss",
+                            onOk = {
+                                showAutoUpdatePopup = false
+                                preferenceManager.setKey("expectedFileSize", "0")
+                                isOutputShowing = true
+                                Config2DL.startDownloadAndSave(this@MainActivity
+                                ) { output ->
+                                    runOnUiThread {
+                                            outputText += "\n$output"
+                                    }
+                                }
+                            },
+                            onDismiss = {
+                                showAutoUpdatePopup = false
+                                return@CustPopup
+                            }
+                        )
+
+
                     }
                 }
 
                 // Handle delayed IPTV launch
                 LaunchedEffect(shouldLaunchIPTV) {
                     if (shouldLaunchIPTV) {
-
                         val savedIPTVRedirectTime = preferenceManager.getKey("isFlagSetForIPTVtime")?.toInt() ?: 5000
                         delay(savedIPTVRedirectTime.toLong())
                         startIPTV()
                     }
                 }
+
             }
         }
     }
@@ -343,8 +417,11 @@ class MainActivity : ComponentActivity() {
             preferenceManager.setKey("isCustomSetForPORT", "5350")
             preferenceManager.setKey("__Port", " --port 5350")
             preferenceManager.setKey("__Public", " --public")
-            preferenceManager.setKey("__EPG", " --config jiotv_go.json")
+            preferenceManager.setKey("__EPG", " --config configtv.json")
             preferenceManager.setKey("BinaryFileName", "majorbin")
+            preferenceManager.setKey("isAutoUpdate", "No")
+            preferenceManager.setKey("VersionNumber", "v3.11")
+            preferenceManager.setKey("expectedFileSize", "69")
         }
 
         // Use the utility function to fetch and save config
@@ -353,20 +430,21 @@ class MainActivity : ComponentActivity() {
         val isUpdate = preferenceManager.getKey("isUpdate")
         val isEngine = preferenceManager.getKey("isEngine")
 
+
+//        Debug Values
+//        val isUpdate = "Yes"
+//        val isEngine = "2"
+
+
         if (isUpdate == "Yes") {
+            showCustUpdatePopup = true
             Toast.makeText(this@MainActivity, "Update Available please update", Toast.LENGTH_SHORT).show()
         }
 
         if (isEngine?.toIntOrNull()?.let { it > 1 } == true) {
+            showCustENDPopup = true
             Toast.makeText(this@MainActivity, "App support period ended.", Toast.LENGTH_SHORT).show()
-            finishAffinity()
-            return
         }
-
-
-
-
-
 
 
         // Check if server should start automatically
@@ -431,7 +509,6 @@ class MainActivity : ComponentActivity() {
                         val appPackageName = preferenceManager.getKey("app_packagename")
                         if (appPackageName.isNotEmpty()) {
                             Log.d("DIX", appPackageName)
-//                            val appLaunchActivity = preferenceManager.getKey("app_launch_activity")
                             val appName = preferenceManager.getKey("app_name")
 
                             if (appPackageName == "webtv") {
@@ -529,7 +606,7 @@ class MainActivity : ComponentActivity() {
                     delay(1000)
                     currentTime -= 1
                 }
-                onDismiss() // Dismiss when time reaches 0
+                onDismiss()
             }
 
             // Log current time
@@ -548,6 +625,32 @@ class MainActivity : ComponentActivity() {
             )
         } else {
             Log.d("RedirectPopup", "Popup is NOT visible.")
+        }
+    }
+
+    @Composable
+    fun CustPopup(isVisible: Boolean, xtitle: String, xsubtitle: String, xokbtn: String, xendbtn: String, onOk: () -> Unit, onDismiss: () -> Unit) {
+        if (isVisible) {
+            Log.d("CustPopup", "Popup is visible.")
+
+            AlertDialog(
+                onDismissRequest = { onDismiss() },
+                title = { Text(xtitle) },
+                text = { Text(xsubtitle) },
+                confirmButton = {
+                    Button(onClick = { onOk() }) {
+                        Text(xokbtn)
+                    }
+                },
+                dismissButton = {
+                    Button(onClick = { onDismiss() }) {
+                        Text(xendbtn)
+                    }
+                },
+                properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
+            )
+        } else {
+            Log.d("CustPopup", "CustPopup is NOT visible.")
         }
     }
 
@@ -600,7 +703,7 @@ class MainActivity : ComponentActivity() {
                 hasNews = false,
             ),
             BottomNavigationItem(
-                title = "DEMOv",
+                title = "Info",
                 selectedIcon = Icons.Filled.Info,
                 unselectedIcon = Icons.Outlined.Info,
                 hasNews = false,
@@ -665,30 +768,17 @@ class MainActivity : ComponentActivity() {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp)
-                .verticalScroll(scrollState), // Enable vertical scrolling
+                .verticalScroll(scrollState),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(text = selectedBinaryName)
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(text = "✨")
-//            Spacer(modifier = Modifier.height(12.dp))
-//            val wifiIpAddress = getWifiIpAddress(this@MainActivity)
-//            Text(text = wifiIpAddress ?: "Not connected to Wi-Fi")
+
             Spacer(modifier = Modifier.height(16.dp))
 
-//            Box(
-//                modifier = Modifier
-//                    .fillMaxWidth(1f)
-//                    .border(2.dp, Color.Gray, RoundedCornerShape(8.dp))
-//                    .padding(5.dp)
-//            ) {
-//                val wifiIpAddress = getWifiIpAddress(this@MainActivity)
-//                Text(
-//                    text = wifiIpAddress ?: "Not connected to Wi-Fi",
-//                    modifier = Modifier.align(Alignment.Center)
-//                )
-//            }
+            Text(text = "✨")
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             Box(
                 modifier = Modifier
@@ -702,11 +792,10 @@ class MainActivity : ComponentActivity() {
 
                 Text(
                     text = wifiIpAddress,
-                    fontSize = 18.sp,
+                    fontSize = 16.sp,
                     modifier = Modifier
                         .align(Alignment.Center)
                         .clickable {
-                            // Copy the text to the clipboard
                             clipboardManager.setText(AnnotatedString(wifiIpAddress))
                         }
                 )
@@ -714,7 +803,6 @@ class MainActivity : ComponentActivity() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // First row with 2 buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
@@ -725,7 +813,6 @@ class MainActivity : ComponentActivity() {
 
             Spacer(modifier = Modifier.height(4.dp)) // Space between rows
 
-            // Second row with 4 buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
@@ -741,7 +828,7 @@ class MainActivity : ComponentActivity() {
 
 
             Column (
-                modifier = Modifier.alpha(if (isBinaryRunning) 1f else 0f)
+                modifier = Modifier.alpha(if (isBinaryRunning || isOutputShowing) 1f else 0f)
             ) {
                 Text(
                     text = outputText,
@@ -750,7 +837,7 @@ class MainActivity : ComponentActivity() {
                     fontWeight = FontWeight.Normal,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(150.dp)
+                        .height(160.dp)
                         .background(Color.Black)
                         .padding(8.dp)
                         .verticalScroll(rememberScrollState())
@@ -766,7 +853,7 @@ class MainActivity : ComponentActivity() {
         val colorSECOND = MaterialTheme.colorScheme.secondary
         val buttonColor = remember { mutableStateOf(colorPRIME) }
 
-        OutlinedButton(
+        Button(
             onClick = {
                 val uriToUse = selectedBinaryUri ?: Uri.parse("android.resource://com.skylake.skytv.jgorunner/raw/majorbin")
                 val arguments = emptyArray<String>()
@@ -834,7 +921,7 @@ class MainActivity : ComponentActivity() {
         val colorPRIME = MaterialTheme.colorScheme.primary
         val colorSECOND = MaterialTheme.colorScheme.secondary
         val buttonColor = remember { mutableStateOf(colorPRIME) }
-        OutlinedButton(
+        Button(
             onClick = { onStopBinary() },
             enabled = isBinaryRunning,
             modifier = Modifier
@@ -860,7 +947,7 @@ class MainActivity : ComponentActivity() {
         val colorPRIME = MaterialTheme.colorScheme.primary
         val colorSECOND = MaterialTheme.colorScheme.secondary
         val buttonColor = remember { mutableStateOf(colorPRIME) }
-        OutlinedButton(
+        Button(
             onClick = { iptvRedirectFunc() },
             modifier = Modifier
                 .weight(1f)
@@ -885,7 +972,7 @@ class MainActivity : ComponentActivity() {
         val colorPRIME = MaterialTheme.colorScheme.primary
         val colorSECOND = MaterialTheme.colorScheme.secondary
         val buttonColor = remember { mutableStateOf(colorPRIME) }
-        OutlinedButton(
+        Button(
             onClick = {  val intent = Intent(this@MainActivity, WebPlayerActivity::class.java)
                     startActivity(intent) },
             modifier = Modifier
@@ -902,7 +989,7 @@ class MainActivity : ComponentActivity() {
             colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
             contentPadding = PaddingValues(2.dp)
         ) {
-            ButtonContent("WEB TV", Icons.TwoTone.LiveTv) // Different icon
+            ButtonContent("Web TV", Icons.TwoTone.LiveTv) // Different icon
         }
     }
 
@@ -911,13 +998,9 @@ class MainActivity : ComponentActivity() {
         val colorPRIME = MaterialTheme.colorScheme.primary
         val colorSECOND = MaterialTheme.colorScheme.secondary
         val buttonColor = remember { mutableStateOf(colorPRIME) }
-        OutlinedButton(
+        Button(
             onClick = {
-                    // Call the function to stop the binary process
-                    onStopBinary()
-
-                    // Exit the app
-                    (this@MainActivity as? Activity)?.finish()
+                currentScreen = "Info"
                 },
             modifier = Modifier
                 .weight(1f)
@@ -933,7 +1016,7 @@ class MainActivity : ComponentActivity() {
             colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
             contentPadding = PaddingValues(2.dp)
         ) {
-            ButtonContent("Holder", Icons.TwoTone.Sailing) // Different icon
+            ButtonContent("Debug", Icons.TwoTone.Sailing) // Different icon
         }
     }
 
@@ -942,7 +1025,7 @@ class MainActivity : ComponentActivity() {
         val colorPRIME = MaterialTheme.colorScheme.primary
         val colorSECOND = MaterialTheme.colorScheme.secondary
         val buttonColor = remember { mutableStateOf(colorPRIME) }
-        OutlinedButton(
+        Button(
             onClick = {
                 // Call the function to stop the binary process
                 onStopBinary()
@@ -977,7 +1060,7 @@ class MainActivity : ComponentActivity() {
                 imageVector = icon,
                 contentDescription = "Icon",
                 tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(27.dp)
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
@@ -987,6 +1070,8 @@ class MainActivity : ComponentActivity() {
             )
         }
     }
+
+
 
     fun handleButton1Click(context: Context) {
         Toast.makeText(context, "Debug Mode : ON", Toast.LENGTH_SHORT).show()
@@ -1035,10 +1120,7 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this@MainActivity, "IPTV app not selected", Toast.LENGTH_SHORT).show()
         }
     }
-
-
 }
-
 
 
 data class BottomNavigationItem(
