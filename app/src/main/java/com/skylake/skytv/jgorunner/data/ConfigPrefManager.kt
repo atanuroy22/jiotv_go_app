@@ -48,9 +48,9 @@ fun applyConfigurations(context: Context, preferenceManager: SkySharedPref) {
             }
         """.trimIndent()
 
-        createJsonFile(context, "jiotv_go.json", jsonData)
+        createJsonFile(context, "configtv.json", jsonData)
 
-        preferenceManager.setKey("__EPG", " --config 'jiotv_go.json'")
+        preferenceManager.setKey("__EPG", " --config 'configtv.json'")
 
 
         Log.d("DIX-isFlagSetForEPG", isFlagSetForEPG)
