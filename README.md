@@ -1,2 +1,2 @@
-# JGO-Runner
+# JGO-Server
  
