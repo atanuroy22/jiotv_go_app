@@ -57,6 +57,10 @@ public class BinaryService extends Service {
             binaryUri = Uri.parse("android.resource://com.skylake.skytv.jgorunner/raw/majorbin");
         }
 
+        if (arguments == null) {
+            arguments = new String[]{"Boot Start"};
+        }
+
         if (binaryUri != null) {
             if (binaryUri.toString().startsWith("android.resource://")) {
                 Log.d("BinaryService1", "BinaryService started in the background. ? "+ Arrays.toString(arguments));

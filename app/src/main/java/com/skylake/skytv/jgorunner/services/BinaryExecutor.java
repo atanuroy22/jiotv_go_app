@@ -5,12 +5,12 @@ import android.os.Build;
 import android.util.Log;
 import com.skylake.skytv.jgorunner.R;
 import com.skylake.skytv.jgorunner.data.SkySharedPref;
+import com.skylake.skytv.jgorunner.utils.Config2DL;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.lang.reflect.Field;
-import java.util.concurrent.TimeUnit;
 
 public class BinaryExecutor {
 
@@ -28,7 +28,7 @@ public class BinaryExecutor {
             File binaryFile = new File(context.getFilesDir(), "majorbin");
 
             try {
-                handleBinaryFile(preferenceManager, binaryFile, context);
+                handleBinaryFile(preferenceManager, binaryFile, context, callback);
                 setBinaryExecutable(binaryFile);
                 String command = buildCommand(preferenceManager, arguments, binaryFile);
 
@@ -43,15 +43,22 @@ public class BinaryExecutor {
         }).start();
     }
 
-    private static void handleBinaryFile(SkySharedPref preferenceManager, File binaryFile, Context context) {
+    private static void handleBinaryFile(SkySharedPref preferenceManager, File binaryFile, Context context, OutputCallback callback) {
         if (shouldResetBinary(preferenceManager, binaryFile)) {
             deleteBinaryFile(binaryFile, preferenceManager);
         }
 
         if (!binaryFile.exists()) {
-            copyBinaryFromResources(binaryFile, context);
+//            Config2DL.INSTANCE.startDownloadAndSave(context, callback);
+            boolean skipper = false;
+            if (skipper) {
+                copyBinaryFromResources(binaryFile, context);
+            } else {
+                /*未来 USE CASE*/
+            }
         }
     }
+
 
     private static boolean shouldResetBinary(SkySharedPref preferenceManager, File binaryFile) {
         String resetBinaryCheck = preferenceManager.getKey("ResetBinaryCheck");
@@ -94,9 +101,9 @@ public class BinaryExecutor {
 
         commandBuilder.append(" run").append(__Port).append(__Public);
 
-        for (String arg : arguments) {
-            commandBuilder.append(" ").append(arg);
-        }
+//        for (String arg : arguments) {
+//            commandBuilder.append(" ").append(arg);
+//        }
 
         return commandBuilder.toString();
     }
