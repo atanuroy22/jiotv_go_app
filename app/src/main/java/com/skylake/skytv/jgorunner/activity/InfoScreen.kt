@@ -62,7 +62,7 @@ fun InfoScreen(context: Context) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "### JGO RUNNER ###",
+            text = "### JGO Server ###",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 8.dp)

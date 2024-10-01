@@ -172,7 +172,7 @@ class MainActivity : ComponentActivity() {
         val savedName = preferenceManager.getKey("selectedBinaryName")
 
         selectedBinaryUri = savedUriString?.let { Uri.parse(it) }
-        selectedBinaryName = savedName ?: "JGO Runner"
+        selectedBinaryName = savedName ?: "JGO Server"
 
         val selectBinaryLauncher = registerForActivityResult(
             ActivityResultContracts.StartActivityForResult()
