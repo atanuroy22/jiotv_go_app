@@ -32,6 +32,9 @@ public class BinaryExecutor {
                 setBinaryExecutable(binaryFile);
                 String command = buildCommand(preferenceManager, arguments, binaryFile);
 
+                String command_log = preferenceManager.getKey("__MasterArgs_final");
+                Log.d("DIX.Runner",command_log);
+
                 binaryProcess = Runtime.getRuntime().exec(new String[]{"sh", "-c", command});
                 new Thread(new StreamGobbler(binaryProcess.getInputStream(), callback)).start();
 
@@ -49,12 +52,13 @@ public class BinaryExecutor {
         }
 
         if (!binaryFile.exists()) {
-//            Config2DL.INSTANCE.startDownloadAndSave(context, callback);
+            Config2DL.INSTANCE.startDownloadAndSave(context, callback);
+            /* DEBUG CASE */
             boolean skipper = false;
             if (skipper) {
                 copyBinaryFromResources(binaryFile, context);
             } else {
-                /*未来 USE CASE*/
+                /* 未来 USE CASE */
             }
         }
     }
@@ -100,6 +104,8 @@ public class BinaryExecutor {
         String __Public = preferenceManager.getKey("__Public");
 
         commandBuilder.append(" run").append(__Port).append(__Public);
+
+        preferenceManager.setKey("__MasterArgs_final",commandBuilder.toString());
 
 //        for (String arg : arguments) {
 //            commandBuilder.append(" ").append(arg);
