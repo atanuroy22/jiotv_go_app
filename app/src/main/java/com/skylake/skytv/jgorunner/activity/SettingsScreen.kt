@@ -1,14 +1,18 @@
 package com.skylake.skytv.jgorunner.activity
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -28,12 +32,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.nativeKeyCode
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.data.applyConfigurations
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.skylake.skytv.jgorunner.MainActivity
 import com.skylake.skytv.jgorunner.utils.Config2DL
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,7 +84,8 @@ fun SettingsScreen(context: Context) {
     var releaseName by remember { mutableStateOf(savedVersionNumber) }
 
     var showPortDialog by remember { mutableStateOf(false) }
-    var showRestartDialog by remember { mutableStateOf(false) } // New state for restart dialog
+    var showRestartDialog by remember { mutableStateOf(false) }
+    var showRestartAppDialog by remember { mutableStateOf(false) }
 
     // Update shared preference when switch states change
     LaunchedEffect(isSwitchOnForLOCAL) {
@@ -263,9 +271,9 @@ fun SettingsScreen(context: Context) {
 
             item {
                 SettingItem(
-                    icon = Icons.Filled.Update,
+                    icon = Icons.Filled.ArrowCircleUp,
                     title = "Update Binary",
-                    subtitle = "Update or Reset Binary [Installed: $releaseName]",
+                    subtitle = "Update to the latest binary version.",
                     onClick = {
                         preferenceManager.setKey("expectedFileSize", "0")
                         Config2DL.startDownloadAndSave(context) { output ->
@@ -273,6 +281,20 @@ fun SettingsScreen(context: Context) {
                                 Toast.makeText(context, output, Toast.LENGTH_LONG).show()
                             }
                         }
+                    }
+                )
+            }
+
+            item {
+                SettingItem(
+                    icon = Icons.Filled.RestartAlt,
+                    title = "Reset All Settings",
+                    subtitle = "Useful for troubleshooting and resolving issues.",
+                    onClick = {
+                        resetFunc(context) {
+                            showRestartAppDialog = true
+                        }
+
                     }
                 )
             }
@@ -300,15 +322,28 @@ fun SettingsScreen(context: Context) {
                 ) {
                     Text(text = "Set Server Port", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(16.dp))
+
                     TextField(
                         value = portNumber,
                         onValueChange = { portNumber = it.take(4) },
                         label = { Text(text = "Port Number") },
                         singleLine = true,
-                        keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number), // Numeric keyboard
+                        keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), // Numeric keyboard + Done action
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                val validPort = portNumber.toIntOrNull()
+                                if (validPort != null && validPort in 1000..9999) {
+                                    preferenceManager.setKey("isCustomSetForPORT", validPort.toString())
+                                    showPortDialog = false
+                                    showRestartDialog = true // Show restart dialog
+                                }
+                            }
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
+
                     Spacer(modifier = Modifier.height(16.dp))
+
                     Row(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         modifier = Modifier.fillMaxWidth()
@@ -320,9 +355,8 @@ fun SettingsScreen(context: Context) {
                             val validPort = portNumber.toIntOrNull()
                             if (validPort != null && validPort in 1000..9999) {
                                 preferenceManager.setKey("isCustomSetForPORT", validPort.toString())
-//                                preferenceManager.setKey("ResetBinaryCheck", "Yes")
                                 showPortDialog = false
-                                showRestartDialog = true // Show restart dialog
+                                showRestartDialog = true
                             }
                         }) {
                             Text("Save")
@@ -332,6 +366,7 @@ fun SettingsScreen(context: Context) {
             }
         }
     }
+
 
     // Restart Required Dialog
     if (showRestartDialog) {
@@ -366,7 +401,78 @@ fun SettingsScreen(context: Context) {
         }
     }
 
+    // Restart App Dialog
+    if (showRestartAppDialog) {
+        Dialog(
+            onDismissRequest = { showRestartAppDialog = false },
+            properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
+        ) {
+            Surface(
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(text = "Restart Required", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(text = "The app needs to be restarted for the changes to take effect. Please restart the app.", fontSize = 16.sp)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Button(onClick = {
+                            showRestartAppDialog = false
+                            restartApp(context)
+                        }) {
+                            Text("Restart")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
 }
+
+fun restartApp(context: Context) {
+    val intent = Intent(context, MainActivity::class.java)
+    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+    context.startActivity(intent)
+    (context as? Activity)?.finish()
+}
+
+
+fun resetFunc(context: Context, onComplete: () -> Unit) {
+    Toast.makeText(context, "[#] Clearing files.", Toast.LENGTH_LONG).show()
+
+    // Delete folder in external storage
+    val externalStoragePath = Environment.getExternalStorageDirectory().path
+    val folder = File("$externalStoragePath/.jiotv_go")
+
+    if (folder.exists() && folder.isDirectory) {
+        folder.deleteRecursively()
+    } else {
+    }
+
+    // Delete binary file in internal storage
+    val binaryFile = File(context.filesDir, "majorbin")
+    if (binaryFile.exists()) {
+        binaryFile.delete()
+    } else {
+        Toast.makeText(context, "Reset successfully.", Toast.LENGTH_SHORT).show();
+    }
+    onComplete()
+}
+
+
+
+
 
 @Composable
 fun SettingSwitchItem(
