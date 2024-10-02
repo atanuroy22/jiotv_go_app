@@ -1,45 +1,36 @@
 package com.skylake.skytv.jgorunner
 
+import android.Manifest
 import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Bundle
-import android.util.Log
-import android.widget.Toast
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
-import android.Manifest
 import android.net.ConnectivityManager
 import android.net.LinkProperties
 import android.net.NetworkCapabilities
+import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
+import android.widget.Toast
+import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
@@ -53,30 +44,40 @@ import androidx.compose.material.icons.twotone.PlayArrow
 import androidx.compose.material.icons.twotone.ResetTv
 import androidx.compose.material.icons.twotone.Sailing
 import androidx.compose.material.icons.twotone.Stop
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.ContextCompat
 import com.skylake.skytv.jgorunner.activity.DemoScreen
 import com.skylake.skytv.jgorunner.activity.InfoScreen
 import com.skylake.skytv.jgorunner.activity.SettingsScreen
 import com.skylake.skytv.jgorunner.activity.WebPlayerActivity
-import com.skylake.skytv.jgorunner.services.BinaryExecutor
-import com.skylake.skytv.jgorunner.services.BinaryService
-import com.skylake.skytv.jgorunner.utils.ConfigUtil
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.data.applyConfigurations
+import com.skylake.skytv.jgorunner.services.BinaryExecutor
+import com.skylake.skytv.jgorunner.services.BinaryService
 import com.skylake.skytv.jgorunner.ui.theme.JGOTheme
 import com.skylake.skytv.jgorunner.utils.Config2DL
+import com.skylake.skytv.jgorunner.utils.ConfigUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
+import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.Inet4Address
 import java.net.URL
@@ -214,23 +215,37 @@ class MainActivity : ComponentActivity() {
         onBackPressedDispatcher.addCallback(this, backPressedCallback)
 
 
-        fun getFileSizeAndSave(context: Context, fileName: String) {
-            val fileDir = context.filesDir // Get the app's internal files directory
-            val file = File(fileDir, fileName) // Create a File object with the specified filename
+        fun updateSizeIfExist(context: Context, fileName: String) {
+            val fileDir = context.filesDir
+            val file = File(fileDir, fileName)
 
             if (file.exists()) {
-                val fileSize = file.length() // Get the file size in bytes
+                val fileSize = file.length()
                 Log.d("DIX", "File size of $fileName: $fileSize bytes")
-
-                // Save the file size to SharedPreferences
                 preferenceManager.setKey("expectedFileSize", fileSize.toString())
+
             } else {
                 Log.e("DIX", "File not found: $fileName")
-                preferenceManager.setKey("expectedFileSize", "69")
+//                preferenceManager.setKey("expectedFileSize", "69")
+                try {
+                    context.resources.openRawResource(R.raw.majorbin).use { `in` ->
+                        FileOutputStream(file).use { out ->
+                            val buffer = ByteArray(1024)
+                            var bytesRead: Int
+                            while ((`in`.read(buffer).also { bytesRead = it }) != -1) {
+                                out.write(buffer, 0, bytesRead)
+                            }
+                        }
+                    }
+                } catch (e: java.lang.Exception) {
+                    Log.e("DIX", "Error copying binary from resources: ", e)
+                }
             }
         }
 
-        getFileSizeAndSave(this@MainActivity,"majorbin")
+        updateSizeIfExist(this@MainActivity,"majorbin")
+        
+        
         val expectedFileSize: Int? = preferenceManager.getKey("expectedFileSize")?.toIntOrNull()
         Config2DL.isFileSizeSame(expectedFileSize) { result ->
             if (result) {
