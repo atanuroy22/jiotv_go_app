@@ -16,20 +16,17 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.Nullable;
 
 import com.skylake.skytv.jgorunner.R;
-
-import java.util.List;
+import com.skylake.skytv.jgorunner.data.SkySharedPref;
 
 public class WebPlayerActivity extends ComponentActivity {
 
+    private static final String TAG = "WebPlayerActivity";
+    private static final String PORT_PREF_KEY = "isCustomSetForPORT";
+    private static final String DEFAULT_URL_TEMPLATE = "http://localhost:%d";
+
     private WebView webView;
     private ProgressBar loadingSpinner;
-    private List<String> channelNumbers;
     private String url;
-
-    private static final String TAG = "WebPlayerActivity";
-    private String BASE_URL;
-    private String CONFIGPART_URL;
-    private String DEFAULT_URL;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -37,11 +34,28 @@ public class WebPlayerActivity extends ComponentActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_web_player);
 
-        // Default URL for the WebView
-        DEFAULT_URL = "http://localhost:5350";
-        Log.d(TAG, "URL: " + DEFAULT_URL);
+        int savedPortNumber = getSavedPortNumber();
+        url = String.format(DEFAULT_URL_TEMPLATE, savedPortNumber);
 
+        Log.d(TAG, "URL: " + url);
 
+        setupBackPressedCallback();
+        setupFullScreenMode();
+
+        webView = findViewById(R.id.webview);
+        loadingSpinner = findViewById(R.id.loading_spinner);
+
+        setupWebView();
+        loadUrl();
+    }
+
+    private int getSavedPortNumber() {
+        SkySharedPref preferenceManager = new SkySharedPref(this);
+        String portString = preferenceManager.getKey(PORT_PREF_KEY);
+        return portString != null ? Integer.parseInt(portString) : 5350; // Default to 5350 if not set
+    }
+
+    private void setupBackPressedCallback() {
         OnBackPressedCallback callback = new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
@@ -52,24 +66,20 @@ public class WebPlayerActivity extends ComponentActivity {
                 }
             }
         };
-
         getOnBackPressedDispatcher().addCallback(this, callback);
+    }
 
+    private void setupFullScreenMode() {
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        updateSystemUiVisibility();
+    }
 
+    private void updateSystemUiVisibility() {
         getWindow().getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_FULLSCREEN |
-                        View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
-                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    View.SYSTEM_UI_FLAG_FULLSCREEN |
+                    View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         );
-
-        webView = findViewById(R.id.webview);
-        loadingSpinner = findViewById(R.id.loading_spinner);
-
-        setupWebView();
-
-        url = DEFAULT_URL;
-        loadUrl();
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -90,15 +100,6 @@ public class WebPlayerActivity extends ComponentActivity {
         if (url != null) {
             webView.loadUrl(url);
         }
-    }
-
-    private void setFullScreenMode() {
-        getWindow().getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_FULLSCREEN |
-                        View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
-                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-        );
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
     }
 
     private void setDarkTheme() {
@@ -125,7 +126,6 @@ public class WebPlayerActivity extends ComponentActivity {
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, String url) {
             if (url.contains("/play/")) {
-                // Replace "/play/" with "/player/" in the URL
                 String newUrl = url.replace("/play/", "/player/");
                 webView.loadUrl(newUrl);
                 return true;
@@ -141,22 +141,23 @@ public class WebPlayerActivity extends ComponentActivity {
         @Override
         public void onPageFinished(WebView view, String url) {
             loadingSpinner.setVisibility(View.GONE);
-
             if (url.contains("/player/")) {
                 Log.d(TAG, "Playing: " + url);
-                Log.d(TAG, "Channel Numbers player: " + channelNumbers);
-                setFullScreenMode();
-
-                view.loadUrl("javascript:(function() { " +
-                        "var video = document.getElementsByTagName('video')[0]; " +
-                        "if (video) { " +
-                        "  video.style.width = '100vw'; " +  // Use viewport width
-                        "  video.style.height = '100vh'; " + // Use viewport height
-                        "  video.style.objectFit = 'contain'; " + // Scale the video while preserving aspect ratio
-                        "  video.play(); " +
-                        "} " +
-                        "})()");
+                setupFullScreenMode();
+                playVideoInFullScreen(view);
             }
+        }
+
+        private void playVideoInFullScreen(WebView view) {
+            view.loadUrl("javascript:(function() { " +
+                    "var video = document.getElementsByTagName('video')[0]; " +
+                    "if (video) { " +
+                    "  video.style.width = '100vw'; " +  // Use viewport width
+                    "  video.style.height = '100vh'; " + // Use viewport height
+                    "  video.style.objectFit = 'contain'; " + // Scale the video while preserving aspect ratio
+                    "  video.play(); " +
+                    "} " +
+                    "})()");
         }
     }
 }

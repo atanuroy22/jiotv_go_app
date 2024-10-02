@@ -14,13 +14,13 @@ fun applyConfigurations(context: Context, preferenceManager: SkySharedPref) {
         Log.d("DIX-isFlagSetForLOCAL", "Public")
     }
 
-    val isFlagSetForPORT = preferenceManager.getKey("isFlagSetForPORT")
-    if (isFlagSetForPORT == "5350") {
+    val isCustomSetForPORT = preferenceManager.getKey("isCustomSetForPORT")
+    if (isCustomSetForPORT == "5350") {
         preferenceManager.setKey("__Port", " --port 5350")
-        Log.d("DIX-isFlagSetForPORT", isFlagSetForPORT)
+        Log.d("DIX-isCustomSetForPORT", isCustomSetForPORT)
     } else {
-        preferenceManager.setKey("__Port", " --port $isFlagSetForPORT")
-        Log.d("DIX-isFlagSetForPORT", "Custom Port $isFlagSetForPORT")
+        preferenceManager.setKey("__Port", " --port $isCustomSetForPORT")
+        Log.d("DIX-isCustomSetForPORT", "Custom Port $isCustomSetForPORT")
     }
 
     val isFlagSetForAutoStartOnBoot = preferenceManager.getKey("isFlagSetForAutoStartOnBoot")
@@ -32,9 +32,9 @@ fun applyConfigurations(context: Context, preferenceManager: SkySharedPref) {
 
     val isFlagSetForAutoBootIPTV = preferenceManager.getKey("isFlagSetForAutoBootIPTV")
     if (isFlagSetForAutoBootIPTV == "Yes") {
-        Log.d("DIX-isisFlagSetForAutoBootIPTV", " $isFlagSetForAutoBootIPTV")
+        Log.d("DIX-isAutoBootIPTV", " $isFlagSetForAutoBootIPTV")
     } else {
-        Log.d("DIX-isisFlagSetForAutoBootIPTV", " $isFlagSetForAutoBootIPTV")
+        Log.d("DIX-isAutoBootIPTV", " $isFlagSetForAutoBootIPTV")
     }
 
     val isFlagSetForEPG = preferenceManager.getKey("isFlagSetForEPG")
@@ -48,9 +48,9 @@ fun applyConfigurations(context: Context, preferenceManager: SkySharedPref) {
             }
         """.trimIndent()
 
-        createJsonFile(context, "jiotv_go.json", jsonData)
+        createJsonFile(context, "configtv.json", jsonData)
 
-        preferenceManager.setKey("__EPG", " --config 'jiotv_go.json'")
+        preferenceManager.setKey("__EPG", " --config 'configtv.json'")
 
 
         Log.d("DIX-isFlagSetForEPG", isFlagSetForEPG)

@@ -23,7 +23,8 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -64,4 +65,11 @@ dependencies {
     androidTestImplementation libs.androidx.ui.test.junit4
     debugImplementation libs.androidx.ui.tooling
     debugImplementation libs.androidx.ui.test.manifest
+    debugImplementation libs.androidx.customview.poolingcontainer
+    debugImplementation libs.androidx.customview
+
+    def composeBom = libs.androidx.compose.bom
+    implementation composeBom
+    implementation libs.androidx.material.icons.extended
+
 }

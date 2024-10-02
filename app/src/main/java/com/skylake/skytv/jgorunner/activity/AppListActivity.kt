@@ -118,7 +118,7 @@ fun getInstalledApps(context: Context): List<AppInfo> {
 
     val webOption = AppInfo(
         appName = "WEB TV",
-        icon = context.getDrawable(com.skylake.skytv.jgorunner.R.drawable.ic_launcher_foreground)!!,
+        icon = context.getDrawable(com.skylake.skytv.jgorunner.R.mipmap.ic_launcher_neo)!!,
         packageName = "webtv",
         launchActivity = ""
     )

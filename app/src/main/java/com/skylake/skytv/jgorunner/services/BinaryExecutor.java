@@ -1,19 +1,22 @@
 package com.skylake.skytv.jgorunner.services;
 
 import android.content.Context;
+import android.os.Build;
 import android.util.Log;
-
 import com.skylake.skytv.jgorunner.R;
 import com.skylake.skytv.jgorunner.data.SkySharedPref;
+import com.skylake.skytv.jgorunner.utils.Config2DL;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 
 public class BinaryExecutor {
 
     private static Process binaryProcess = null;
     private static StringBuilder outputBuilder = new StringBuilder();
+    private static final String TAG = "BinaryExecutor";
 
     public interface OutputCallback {
         void onOutput(String output);
@@ -21,69 +24,175 @@ public class BinaryExecutor {
 
     public static void executeBinary(final Context context, final String[] arguments, final OutputCallback callback) {
         new Thread(() -> {
-            File binaryFile;
+            SkySharedPref preferenceManager = new SkySharedPref(context);
+            File binaryFile = new File(context.getFilesDir(), "majorbin");
+
             try {
-                String fileName = "majorbin";
-                binaryFile = new File(context.getFilesDir(), fileName);
+                handleBinaryFile(preferenceManager, binaryFile, context, callback);
+                setBinaryExecutable(binaryFile);
+                String command = buildCommand(preferenceManager, arguments, binaryFile);
 
-                if (!binaryFile.exists()) {
-                    try (InputStream in = context.getResources().openRawResource(R.raw.majorbin);
-                         FileOutputStream out = new FileOutputStream(binaryFile)) {
+                String command_log = preferenceManager.getKey("__MasterArgs_final");
+                Log.d("DIX.Runner",command_log);
 
-                        byte[] buffer = new byte[1024];
-                        int bytesRead;
-                        while ((bytesRead = in.read(buffer)) != -1) {
-                            out.write(buffer, 0, bytesRead);
-                        }
-                    }
-                }
-
-                binaryFile.setExecutable(true, false); // true = only owner, false = all users
-
-                StringBuilder commandBuilder = new StringBuilder();
-                commandBuilder.append(binaryFile.getAbsolutePath());
-
-                SkySharedPref preferenceManager = new SkySharedPref(context);
-                String __MasterArgs = preferenceManager.getKey("__MasterArgs");
-                String __Port = preferenceManager.getKey("__Port");
-                String __Public = preferenceManager.getKey("__Public");
-                String __EPG = preferenceManager.getKey("__EPG");
-
-
-                commandBuilder.append(" run").append(__Port).append(__Public);
-
-                //commandBuilder.append(" run").append(__EPG).append(__Port).append(__Public);
-
-                preferenceManager.setKey("__MasterArgs", commandBuilder.toString() );
-
-
-//                Append arguments to the command
-//                commandBuilder.append(" run --port 5350 --public");
-
-//                // Append arguments to the command
-//                for (String arg : arguments) {
-//                    commandBuilder.append(" ").append(arg);
-//                }
-
-                binaryProcess = Runtime.getRuntime().exec(new String[] { "sh", "-c", commandBuilder.toString() });
-
+                binaryProcess = Runtime.getRuntime().exec(new String[]{"sh", "-c", command});
                 new Thread(new StreamGobbler(binaryProcess.getInputStream(), callback)).start();
 
                 binaryProcess.waitFor();
-
             } catch (Exception e) {
-                Log.d("BinaryExecutor", String.valueOf(e));
+                Log.e(TAG, "Error executing binary: ", e);
                 callback.onOutput("Exception occurred: " + e.getMessage());
             }
         }).start();
     }
 
-    public static void stopBinary() {
-        if (binaryProcess != null) {
-            binaryProcess.destroy();
-            binaryProcess = null;
+    private static void handleBinaryFile(SkySharedPref preferenceManager, File binaryFile, Context context, OutputCallback callback) {
+        if (shouldResetBinary(preferenceManager, binaryFile)) {
+            deleteBinaryFile(binaryFile, preferenceManager);
+        }
+
+        if (!binaryFile.exists()) {
+            Config2DL.INSTANCE.startDownloadAndSave(context, callback);
+            /* DEBUG CASE */
+            boolean skipper = false;
+            if (skipper) {
+                copyBinaryFromResources(binaryFile, context);
+            } else {
+                /* 未来 USE CASE */
+            }
         }
     }
+
+
+    private static boolean shouldResetBinary(SkySharedPref preferenceManager, File binaryFile) {
+        String resetBinaryCheck = preferenceManager.getKey("ResetBinaryCheck");
+        return "Yes".equals(resetBinaryCheck) && binaryFile.exists();
+    }
+
+    private static void deleteBinaryFile(File binaryFile, SkySharedPref preferenceManager) {
+        if (binaryFile.delete()) {
+            Log.e(TAG, "Binary file deleted successfully.");
+            preferenceManager.setKey("ResetBinaryCheck", "No");
+        } else {
+            Log.e(TAG, "Failed to delete binary file.");
+        }
+    }
+
+    private static void copyBinaryFromResources(File binaryFile, Context context) {
+        try (InputStream in = context.getResources().openRawResource(R.raw.majorbin);
+             FileOutputStream out = new FileOutputStream(binaryFile)) {
+
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+            while ((bytesRead = in.read(buffer)) != -1) {
+                out.write(buffer, 0, bytesRead);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error copying binary from resources: ", e);
+        }
+    }
+
+    private static void setBinaryExecutable(File binaryFile) {
+        if (binaryFile.exists()) {
+            binaryFile.setExecutable(true, false);
+        }
+    }
+
+    private static String buildCommand(SkySharedPref preferenceManager, String[] arguments, File binaryFile) {
+        StringBuilder commandBuilder = new StringBuilder(binaryFile.getAbsolutePath());
+        String __Port = preferenceManager.getKey("__Port");
+        String __Public = preferenceManager.getKey("__Public");
+
+        commandBuilder.append(" run").append(__Port).append(__Public);
+
+        preferenceManager.setKey("__MasterArgs_final",commandBuilder.toString());
+
+//        for (String arg : arguments) {
+//            commandBuilder.append(" ").append(arg);
+//        }
+
+        return commandBuilder.toString();
+    }
+//
+//    public static void stopBinary() {
+//        if (binaryProcess != null) {
+//            binaryProcess.destroy();
+//            binaryProcess = null;
+//        }
+//    }
+
+    public static void stopBinary() {
+        if (binaryProcess != null) {
+            try {
+                // Close all streams before killing the process
+                closeProcessStreams(binaryProcess);
+
+                // Retrieve the process ID (PID)
+                String pid = getProcessId(binaryProcess);
+                if (pid != null) {
+                    Log.i(TAG, "Killing process tree for PID: " + pid);
+
+                    // Execute shell command to kill the entire process tree
+                    killProcessTree(pid);
+                }
+
+                // First attempt to stop the process gracefully
+                binaryProcess.destroy();
+                Log.i(TAG+"DIX", "Process destroyed.");
+
+                // If needed, escalate to forcibly destroying it
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    binaryProcess.destroyForcibly();
+                }
+                Log.i(TAG, "Process forcibly destroyed.");
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error while stopping binary process: ", e);
+            } finally {
+                binaryProcess = null;  // Reset the process variable
+            }
+        }
+    }
+
+    // Helper method to retrieve the process ID (PID) via reflection
+    private static String getProcessId(Process process) {
+        try {
+            // Use reflection to access the PID field in the Process class
+            Field pidField = process.getClass().getDeclaredField("pid");
+            pidField.setAccessible(true);
+            Log.e(TAG, "String.valueOf(pidField.getInt(process)");
+            return String.valueOf(pidField.getInt(process));
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting process ID: ", e);
+            return null;
+        }
+    }
+
+    // Helper method to kill the process tree using a shell command
+    private static void killProcessTree(String pid) {
+        try {
+            // Execute shell command to kill the process tree (including subprocesses)
+            String[] cmd = { "sh", "-c", "kill -9 " + pid };
+            Process killProcess = Runtime.getRuntime().exec(cmd);
+            killProcess.waitFor();  // Wait for the kill command to finish
+            Log.i(TAG, "Successfully killed process tree for PID: " + pid);
+        } catch (Exception e) {
+            Log.e(TAG, "Error killing process tree: ", e);
+        }
+    }
+
+    // Helper method to close process streams
+    private static void closeProcessStreams(Process process) {
+        try {
+            process.getInputStream().close();
+            process.getOutputStream().close();
+            process.getErrorStream().close();
+        } catch (Exception e) {
+            Log.e(TAG, "Error closing process streams: ", e);
+        }
+    }
+
+
 
     public static boolean isBinaryRunning() {
         return binaryProcess != null;
@@ -109,7 +218,7 @@ public class BinaryExecutor {
                     callback.onOutput(output);
                 }
             } catch (Exception e) {
-                Log.d("BinaryExecutor", String.valueOf(e));
+                Log.e(TAG, "Error reading binary output: ", e);
             }
         }
     }
