@@ -15,15 +15,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.skylake.skytv.jgorunner.data.SkySharedPref
 import java.net.InetAddress
 import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
 fun InfoScreen(context: Context) {
+    val preferenceManager = remember { SkySharedPref(context) }
     val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
     val ipAddress = getIpAddress(wifiManager)
     val appVersion = getAppVersion(context)
+    val binVersion = preferenceManager.getKey("releaseName")
     val androidVersion = Build.VERSION.RELEASE
     val sdkVersion = Build.VERSION.SDK_INT
     val countryCode = Locale.getDefault().country
@@ -46,6 +49,7 @@ fun InfoScreen(context: Context) {
     // Creating a formatted device information string
     val deviceInfo = """
         JGO Version: $appVersion
+        Binary Version: $binVersion
         IP Address: $ipAddress
         Android Version: $androidVersion
         SDK Version: $sdkVersion
