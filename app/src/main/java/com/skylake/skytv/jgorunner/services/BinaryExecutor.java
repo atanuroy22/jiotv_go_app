@@ -3,6 +3,8 @@ package com.skylake.skytv.jgorunner.services;
 import android.content.Context;
 import android.os.Build;
 import android.util.Log;
+import android.widget.Toast;
+
 import com.skylake.skytv.jgorunner.R;
 import com.skylake.skytv.jgorunner.data.SkySharedPref;
 import com.skylake.skytv.jgorunner.utils.Config2DL;
@@ -28,6 +30,15 @@ public class BinaryExecutor {
             File binaryFile = new File(context.getFilesDir(), "majorbin");
 
             try {
+
+                String arch =  preferenceManager.getKey("ARCHx");
+                Log.d(TAG, "Device architecture: " + arch);
+
+                assert arch != null;
+                if (!arch.toLowerCase().contains("arm") && !arch.toLowerCase().contains("aarch")) {
+                    Toast.makeText(context, "The device architecture["+arch+"] is not supported.", Toast.LENGTH_SHORT).show();
+                }
+
                 handleBinaryFile(preferenceManager, binaryFile, context, callback);
                 setBinaryExecutable(binaryFile);
                 String command = buildCommand(preferenceManager, arguments, binaryFile);
@@ -215,6 +226,7 @@ public class BinaryExecutor {
                 while ((bytesRead = inputStream.read(buffer)) != -1) {
                     String output = new String(buffer, 0, bytesRead);
                     outputBuilder.append(output).append("\n");
+                    Log.d(TAG, "Process output: " + output);
                     callback.onOutput(output);
                 }
             } catch (Exception e) {
@@ -223,3 +235,4 @@ public class BinaryExecutor {
         }
     }
 }
+
