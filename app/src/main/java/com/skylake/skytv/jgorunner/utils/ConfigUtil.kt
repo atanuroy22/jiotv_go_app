@@ -60,7 +60,7 @@ object ConfigUtil {
                     val key = parts[0].trim()
                     val value = parts[1].replace("\"", "").trim() // Remove any quotes
                     preferenceManager.setKey(key, value)
-                    Log.d(TAG, "Saved Key: $key with Value: $value")
+                    if (false) Log.d(TAG, "Saved Key: $key with Value: $value")
                 }
             }
         }
