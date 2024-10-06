@@ -27,7 +27,18 @@ import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -44,9 +55,25 @@ import androidx.compose.material.icons.twotone.PlayArrow
 import androidx.compose.material.icons.twotone.ResetTv
 import androidx.compose.material.icons.twotone.Sailing
 import androidx.compose.material.icons.twotone.Stop
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -226,20 +253,20 @@ class MainActivity : ComponentActivity() {
 
             } else {
                 Log.e("DIX", "File not found: $fileName")
-//                preferenceManager.setKey("expectedFileSize", "69")
-                try {
-                    context.resources.openRawResource(R.raw.majorbin).use { `in` ->
-                        FileOutputStream(file).use { out ->
-                            val buffer = ByteArray(1024)
-                            var bytesRead: Int
-                            while ((`in`.read(buffer).also { bytesRead = it }) != -1) {
-                                out.write(buffer, 0, bytesRead)
-                            }
-                        }
-                    }
-                } catch (e: java.lang.Exception) {
-                    Log.e("DIX", "Error copying binary from resources: ", e)
-                }
+                preferenceManager.setKey("expectedFileSize", "69")
+//                try {
+//                    context.resources.openRawResource(R.raw.majorbin).use { `in` ->
+//                        FileOutputStream(file).use { out ->
+//                            val buffer = ByteArray(1024)
+//                            var bytesRead: Int
+//                            while ((`in`.read(buffer).also { bytesRead = it }) != -1) {
+//                                out.write(buffer, 0, bytesRead)
+//                            }
+//                        }
+//                    }
+//                } catch (e: java.lang.Exception) {
+//                    Log.e("DIX", "Error copying binary from resources: ", e)
+//                }
             }
         }
 
@@ -336,11 +363,31 @@ class MainActivity : ComponentActivity() {
                             }
                         )
 
+//                        CustPopup(
+//                            isVisible = showCustUpdatePopup,
+//                            xtitle ="Update Available",
+//                            xsubtitle="A new version of the app is available. Please update to the latest version for improved features and performance.",
+//                            xokbtn="Update!",
+//                            xendbtn="Dismiss",
+//                            onOk = { showCustUpdatePopup = false },
+//                            onDismiss = { showCustUpdatePopup = false }
+//                        )
+
+                        val isUpdate_xtitle = preferenceManager.getKey("isUpdate_xtitle")?.takeIf { it.isNotEmpty() } ?: "WARNING"
+                        val isUpdate_xsubtitle = preferenceManager.getKey("isUpdate_xsubtitle")?.takeIf { it.isNotEmpty() } ?: "If you are seeing this message, it indicates an error has occurred."
+                        val isUpdate_xokbtn = preferenceManager.getKey("isUpdate_xokbtn")?.takeIf { it.isNotEmpty() } ?: "OK"
+
+                        val isEngine_xtitle = preferenceManager.getKey("isEngine_xtitle")?.takeIf { it.isNotEmpty() } ?: "WARNING"
+                        val isEngine_xsubtitle = preferenceManager.getKey("isEngine_xsubtitle")?.takeIf { it.isNotEmpty() } ?: "If you are seeing this message, it indicates an error has occurred."
+                        val isEngine_xokbtn = preferenceManager.getKey("isEngine_xokbtn")?.takeIf { it.isNotEmpty() } ?: "OK"
+
+
+
                         CustPopup(
                             isVisible = showCustUpdatePopup,
-                            xtitle ="Update Available",
-                            xsubtitle="A new version of the app is available. Please update to the latest version for improved features and performance.",
-                            xokbtn="Update!",
+                            xtitle = isUpdate_xtitle,
+                            xsubtitle=isUpdate_xsubtitle,
+                            xokbtn=isUpdate_xokbtn,
                             xendbtn="Dismiss",
                             onOk = { showCustUpdatePopup = false },
                             onDismiss = { showCustUpdatePopup = false }
@@ -348,11 +395,15 @@ class MainActivity : ComponentActivity() {
 
                         CustPopup(
                             isVisible = showCustENDPopup,
-                            xtitle = "App Not Supported",
-                            xsubtitle = "This app is no longer supported. Please exit.",
-                            xokbtn = "Exit",
+                            xtitle = isEngine_xtitle,
+                            xsubtitle= isEngine_xsubtitle,
+                            xokbtn= isEngine_xokbtn,
                             xendbtn = "Dismiss",
-                            onOk = { showCustENDPopup = false },
+                            onOk = {
+                                showCustENDPopup = false
+                                finishAffinity()
+                                return@CustPopup
+                                   },
                             onDismiss = {
                                 showCustENDPopup = false
                                 finishAffinity()
@@ -419,6 +470,9 @@ class MainActivity : ComponentActivity() {
             preferenceManager.setKey("nekoFirstTime", "Done")
             Log.d("MainActivity", "nekoFirstTime was empty or not available, set to Done.")
 
+            val arch = System.getProperty("os.arch")
+            preferenceManager.setKey("ARCHx", arch)
+
             // Set default values
             preferenceManager.setKey("isFlagSetForLOCAL", "Yes") // Reverse
             preferenceManager.setKey("isFlagSetForAutoStartServer", "No")
@@ -437,6 +491,7 @@ class MainActivity : ComponentActivity() {
             preferenceManager.setKey("isAutoUpdate", "No")
             preferenceManager.setKey("VersionNumber", "v3.11")
             preferenceManager.setKey("expectedFileSize", "69")
+
         }
 
         // Use the utility function to fetch and save config
@@ -444,6 +499,8 @@ class MainActivity : ComponentActivity() {
 
         val isUpdate = preferenceManager.getKey("isUpdate")
         val isEngine = preferenceManager.getKey("isEngine")
+
+
 
 
 //        Debug Values
@@ -689,14 +746,14 @@ class MainActivity : ComponentActivity() {
 
 
     private fun checkStoragePermission() {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val isPermissionGranted = ContextCompat.checkSelfPermission(
-                this, Manifest.permission.READ_EXTERNAL_STORAGE
+                this, Manifest.permission.WRITE_EXTERNAL_STORAGE
             ) == PackageManager.PERMISSION_GRANTED
 
             if (!isPermissionGranted) {
                 storagePermissionLauncher.launch(
-                    arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+                    arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 )
             }
         }
