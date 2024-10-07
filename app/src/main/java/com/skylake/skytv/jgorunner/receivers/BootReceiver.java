@@ -19,6 +19,8 @@ public class BootReceiver extends BroadcastReceiver {
     private static final String TAG = "BootReceiver";
     private static final String AUTO_BOOT_PREF_KEY = "isFlagSetForAutoStartOnBoot";
     private static final String AUTO_BOOT_ENABLED = "Yes";
+    private static final String AUTO_BOOT_STATE_PREF_KEY = "isFlagSetForAutoBootIPTV";
+    private static final String AUTO_BOOT_STATE = "Yes";
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
@@ -32,10 +34,15 @@ public class BootReceiver extends BroadcastReceiver {
     private void handleBootCompleted(Context context) {
         SkySharedPref preferenceManager = new SkySharedPref(context);
         String isAutoboot = preferenceManager.getKey(AUTO_BOOT_PREF_KEY);
+        String stateBG = preferenceManager.getKey(AUTO_BOOT_STATE_PREF_KEY);
 
         if (AUTO_BOOT_ENABLED.equals(isAutoboot)) {
-//            startBinaryService(context);
-            startBinaryServiceFG(context);
+            if (AUTO_BOOT_STATE.equals(stateBG)) {
+                startBinaryService(context);
+            } else {
+                preferenceManager.setKey("isFlagSetForAutoStartServer","Yes");
+                startBinaryServiceFG(context);
+            }
         }
     }
 
@@ -64,6 +71,8 @@ public class BootReceiver extends BroadcastReceiver {
     private void launchMainActivity(Context context) {
         PackageManager pm = context.getPackageManager();
         Intent launchIntent = pm.getLaunchIntentForPackage(context.getPackageName());
+
+
 
         if (launchIntent != null) {
             launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
