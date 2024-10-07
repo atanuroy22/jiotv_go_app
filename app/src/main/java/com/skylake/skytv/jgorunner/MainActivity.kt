@@ -15,6 +15,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -176,6 +177,8 @@ class MainActivity : ComponentActivity() {
     private var showCustENDPopup by mutableStateOf(false)
     private var showAutoUpdatePopup by mutableStateOf(false)
 
+    private var showPARAM by mutableStateOf(false)
+
     private var showRedirectPopup by mutableStateOf(false)
     private var shouldLaunchIPTV by mutableStateOf(false)
     private var countdownJob: Job? = null
@@ -186,12 +189,29 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        preferenceManager = SkySharedPref(this)
 
         checkStoragePermission()
+
+        val overlayRequestCounter: Int = preferenceManager.getKey("REQcounter")?.toIntOrNull() ?: 0
+        fun checkOverlayPermission() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (overlayRequestCounter < 2) {
+                    requestOverlayPermission()
+                    preferenceManager.setKey("REQcounter", (overlayRequestCounter + 1).toString())
+                } else {
+                    Log.d("MainActivity", "Overlay permission request skipped")
+                }
+            }
+        }
+
+        checkOverlayPermission()
+
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             requestNotificationPermissions()
         }
-        preferenceManager = SkySharedPref(this)
+
 
         val preferenceManager = SkySharedPref(this)
         applyConfigurations(this, preferenceManager)
@@ -434,6 +454,29 @@ class MainActivity : ComponentActivity() {
                             }
                         )
 
+                        CustPopup(
+                            isVisible = showPARAM,
+                            xtitle = "Request Permission",
+                            xsubtitle= "Draw over other apps permission is required for the app to function properly.",
+                            xokbtn= "Grant",
+                            xendbtn = "Dismiss",
+                            onOk = {
+                                showPARAM = false
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                    val intent = Intent(
+                                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                        Uri.parse("package:$packageName")
+                                    )
+                                    overlayPermissionLauncher.launch(intent)
+                                }
+                            },
+                            onDismiss = {
+                                showPARAM = false
+                                Toast.makeText(this@MainActivity, "Permission is required to continue", Toast.LENGTH_SHORT).show()
+                                return@CustPopup
+                            }
+                        )
+
 
                     }
                 }
@@ -477,7 +520,7 @@ class MainActivity : ComponentActivity() {
             preferenceManager.setKey("isFlagSetForLOCAL", "Yes") // Reverse
             preferenceManager.setKey("isFlagSetForAutoStartServer", "No")
             preferenceManager.setKey("isFlagSetForAutoStartOnBoot", "No")
-            preferenceManager.setKey("isFlagSetForAutoBootIPTV", "No")
+            preferenceManager.setKey("isFlagSetForAutoBootIPTV", "Yes")
             preferenceManager.setKey("app_packagename", "")
             preferenceManager.setKey("isFlagSetForEPG", "No")
             preferenceManager.setKey("app_name", "")
@@ -1192,7 +1235,35 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this@MainActivity, "IPTV app not selected", Toast.LENGTH_SHORT).show()
         }
     }
+
+    @RequiresApi(Build.VERSION_CODES.M)
+    private val overlayPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        // Handle the result of the permission request
+        if (Settings.canDrawOverlays(this)) {
+            // Permission granted
+            Log.d("KOX","granted")
+        } else {
+            // Permission not granted
+            Log.d("KOX","not granted")
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.M)
+    private fun requestOverlayPermission() {
+        if (!Settings.canDrawOverlays(this)) {
+//            val intent = Intent(
+//                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+//                Uri.parse("package:$packageName")
+//            )
+//            overlayPermissionLauncher.launch(intent)
+            showPARAM = true
+        }
+    }
 }
+
+
 
 
 data class BottomNavigationItem(
