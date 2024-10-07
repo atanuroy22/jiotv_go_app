@@ -165,22 +165,27 @@ fun SettingsScreen(context: Context) {
                 )
             }
 
-            // Conditionally render the Auto Start IPTV on Boot switch
-            if (false) {
+
+
+            // Conditionally render the Boot switch
+            if (isSwitchOnForAutoStartOnBoot) {
                 item {
+                    val stateBG = if (isSwitchOnForisFlagSetForAutoBootIPTV) "background" else "foreground"
                     SettingSwitchItem(
-                        icon = Icons.Filled.PlayArrow,
-                        title = "Auto Start IPTV on Boot",
-                        subtitle = "Automatically start IPTV on boot",
+                        icon = Icons.Filled.CenterFocusStrong,
+                        title = "Start Server Mode",
+                        subtitle =  "The server will start in $stateBG mode",
                         isChecked = isSwitchOnForisFlagSetForAutoBootIPTV,
-                        onCheckedChange = { isChecked -> isSwitchOnForisFlagSetForAutoBootIPTV = isChecked }
+                        onCheckedChange = {
+                            isChecked -> isSwitchOnForisFlagSetForAutoBootIPTV = isChecked
+                        }
                     )
                 }
             }
 
             item {
                 SettingSwitchItem(
-                    icon = Icons.Filled.NetworkWifi,
+                    icon = Icons.Filled.Public,
                     title = "Use Server Publicly",
                     subtitle = "Allow access to server from other devices",
                     isChecked = isSwitchOnForLOCAL,
