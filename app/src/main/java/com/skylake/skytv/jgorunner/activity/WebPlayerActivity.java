@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.content.pm.ActivityInfo;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -18,6 +19,9 @@ import androidx.annotation.Nullable;
 import com.skylake.skytv.jgorunner.R;
 import com.skylake.skytv.jgorunner.data.SkySharedPref;
 
+import java.util.Arrays;
+import java.util.List;
+
 public class WebPlayerActivity extends ComponentActivity {
 
     private static final String TAG = "WebPlayerActivity";
@@ -27,6 +31,9 @@ public class WebPlayerActivity extends ComponentActivity {
     private WebView webView;
     private ProgressBar loadingSpinner;
     private String url;
+
+    private List<String> channelNumbers;
+    private String initURL;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -55,12 +62,32 @@ public class WebPlayerActivity extends ComponentActivity {
         return portString != null ? Integer.parseInt(portString) : 5350; // Default to 5350 if not set
     }
 
+    private int playerUrlCount = 0;
+
     private void setupBackPressedCallback() {
         OnBackPressedCallback callback = new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
-                if (webView != null && webView.canGoBack()) {
-                    webView.goBack();
+                if (webView != null) {
+                    String currentUrl = webView.getUrl();
+
+                    if (currentUrl != null && currentUrl.contains("/player/")) {
+                        playerUrlCount++;
+                        if (playerUrlCount >= 3) {
+                            webView.loadUrl(initURL);
+                        } else {
+                            webView.goBack();
+                        }
+                    } else if (webView.canGoBack()) {
+                        playerUrlCount++;
+                        if (playerUrlCount >= 6) {
+                            finish();
+                        } else {
+                            webView.goBack();
+                        }
+                    } else {
+                        finish();
+                    }
                 } else {
                     finish();
                 }
@@ -69,6 +96,7 @@ public class WebPlayerActivity extends ComponentActivity {
         getOnBackPressedDispatcher().addCallback(this, callback);
     }
 
+
     private void setupFullScreenMode() {
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         updateSystemUiVisibility();
@@ -76,9 +104,9 @@ public class WebPlayerActivity extends ComponentActivity {
 
     private void updateSystemUiVisibility() {
         getWindow().getDecorView().setSystemUiVisibility(
-                    View.SYSTEM_UI_FLAG_FULLSCREEN |
-                    View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
-                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                View.SYSTEM_UI_FLAG_FULLSCREEN |
+                        View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         );
     }
 
@@ -122,18 +150,88 @@ public class WebPlayerActivity extends ComponentActivity {
         webView.onResume();
     }
 
+    @SuppressLint("RestrictedApi")
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (event.getAction() == KeyEvent.ACTION_DOWN && webView.getUrl() != null && webView.getUrl().contains("/player/")) {
+            switch (event.getKeyCode()) {
+                case KeyEvent.KEYCODE_DPAD_RIGHT:
+                    navigateToNextChannel();
+                    return true;
+                case KeyEvent.KEYCODE_DPAD_LEFT:
+                    navigateToPreviousChannel();
+                    return true;
+            }
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    private void navigateToNextChannel() {
+        navigateChannel(1);
+    }
+
+    private void navigateToPreviousChannel() {
+        navigateChannel(-1);
+    }
+
+    private void navigateChannel(int direction) {
+        if (channelNumbers == null || channelNumbers.isEmpty()) {
+            Log.d(TAG, "No channel numbers available.");
+            return;
+        }
+
+        Log.d(TAG, "Total channels available: " + channelNumbers.size());
+
+        String currentUrl = webView.getUrl();
+        assert currentUrl != null;
+
+        int queryIndex = currentUrl.indexOf('?');
+        String currentNumber;
+
+        if (queryIndex != -1) {
+            currentNumber = currentUrl.substring(currentUrl.lastIndexOf('/') + 1, queryIndex);
+        } else {
+            currentNumber = currentUrl.substring(currentUrl.lastIndexOf('/') + 1);
+        }
+
+        int index = channelNumbers.indexOf(currentNumber);
+
+        if (index >= 0) {
+            int newIndex = (index + direction + channelNumbers.size()) % channelNumbers.size();
+            String newNumber = channelNumbers.get(newIndex);
+
+            String newUrl;
+            if (queryIndex != -1) {
+                newUrl = currentUrl.replace("/" + currentNumber + "?", "/" + newNumber + "?");
+            } else {
+                newUrl = currentUrl.replace("/" + currentNumber, "/" + newNumber);
+            }
+
+            Log.d(TAG, "Navigating to Channel: " + newUrl);
+            webView.loadUrl(newUrl);
+        } else {
+            Log.d(TAG, "Current number not found in channel numbers.");
+        }
+    }
+
     private class CustomWebViewClient extends WebViewClient {
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, String url) {
             if (url.contains("/play/")) {
+                initURL = webView.getUrl();
+                Log.d(TAG, "Saving initURL: " + initURL);
                 String newUrl = url.replace("/play/", "/player/");
+                Log.d(TAG, "Loading new player URL: " + newUrl);
                 webView.loadUrl(newUrl);
                 return true;
+            } else if (!url.contains("/play/") && !url.contains("/player/")) {
+                initURL = url;
+                return false;
             }
             return false;
         }
 
-        @Override
+            @Override
         public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
             loadingSpinner.setVisibility(View.VISIBLE);
         }
@@ -145,7 +243,20 @@ public class WebPlayerActivity extends ComponentActivity {
                 Log.d(TAG, "Playing: " + url);
                 setupFullScreenMode();
                 playVideoInFullScreen(view);
+            } else{
+                moveSearchInput(view);
+                extractChannelNumbers();
             }
+        }
+
+        private void extractChannelNumbers() {
+            webView.evaluateJavascript("Array.from(document.querySelectorAll('.card')).map(card => card.getAttribute('href').match(/\\/play\\/(\\d+)/)[1])", result -> {
+                if (result != null && !result.isEmpty()) {
+                    result = result.replace("[", "").replace("]", "").replace("\"", "");
+                    channelNumbers = Arrays.asList(result.split(","));
+                    Log.d(TAG, "Channel Numbers: " + channelNumbers);
+                }
+            });
         }
 
         private void playVideoInFullScreen(WebView view) {
@@ -156,6 +267,16 @@ public class WebPlayerActivity extends ComponentActivity {
                     "  video.style.height = '100vh'; " + // Use viewport height
                     "  video.style.objectFit = 'contain'; " + // Scale the video while preserving aspect ratio
                     "  video.play(); " +
+                    "} " +
+                    "})()");
+        }
+
+        private void moveSearchInput(WebView view) {
+            view.loadUrl("javascript:(function() { " +
+                    "var searchButton = document.getElementById('portexe-search-button'); " +
+                    "var searchInput = document.getElementById('portexe-search-input'); " +
+                    "if (searchButton && searchInput) { " +
+                    "  searchButton.parentNode.insertBefore(searchInput, searchButton.nextSibling); " +
                     "} " +
                     "})()");
         }
