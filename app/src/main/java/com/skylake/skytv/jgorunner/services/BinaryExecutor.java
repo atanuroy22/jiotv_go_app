@@ -2,6 +2,7 @@ package com.skylake.skytv.jgorunner.services;
 
 import android.content.Context;
 import android.os.Build;
+import android.os.Environment;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -41,7 +42,7 @@ public class BinaryExecutor {
 
                 handleBinaryFile(preferenceManager, binaryFile, context, callback);
                 setBinaryExecutable(binaryFile);
-                String command = buildCommand(preferenceManager, arguments, binaryFile);
+                String command = buildCommand(preferenceManager, arguments, binaryFile,context);
 
                 String command_log = preferenceManager.getKey("__MasterArgs_final");
                 Log.d("DIX.Runner",command_log);
@@ -109,12 +110,56 @@ public class BinaryExecutor {
         }
     }
 
-    private static String buildCommand(SkySharedPref preferenceManager, String[] arguments, File binaryFile) {
+    private static String buildCommand(SkySharedPref preferenceManager, String[] arguments, File binaryFile, Context context) {
         StringBuilder commandBuilder = new StringBuilder(binaryFile.getAbsolutePath());
         String __Port = preferenceManager.getKey("__Port");
         String __Public = preferenceManager.getKey("__Public");
 
-        commandBuilder.append(" run").append(__Port).append(__Public);
+//        commandBuilder.append(" run").append(__Port).append(__Public).append(" --config \"jiotv-config.json\"");
+
+        // Internal storage
+        if (false) {
+            commandBuilder.append(" run")
+                    .append(__Port)
+                    .append(__Public)
+                    .append(" --config \"")
+                    .append(context.getFilesDir().getAbsolutePath())
+                    .append("/jiotv-config.json\"");
+        }
+
+        // External storage
+        if (true) {
+            String externalStoragePath = Environment.getExternalStorageDirectory().getPath();
+            File folder = new File(externalStoragePath, ".jiotv_go");
+            File jsonFile = new File(folder, "jiotv-config.json");
+            File keyFile = new File(folder, "key.pem");
+            File certFile = new File(folder, "cert.pem");
+
+            commandBuilder.append(" run")
+                    .append(__Port)
+                    .append(__Public)
+                    .append(" --config \"")
+                    .append(jsonFile.getAbsolutePath())
+                    .append("\"");
+
+            if (false){
+                commandBuilder.append(" run")
+                        .append(__Port)
+                        .append(__Public)
+                        .append(" --tls")
+                        .append(" --tls-key \"")
+                        .append(keyFile.getAbsolutePath())
+                        .append("\"")
+                        .append(" --tls-cert \"")
+                        .append(certFile.getAbsolutePath())
+                        .append("\"")
+                        .append(" --config \"")
+                        .append(jsonFile.getAbsolutePath())
+                        .append("\"");
+            }
+        }
+
+
 
         preferenceManager.setKey("__MasterArgs_final",commandBuilder.toString());
 
