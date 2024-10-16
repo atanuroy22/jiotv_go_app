@@ -32,6 +32,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.nativeKeyCode
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import com.skylake.skytv.jgorunner.data.SkySharedPref
@@ -39,6 +41,7 @@ import com.skylake.skytv.jgorunner.data.applyConfigurations
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.skylake.skytv.jgorunner.MainActivity
+import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.utils.Config2DL
 import java.io.File
 
@@ -49,6 +52,8 @@ fun SettingsScreen(context: Context) {
     val preferenceManager = remember { SkySharedPref(context) }
 
     val focusRequester = remember { FocusRequester() }
+
+    val customFontFamily = FontFamily(Font(R.font.chakrapetch_bold))
 
     // Retrieve saved switch states
     val savedSwitchStateForLOCAL = preferenceManager.getKey("isFlagSetForLOCAL") == "Yes"
@@ -138,7 +143,7 @@ fun SettingsScreen(context: Context) {
     ) {
         // TopAppBar
         TopAppBar(
-            title = { Text(text = "Settings", fontSize = 30.sp) },
+            title = { Text(text = "Settings", fontSize = 30.sp,fontFamily = customFontFamily) },
         )
 
         // Content
