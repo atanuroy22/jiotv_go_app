@@ -39,19 +39,10 @@ fun applyConfigurations(context: Context, preferenceManager: SkySharedPref) {
 
     val isFlagSetForEPG = preferenceManager.getKey("isFlagSetForEPG")
     if (isFlagSetForEPG == "Yes") {
-        val jsonData = """
-            {
-                "epg": false,
-                "disable_logout": true,
-                "title": "花より団子",
-  
-            }
-        """.trimIndent()
 
-        createJsonFile(context, "configtv.json", jsonData)
+        jsonmaker(context);
 
         preferenceManager.setKey("__EPG", " --config 'configtv.json'")
-
 
         Log.d("DIX-isFlagSetForEPG", isFlagSetForEPG)
     } else {
@@ -75,5 +66,24 @@ fun applyConfigurations(context: Context, preferenceManager: SkySharedPref) {
     val __EPG = preferenceManager.getKey("__EPG")
 
     preferenceManager.setKey("__MasterArgs_temp", " run$__Port$__Public$__EPG")
+}
+
+fun jsonmaker(context: Context)  {
+    val jsonData = """
+                    {
+            "debug": false,
+            "disable_ts_handler": false,
+            "disable_logout": false,
+            "drm": false,
+            "title": "JTV-GO",
+            "disable_url_encryption": false,
+            "path_prefix": "",
+            "proxy": ""
+        }
+        """.trimIndent()
+
+    createJsonFile(context, "jiotv-config.json", jsonData,true)
+
+
 }
 
