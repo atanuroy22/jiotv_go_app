@@ -44,17 +44,24 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.twotone.Login
+import androidx.compose.material.icons.filled.DeveloperMode
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.DeveloperMode
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.twotone.Close
+import androidx.compose.material.icons.twotone.Key
 import androidx.compose.material.icons.twotone.LiveTv
+import androidx.compose.material.icons.twotone.LocalPolice
+import androidx.compose.material.icons.twotone.Login
 import androidx.compose.material.icons.twotone.PlayArrow
 import androidx.compose.material.icons.twotone.ResetTv
 import androidx.compose.material.icons.twotone.Sailing
+import androidx.compose.material.icons.twotone.Shield
 import androidx.compose.material.icons.twotone.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
@@ -83,13 +90,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
-import com.skylake.skytv.jgorunner.activity.DemoScreen
+import com.skylake.skytv.jgorunner.activity.DebugScreen
 import com.skylake.skytv.jgorunner.activity.InfoScreen
+import com.skylake.skytv.jgorunner.activity.LoginScreen
+import com.skylake.skytv.jgorunner.activity.RunnerScreen
 import com.skylake.skytv.jgorunner.activity.SettingsScreen
 import com.skylake.skytv.jgorunner.activity.WebPlayerActivity
 import com.skylake.skytv.jgorunner.data.SkySharedPref
@@ -116,12 +127,14 @@ class MainActivity : ComponentActivity() {
     private var selectedBinaryUri: Uri? = null
     private var isBinaryRunning by mutableStateOf(false)
     private var isOutputShowing by mutableStateOf(false)
-    private var selectedBinaryName by mutableStateOf("JGO Server")
+    private var selectedBinaryName by mutableStateOf("JTV-GO SERVER")
 
     // SharedPreferences for saving binary selection
     private lateinit var preferenceManager: SkySharedPref
 
     private val REQUEST_STORAGE_PERMISSION = 100
+
+    private val customFontFamily = FontFamily(Font(R.font.chakrapetch_bold))
 
     // Receiver to handle binary stop action
     private val binaryStoppedReceiver = object : BroadcastReceiver() {
@@ -219,7 +232,7 @@ class MainActivity : ComponentActivity() {
         val savedName = preferenceManager.getKey("selectedBinaryName")
 
         selectedBinaryUri = savedUriString?.let { Uri.parse(it) }
-        selectedBinaryName = savedName ?: "JGO Server"
+        selectedBinaryName = savedName ?: "JTV-GO SERVER"
 
         val selectBinaryLauncher = registerForActivityResult(
             ActivityResultContracts.StartActivityForResult()
@@ -234,7 +247,15 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        registerReceiver(binaryStoppedReceiver, IntentFilter(BinaryService.ACTION_BINARY_STOPPED))
+//        registerReceiver(binaryStoppedReceiver, IntentFilter(BinaryService.ACTION_BINARY_STOPPED))
+
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(binaryStoppedReceiver, IntentFilter(BinaryService.ACTION_BINARY_STOPPED), RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(binaryStoppedReceiver, IntentFilter(BinaryService.ACTION_BINARY_STOPPED))
+        }
+
 
         // Register the OnBackPressedCallback
         backPressedCallback = object : OnBackPressedCallback(true) {
@@ -243,10 +264,16 @@ class MainActivity : ComponentActivity() {
                     "Settings" -> {
                         currentScreen = "Home"
                     }
-                    "DEMOv" -> {
+                    "Debug" -> {
                         currentScreen = "Home"
                     }
                     "Info" -> {
+                        currentScreen = "Home"
+                    }
+                    "Runner" -> {
+                        currentScreen = "Home"
+                    }
+                    "Login" -> {
                         currentScreen = "Home"
                     }
                     else -> {
@@ -365,12 +392,14 @@ class MainActivity : ComponentActivity() {
                             )
                             "Settings" -> SettingsScreen(context = this@MainActivity)
                             "Info" -> InfoScreen(context = this@MainActivity)
-                            "DEMOv" -> DemoScreen(context = this@MainActivity)
+                            "Debug" -> DebugScreen(context = this@MainActivity, onNavigate = { title -> currentScreen = title })
+                            "Runner" -> RunnerScreen(context = this@MainActivity)
+                            "Login" -> LoginScreen(context = this@MainActivity)
                         }
 
 
                         val savedIPTVRedirectTime = preferenceManager.getKey("isFlagSetForIPTVtime")?.toInt() ?: 5000
-                        var countdownTimeF = savedIPTVRedirectTime / 1000
+                        val countdownTimeF = savedIPTVRedirectTime / 1000
 
                         // Show the redirect popup
                         RedirectPopup(
@@ -817,9 +846,9 @@ class MainActivity : ComponentActivity() {
                 hasNews = false,
             ),
             BottomNavigationItem(
-                title = "Info",
-                selectedIcon = Icons.Filled.Info,
-                unselectedIcon = Icons.Outlined.Info,
+                title = "Debug",
+                selectedIcon = Icons.Filled.DeveloperMode,
+                unselectedIcon = Icons.Outlined.DeveloperMode,
                 hasNews = false,
             ),
         )
@@ -886,13 +915,18 @@ class MainActivity : ComponentActivity() {
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(text = selectedBinaryName)
+            Text(
+                text = selectedBinaryName,
+                fontSize = 24.sp,
+                fontFamily = customFontFamily, 
+                color = MaterialTheme.colorScheme.onBackground
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text(text = "✨")
-
-            Spacer(modifier = Modifier.height(16.dp))
+//            Text(text = "✨")
+//
+//            Spacer(modifier = Modifier.height(16.dp))
 
             Box(
                 modifier = Modifier
@@ -1114,7 +1148,7 @@ class MainActivity : ComponentActivity() {
         val buttonColor = remember { mutableStateOf(colorPRIME) }
         Button(
             onClick = {
-                currentScreen = "Info"
+                currentScreen = "Login"
                 },
             modifier = Modifier
                 .weight(1f)
@@ -1130,7 +1164,7 @@ class MainActivity : ComponentActivity() {
             colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
             contentPadding = PaddingValues(2.dp)
         ) {
-            ButtonContent("Debug", Icons.TwoTone.Sailing) // Different icon
+            ButtonContent("Login", Icons.TwoTone.Shield) // Different icon
         }
     }
 
