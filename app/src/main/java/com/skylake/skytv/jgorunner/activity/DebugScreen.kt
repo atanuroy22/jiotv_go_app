@@ -1,6 +1,8 @@
 package com.skylake.skytv.jgorunner.activity
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.*
@@ -36,7 +38,9 @@ import androidx.compose.ui.text.TextStyle
 
 import android.util.Log
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.sharp.Info
+import androidx.compose.material.icons.sharp.Support
 import androidx.compose.runtime.*
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 
@@ -83,7 +87,6 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Title with conditional glowing effect
         Text(
             text = "JTV-GO SERVER",
             fontSize = 24.sp,
@@ -93,17 +96,16 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
                 TextStyle(
                     shadow = Shadow(
                         color = glowColor.value,
-                        blurRadius = 30f,  // Adjust the blur radius for a soft glow effect
-                        offset = androidx.compose.ui.geometry.Offset(0f, 0f)  // Center the glow around the text
+                        blurRadius = 30f,
+                        offset = androidx.compose.ui.geometry.Offset(0f, 0f)
                     )
                 )
             } else {
-                TextStyle.Default // No glow if the flag is not set
+                TextStyle.Default
             },
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        // First row with 2 buttons
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -198,8 +200,12 @@ fun RowScope.Button3(context: Context) {
     val colorPRIME = MaterialTheme.colorScheme.primary
     val colorSECOND = MaterialTheme.colorScheme.secondary
     val buttonColor = remember { mutableStateOf(colorPRIME) }
+
     Button(
-        onClick = { handleButton3Click(context) },
+        onClick = {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://bit.ly/3Uc1usW"))
+            context.startActivity(intent)
+        },
         modifier = Modifier
             .weight(1f)
             .padding(8.dp)
@@ -214,9 +220,10 @@ fun RowScope.Button3(context: Context) {
         colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
         contentPadding = PaddingValues(2.dp)
     ) {
-        ButtonContent("Demo 13", Icons.Default.Build) // Different icon
+        ButtonContent("Support", Icons.Sharp.Support) // Different icon
     }
 }
+
 
 @Composable
 fun RowScope.Button4(context: Context) {
