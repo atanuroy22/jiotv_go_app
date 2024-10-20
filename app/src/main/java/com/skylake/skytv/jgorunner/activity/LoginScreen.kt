@@ -23,8 +23,10 @@ import kotlinx.coroutines.delay
 import android.widget.Toast
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.input.ImeAction
 
 @Composable
@@ -56,171 +58,194 @@ fun LoginScreen(context: Context) {
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "Login",
-            fontSize = 24.sp,
-            fontFamily = customFontFamily,
-            color = MaterialTheme.colorScheme.onBackground,
-            style = if (isGlowing) {
-                TextStyle(
-                    shadow = Shadow(
-                        color = glowColor,
-                        blurRadius = 30f,
-                        offset = Offset(0f, 0f)
+    // Function to draw the watermark
+    @Composable
+    fun Watermark() {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer(rotationZ = -30f)
+                .alpha(0.1f)
+        ) {
+            Text(
+                text = "NOT WORKING",
+                fontSize = 50.sp,
+                color = Color.Red,
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
+    }
+
+    // Main UI layout
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Login",
+                fontSize = 24.sp,
+                fontFamily = customFontFamily,
+                color = MaterialTheme.colorScheme.onBackground,
+                style = if (isGlowing) {
+                    TextStyle(
+                        shadow = Shadow(
+                            color = glowColor,
+                            blurRadius = 30f,
+                            offset = Offset(0f, 0f)
+                        )
                     )
+                } else {
+                    TextStyle.Default
+                },
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            // Tab layout to switch between OTP and Password
+            var selectedTabIndex by remember { mutableStateOf(0) }
+            TabRow(selectedTabIndex = selectedTabIndex) {
+                Tab(
+                    selected = selectedTabIndex == 0,
+                    onClick = {
+                        selectedTabIndex = 0
+                        isUsingOtp = true
+                        // Request focus for phone number when switching to OTP
+                        phoneNumberFocusRequester.requestFocus()
+                    }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .height(56.dp)
+                            .padding(vertical = 16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Use OTP")
+                    }
+                }
+                Tab(
+                    selected = selectedTabIndex == 1,
+                    onClick = {
+                        selectedTabIndex = 1
+                        isUsingOtp = false
+                        // Request focus for phone number when switching to Password
+                        phoneNumberFocusRequester.requestFocus()
+                    }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .height(56.dp)
+                            .padding(vertical = 16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Use Password")
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (isUsingOtp) {
+                // OTP Login UI
+                TextField(
+                    value = phoneNumber,
+                    onValueChange = { phoneNumber = it },
+                    label = { Text("Phone Number") },
+                    keyboardOptions = KeyboardOptions.Default.copy(
+                        keyboardType = KeyboardType.Phone,
+                        imeAction = ImeAction.Next
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onNext = {
+                            otpCodeFocusRequester.requestFocus() // Move focus to OTP code
+                        }
+                    ),
+                    modifier = Modifier.focusRequester(phoneNumberFocusRequester) // Attach focus requester
                 )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(onClick = {
+                    sendOtp(context, phoneNumber)
+                }) {
+                    Text(text = "Send OTP")
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                TextField(
+                    value = otpCode,
+                    onValueChange = { otpCode = it },
+                    label = { Text("OTP Code") },
+                    keyboardOptions = KeyboardOptions.Default.copy(
+                        keyboardType = KeyboardType.Phone,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = {
+                            verifyOtp(context, phoneNumber, otpCode)
+                        }
+                    ),
+                    modifier = Modifier.focusRequester(otpCodeFocusRequester) // Attach focus requester
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(onClick = {
+                    verifyOtp(context, phoneNumber, otpCode)
+                }) {
+                    Text(text = "Verify OTP")
+                }
+
             } else {
-                TextStyle.Default
-            },
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
+                // Password Login UI
+                TextField(
+                    value = phoneNumber,
+                    onValueChange = { phoneNumber = it },
+                    label = { Text("Phone Number") },
+                    keyboardOptions = KeyboardOptions.Default.copy(
+                        keyboardType = KeyboardType.Phone,
+                        imeAction = ImeAction.Next
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onNext = {
+                            passwordFocusRequester.requestFocus() // Move focus to password field
+                        }
+                    ),
+                    modifier = Modifier.focusRequester(phoneNumberFocusRequester) // Attach focus requester
+                )
 
-        // Tab layout to switch between OTP and Password
-        var selectedTabIndex by remember { mutableStateOf(0) }
-        TabRow(selectedTabIndex = selectedTabIndex) {
-            Tab(
-                selected = selectedTabIndex == 0,
-                onClick = {
-                    selectedTabIndex = 0
-                    isUsingOtp = true
-                    // Request focus for phone number when switching to OTP
-                    phoneNumberFocusRequester.requestFocus()
-                }
-            ) {
-                Box(
-                    modifier = Modifier
-                        .height(56.dp)
-                        .padding(vertical = 16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Use OTP")
-                }
-            }
-            Tab(
-                selected = selectedTabIndex == 1,
-                onClick = {
-                    selectedTabIndex = 1
-                    isUsingOtp = false
-                    // Request focus for phone number when switching to Password
-                    phoneNumberFocusRequester.requestFocus()
-                }
-            ) {
-                Box(
-                    modifier = Modifier
-                        .height(56.dp)
-                        .padding(vertical = 16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Use Password")
+                Spacer(modifier = Modifier.height(8.dp))
+
+                TextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions.Default.copy(
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = {
+                            login(context, phoneNumber, password)
+                        }
+                    ),
+                    modifier = Modifier.focusRequester(passwordFocusRequester) // Attach focus requester
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(onClick = {
+                    login(context, phoneNumber, password)
+                }) {
+                    Text(text = "Login")
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (isUsingOtp) {
-            // OTP Login UI
-            TextField(
-                value = phoneNumber,
-                onValueChange = { phoneNumber = it },
-                label = { Text("Phone Number") },
-                keyboardOptions = KeyboardOptions.Default.copy(
-                    keyboardType = KeyboardType.Phone,
-                    imeAction = ImeAction.Next
-                ),
-                keyboardActions = KeyboardActions(
-                    onNext = {
-                        otpCodeFocusRequester.requestFocus() // Move focus to OTP code
-                    }
-                ),
-                modifier = Modifier.focusRequester(phoneNumberFocusRequester) // Attach focus requester
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Button(onClick = {
-                sendOtp(context, phoneNumber)
-            }) {
-                Text(text = "Send OTP")
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            TextField(
-                value = otpCode,
-                onValueChange = { otpCode = it },
-                label = { Text("OTP Code") },
-                keyboardOptions = KeyboardOptions.Default.copy(
-                    keyboardType = KeyboardType.Phone,
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        verifyOtp(context, phoneNumber, otpCode)
-                    }
-                ),
-                modifier = Modifier.focusRequester(otpCodeFocusRequester) // Attach focus requester
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Button(onClick = {
-                verifyOtp(context, phoneNumber, otpCode)
-            }) {
-                Text(text = "Verify OTP")
-            }
-
-        } else {
-            // Password Login UI
-            TextField(
-                value = phoneNumber,
-                onValueChange = { phoneNumber = it },
-                label = { Text("Phone Number") },
-                keyboardOptions = KeyboardOptions.Default.copy(
-                    keyboardType = KeyboardType.Phone,
-                    imeAction = ImeAction.Next
-                ),
-                keyboardActions = KeyboardActions(
-                    onNext = {
-                        passwordFocusRequester.requestFocus() // Move focus to password field
-                    }
-                ),
-                modifier = Modifier.focusRequester(phoneNumberFocusRequester) // Attach focus requester
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            TextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Password") },
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions.Default.copy(
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        login(context, phoneNumber, password)
-                    }
-                ),
-                modifier = Modifier.focusRequester(passwordFocusRequester) // Attach focus requester
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Button(onClick = {
-                login(context, phoneNumber, password)
-            }) {
-                Text(text = "Login")
-            }
-        }
+        Watermark()
     }
 }
 
