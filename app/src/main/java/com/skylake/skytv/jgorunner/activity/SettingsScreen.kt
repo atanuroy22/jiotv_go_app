@@ -74,6 +74,9 @@ fun SettingsScreen(context: Context) {
     val savedSwitchStateForAutoIPTV = preferenceManager.getKey("isFlagSetForAutoIPTV") == "Yes"
     var isSwitchOnForAutoIPTV by remember { mutableStateOf(savedSwitchStateForAutoIPTV) }
 
+    val savedisCheckForUpdate = preferenceManager.getKey("isCheckForUpdate") == "Yes"
+    var isSwitchOnCheckForUpdate by remember { mutableStateOf(savedisCheckForUpdate) }
+
     val savedSwitchStateForAutoStartIPTVOnBoot = preferenceManager.getKey("isFlagSetForAutoBootIPTV") == "Yes"
     var isSwitchOnForisFlagSetForAutoBootIPTV by remember { mutableStateOf(savedSwitchStateForAutoStartIPTVOnBoot) }
 
@@ -134,6 +137,11 @@ fun SettingsScreen(context: Context) {
             preferenceManager.setKey("isCustomSetForPORT", validPort.toString())
             applyConfigurations(context, preferenceManager)
         }
+    }
+
+    LaunchedEffect(isSwitchOnCheckForUpdate) {
+        preferenceManager.setKey("isCheckForUpdate", if (isSwitchOnCheckForUpdate) "Yes" else "No")
+        applyConfigurations(context, preferenceManager)
     }
 
     Column(
@@ -277,6 +285,16 @@ fun SettingsScreen(context: Context) {
                         }
                 )
 
+            }
+
+            item {
+                SettingSwitchItem(
+                    icon = Icons.Filled.SoupKitchen,
+                    title = "Check for updates",
+                    subtitle = "Check for updates when the app starts",
+                    isChecked = isSwitchOnCheckForUpdate,
+                    onCheckedChange = { isChecked -> isSwitchOnCheckForUpdate = isChecked }
+                )
             }
 
             item {
