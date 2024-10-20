@@ -13,6 +13,7 @@ import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
@@ -44,6 +45,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.twotone.ExitToApp
 import androidx.compose.material.icons.automirrored.twotone.Login
 import androidx.compose.material.icons.filled.DeveloperMode
 import androidx.compose.material.icons.filled.Home
@@ -54,6 +56,8 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.twotone.Close
+import androidx.compose.material.icons.twotone.Deblur
+import androidx.compose.material.icons.twotone.ExitToApp
 import androidx.compose.material.icons.twotone.Key
 import androidx.compose.material.icons.twotone.LiveTv
 import androidx.compose.material.icons.twotone.LocalPolice
@@ -85,11 +89,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -105,6 +112,7 @@ import com.skylake.skytv.jgorunner.activity.SettingsScreen
 import com.skylake.skytv.jgorunner.activity.WebPlayerActivity
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.data.applyConfigurations
+import com.skylake.skytv.jgorunner.data.jsonmaker
 import com.skylake.skytv.jgorunner.services.BinaryExecutor
 import com.skylake.skytv.jgorunner.services.BinaryService
 import com.skylake.skytv.jgorunner.ui.theme.JGOTheme
@@ -115,6 +123,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.Inet4Address
@@ -188,6 +197,12 @@ class MainActivity : ComponentActivity() {
     private var showCustUpdatePopup by mutableStateOf(false)
     private var showCustENDPopup by mutableStateOf(false)
     private var showAutoUpdatePopup by mutableStateOf(false)
+    private var showLoginPopup by mutableStateOf(false)
+    private var isServerLoginRunning by mutableStateOf(false)
+    private var isServerRunning by mutableStateOf(false)
+
+    private var isGlowBox by mutableStateOf(true)
+
 
     private var showPARAM by mutableStateOf(false)
 
@@ -316,25 +331,33 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        updateSizeIfExist(this@MainActivity,"majorbin")
-        
-        
-        val expectedFileSize: Int? = preferenceManager.getKey("expectedFileSize")?.toIntOrNull()
-        Config2DL.isFileSizeSame(expectedFileSize) { result ->
-            if (result) {
-                if (expectedFileSize == 69){
-                    isOutputShowing = true
-                    Config2DL.startDownloadAndSave(this@MainActivity) { output ->
-                        Handler(Looper.getMainLooper()).post {
-                            outputText += "\n$output"
-                        }
-                    }
-                } else {
-                    showAutoUpdatePopup = true
-                }
+        val isCheckForUpdate = preferenceManager.getKey("isCheckForUpdate")
 
+        if (isCheckForUpdate.isNullOrEmpty() || isCheckForUpdate == "Yes") {
+            updateSizeIfExist(this@MainActivity,"majorbin")
+
+
+            val expectedFileSize: Int? = preferenceManager.getKey("expectedFileSize")?.toIntOrNull()
+            Config2DL.isFileSizeSame(expectedFileSize) { result ->
+                if (result) {
+                    if (expectedFileSize == 69){
+                        isOutputShowing = true
+                        Config2DL.startDownloadAndSave(this@MainActivity) { output ->
+                            Handler(Looper.getMainLooper()).post {
+                                outputText += "\n$output"
+                            }
+                        }
+                    } else {
+                        showAutoUpdatePopup = true
+                    }
+
+                }
             }
+        } else {
+           Log.d("DIX","Auto Update OFF")
         }
+
+
 
 
         setContent {
@@ -460,6 +483,27 @@ class MainActivity : ComponentActivity() {
                         )
 
                         CustPopup(
+                            isVisible = showLoginPopup,
+                            xtitle = "Login Required",
+                            xsubtitle = "Please log in using WebTV, to access the server.",
+                            xokbtn = "Login",
+                            xendbtn = "Cancel",
+                            onOk = {
+                                showLoginPopup = false
+                                val intent = Intent(this@MainActivity, WebPlayerActivity::class.java)
+                                startActivity(intent)
+                                Toast.makeText(this@MainActivity, "Opening WEBTV", Toast.LENGTH_SHORT).show()
+                                Log.d("DIX", "Opening WEBTV")
+                                return@CustPopup
+                            },
+                            onDismiss = {
+                                showLoginPopup = false
+                                return@CustPopup
+                            }
+                        )
+
+
+                        CustPopup(
                             isVisible = showAutoUpdatePopup,
                             xtitle = "Binary Update Available",
                             xsubtitle = "A new version of the Binary is available.",
@@ -509,14 +553,14 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Handle delayed IPTV launch
-                LaunchedEffect(shouldLaunchIPTV) {
-                    if (shouldLaunchIPTV) {
-                        val savedIPTVRedirectTime = preferenceManager.getKey("isFlagSetForIPTVtime")?.toInt() ?: 5000
-                        delay(savedIPTVRedirectTime.toLong())
-                        startIPTV()
-                    }
-                }
+//                // Handle delayed IPTV launch
+//                LaunchedEffect(shouldLaunchIPTV) {
+//                    if (shouldLaunchIPTV) {
+//                        val savedIPTVRedirectTime = preferenceManager.getKey("isFlagSetForIPTVtime")?.toInt() ?: 5000
+//                        delay(savedIPTVRedirectTime.toLong())
+//                        startIPTV()
+//                    }
+//                }
 
             }
         }
@@ -562,6 +606,7 @@ class MainActivity : ComponentActivity() {
             preferenceManager.setKey("isAutoUpdate", "No")
             preferenceManager.setKey("VersionNumber", "v3.11")
             preferenceManager.setKey("expectedFileSize", "69")
+            preferenceManager.setKey("isCheckForUpdate", "Yes")
 
         }
 
@@ -570,8 +615,6 @@ class MainActivity : ComponentActivity() {
 
         val isUpdate = preferenceManager.getKey("isUpdate")
         val isEngine = preferenceManager.getKey("isEngine")
-
-
 
 
 //        Debug Values
@@ -590,6 +633,21 @@ class MainActivity : ComponentActivity() {
         }
 
 
+        fun checkAndRun() {
+            val externalStoragePath = Environment.getExternalStorageDirectory().path
+            val folder = File(externalStoragePath, ".jiotv_go")
+            val jsonFile = File(folder, "jiotv-config.json")
+
+            if (jsonFile.exists()) {
+                Log.d("DIX","Config exist")
+            } else {
+                jsonmaker(this@MainActivity);
+            }
+        }
+
+        checkAndRun()
+
+
         // Check if server should start automatically
         val isFlagSetForAutoStartServer = preferenceManager.getKey("isFlagSetForAutoStartServer")
         if (isFlagSetForAutoStartServer == "Yes") {
@@ -603,24 +661,34 @@ class MainActivity : ComponentActivity() {
         }
 
         val isFlagSetForAutoIPTV = preferenceManager.getKey("isFlagSetForAutoIPTV")
-        if (isFlagSetForAutoIPTV == "Yes") {
-            showRedirectPopup = true
-            shouldLaunchIPTV = true
 
-            countdownJob?.cancel() // Cancel any existing countdown job
-            val savedIPTVRedirectTime = preferenceManager.getKey("isFlagSetForIPTVtime")?.toInt() ?: 4000
-            var countdownTime = savedIPTVRedirectTime / 1000
-            countdownJob = CoroutineScope(Dispatchers.Main).launch {
-                while (countdownTime > 0) {
-                    delay(1000)
-                    countdownTime--
-                }
-                if (shouldLaunchIPTV) {
-                    startIPTV()
-                }
-                showRedirectPopup = false
-            }
-        }
+//        val isServerRunning = checkServerStatus()
+
+        Log.i("DIX::","UP")
+        checkServerStatusInCoroutine()
+        Log.i("DIX::","DOWN")
+
+
+
+
+//        if (isFlagSetForAutoIPTV == "Yes" && isServerLoginRunning) {
+//            showRedirectPopup = true
+//            shouldLaunchIPTV = true
+//
+//            countdownJob?.cancel() // Cancel any existing countdown job
+//            val savedIPTVRedirectTime = preferenceManager.getKey("isFlagSetForIPTVtime")?.toInt() ?: 4000
+//            var countdownTime = savedIPTVRedirectTime / 1000
+//            countdownJob = CoroutineScope(Dispatchers.Main).launch {
+//                while (countdownTime > 0) {
+//                    delay(1000)
+//                    countdownTime--
+//                }
+//                if (shouldLaunchIPTV) {
+//                    startIPTV()
+//                }
+//                showRedirectPopup = false
+//            }
+//        }
     }
 
 
@@ -643,12 +711,69 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun checkServerStatusInCoroutine() {
+        CoroutineScope(Dispatchers.IO).launch {
+            val isServerRunning = checkServerStatus()
+            if (isServerRunning) {
+                checkLoginStatusInCoroutine()
+            } else {
+                Log.w("DIXxx", "Server is not expected to be running.")
+            }
+            withContext(Dispatchers.Main) {
+                Log.d("DIXx", "Is server running: $isServerRunning")
+            }
+        }
+    }
+
+    private fun checkLoginStatusInCoroutine() {
+        CoroutineScope(Dispatchers.IO).launch {
+            val statusCode = checkServerLoginStatus()
+            withContext(Dispatchers.Main) {
+                Log.d("DIX", "Server login status code: $statusCode")
+                when (statusCode) {
+                    200 -> {
+                        Log.i("DIX", "Server is online, login successful.")
+                        isGlowBox = false
+                        isServerLoginRunning = true
+                        val isFlagSetForAutoIPTV = preferenceManager.getKey("isFlagSetForAutoIPTV")
+                        if (isFlagSetForAutoIPTV == "Yes" && isServerLoginRunning) {
+                            showRedirectPopup = true
+                            shouldLaunchIPTV = true
+
+                            countdownJob?.cancel() // Cancel any existing countdown job
+                            val savedIPTVRedirectTime = preferenceManager.getKey("isFlagSetForIPTVtime")?.toInt() ?: 4000
+                            var countdownTime = savedIPTVRedirectTime / 1000
+                            countdownJob = CoroutineScope(Dispatchers.Main).launch {
+                                while (countdownTime > 0) {
+                                    delay(1000)
+                                    countdownTime--
+                                }
+                                if (shouldLaunchIPTV) {
+                                    startIPTV()
+                                }
+                                showRedirectPopup = false
+                            }
+                        }
+                    }
+                    500 -> {
+                        Log.e("DIX", "Server returned an internal error (500).")
+                        showLoginPopup = true
+                    }
+                    0 -> {
+                        Log.e("DIX", "Error checking server status or server is down.")
+                    }
+                    else -> {
+                        Log.e("DIX", "Unexpected return value: $statusCode")
+                    }
+                }
+            }
+        }
+    }
+
     private fun startIPTV() {
         executor.execute {
             try {
-                val isServerRunning = checkServerStatus()
                 runOnUiThread {
-                    if (isServerRunning) {
                         val appPackageName = preferenceManager.getKey("app_packagename")
                         if (appPackageName.isNotEmpty()) {
                             Log.d("DIX", appPackageName)
@@ -677,10 +802,6 @@ class MainActivity : ComponentActivity() {
                             Toast.makeText(this@MainActivity, "IPTV not set.", Toast.LENGTH_SHORT).show()
                             Log.d("DIX", "IPTV not set")
                         }
-                    } else {
-                        Toast.makeText(this@MainActivity, "Server issue. If it persists, restart.", Toast.LENGTH_SHORT).show()
-                        Log.d("DIX", "Server issue. If it persists, restart")
-                    }
                 }
             } catch (e: Exception) {
                 Log.e("DIX", "Error starting IPTV", e)
@@ -798,22 +919,105 @@ class MainActivity : ComponentActivity() {
     }
 
 
-    private fun checkServerStatus(): Boolean {
-        return try {
-            val savedPortNumber = preferenceManager.getKey("isCustomSetForPORT")?.toIntOrNull() ?: 5350
-            val url = URL("http://localhost:$savedPortNumber")
-            val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "HEAD"
-            connection.connectTimeout = 5000 // 5 seconds timeout
-            connection.readTimeout = 5000 // 5 seconds timeout
-            val responseCode = connection.responseCode
-            connection.disconnect()
-            responseCode == HttpURLConnection.HTTP_OK
-        } catch (e: Exception) {
-            Log.e("DIX", "Error checking server status", e)
-            false
+
+    private suspend fun checkServerStatus(): Boolean {
+        val savedPortNumber = preferenceManager.getKey("isCustomSetForPORT")?.toIntOrNull() ?: 5350
+        val url = URL("http://localhost:$savedPortNumber")
+        Log.d("DIXx", url.toString())
+
+        repeat(3) { attempt ->
+            try {
+                Log.d("DIXx", "om1")
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "HEAD"
+                connection.connectTimeout = 5000 // 5 seconds timeout
+                connection.readTimeout = 5000 // 5 seconds timeout
+                val responseCode = connection.responseCode
+                connection.disconnect()
+
+                // If we get a successful response, return true
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+                    Log.d("DIXx", responseCode.toString())
+                    return true
+                }
+            } catch (e: Exception) {
+                Log.d("DIXx", "om2")
+                Log.e("DIXx", "Error checking server status (attempt ${attempt + 1})", e)
+            }
+
+            // Only introduce a delay if an error occurs
+            if (attempt < 2) { // Avoid sleeping after the last attempt
+                Log.d("DIXx", "om1.1")
+                delay(1000) // Use delay instead of Thread.sleep
+            }
         }
+
+        // If all attempts fail, return false
+        return false
     }
+
+
+
+
+    private suspend fun checkServerLoginStatus(): Int {
+        val savedPortNumber = preferenceManager.getKey("isCustomSetForPORT")?.toIntOrNull() ?: 5350
+        val url = URL("http://localhost:$savedPortNumber/live/144.m3u8")
+        var consecutiveFailures = 0 // Counter for consecutive failures
+        val maxFailures = 5 // Maximum allowed consecutive failures
+
+        repeat(5) { attempt ->
+            try {
+                Log.d("DIXx", "xom1")
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "HEAD"
+                connection.connectTimeout = 5000 // 5 seconds timeout
+                connection.readTimeout = 5000 // 5 seconds timeout
+                val responseCode = connection.responseCode
+                connection.disconnect()
+
+                return when (responseCode) {
+                    HttpURLConnection.HTTP_OK -> {
+                        Log.d("DIX", "Response Code: $responseCode")
+                        consecutiveFailures = 0 // Reset on success
+                        200
+                    }
+                    HttpURLConnection.HTTP_INTERNAL_ERROR -> {
+                        Log.d("DIX", "Response Code: $responseCode")
+                        consecutiveFailures = 0 // Reset on success
+                        500
+                    }
+                    else -> {
+                        consecutiveFailures++ // Increment failure counter
+                        Log.d("DIX", "Unexpected Response Code: $responseCode")
+                        if (consecutiveFailures >= maxFailures) {
+                            Log.d("DIX", "Reached maximum consecutive failures.")
+                            return 0 // Stop checking after 5 failures
+                        }
+                        0
+                    }
+                }
+            } catch (e: Exception) {
+                Log.d("DIXx", "xom2")
+                Log.e("DIX", "Error checking server status (attempt ${attempt + 1})", e)
+                consecutiveFailures++ // Increment failure counter
+                if (consecutiveFailures >= maxFailures) {
+                    Log.d("DIX", "Reached maximum consecutive failures.")
+                    return 0 // Stop checking after 5 failures
+                }
+            }
+
+            // Only introduce a delay if an error occurs
+            if (attempt < 2) { // Avoid sleeping after the last attempt
+                Log.d("DIXx", "xom1.1")
+                delay(1000) // Use delay instead of Thread.sleep
+            }
+        }
+
+        // If all attempts fail, return 0
+        return 0
+    }
+
+
 
 
     private fun checkStoragePermission() {
@@ -915,11 +1119,29 @@ class MainActivity : ComponentActivity() {
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+//            Text(
+//                text = selectedBinaryName,
+//                fontSize = 24.sp,
+//                fontFamily = customFontFamily,
+//                color = MaterialTheme.colorScheme.onBackground
+//            )
             Text(
                 text = selectedBinaryName,
                 fontSize = 24.sp,
-                fontFamily = customFontFamily, 
-                color = MaterialTheme.colorScheme.onBackground
+                fontFamily = customFontFamily,
+                color = MaterialTheme.colorScheme.onBackground,
+                style = if (isGlowBox) {
+                    TextStyle.Default
+                } else {
+                    TextStyle(
+                        shadow = Shadow(
+                            color = Color.Green,
+                            blurRadius = 30f,
+                            offset = androidx.compose.ui.geometry.Offset(0f, 0f)
+                        )
+                    )
+                },
+                modifier = Modifier.padding(bottom = 16.dp)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -932,15 +1154,19 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier
                     .fillMaxWidth()
                     .border(2.dp, Color.Gray, RoundedCornerShape(8.dp))
+                    .background(
+                        if (isGlowBox) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
+                        RoundedCornerShape(8.dp)
+                    )
                     .padding(5.dp)
             ) {
-                // Replace with your actual method for retrieving the Wi-Fi IP address
                 val wifiIpAddress = getWifiIpAddress(this@MainActivity) ?: "Not connected to Wi-Fi"
                 val clipboardManager = LocalClipboardManager.current
 
                 Text(
                     text = wifiIpAddress,
                     fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier
                         .align(Alignment.Center)
                         .clickable {
@@ -948,6 +1174,8 @@ class MainActivity : ComponentActivity() {
                         }
                 )
             }
+
+
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -1148,7 +1376,7 @@ class MainActivity : ComponentActivity() {
         val buttonColor = remember { mutableStateOf(colorPRIME) }
         Button(
             onClick = {
-                currentScreen = "Login"
+                currentScreen = "Debug"
                 },
             modifier = Modifier
                 .weight(1f)
@@ -1164,7 +1392,7 @@ class MainActivity : ComponentActivity() {
             colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
             contentPadding = PaddingValues(2.dp)
         ) {
-            ButtonContent("Login", Icons.TwoTone.Shield) // Different icon
+            ButtonContent("Debug", Icons.TwoTone.Deblur) // Different icon
         }
     }
 
@@ -1195,7 +1423,7 @@ class MainActivity : ComponentActivity() {
             colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
             contentPadding = PaddingValues(2.dp)
         ) {
-            ButtonContent("Exit", Icons.TwoTone.Close) // Different icon
+            ButtonContent("Exit", Icons.AutoMirrored.TwoTone.ExitToApp) // Different icon
         }
     }
 
