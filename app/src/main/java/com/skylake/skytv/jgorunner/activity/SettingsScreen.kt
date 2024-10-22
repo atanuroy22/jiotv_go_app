@@ -216,6 +216,14 @@ fun SettingsScreen(context: Context) {
                 )
             }
 
+//            item {
+//                HorizontalDivider(
+//                    modifier = Modifier.padding(horizontal = 16.dp),
+//                    thickness = 1.dp,
+//                    color = MaterialTheme.colorScheme.surface
+//                )
+//            }
+
             if (false) {
                 item {
                     SettingSwitchItem(
@@ -286,6 +294,15 @@ fun SettingsScreen(context: Context) {
                 )
 
             }
+
+//            item {
+//                HorizontalDivider(
+//                    modifier = Modifier.padding(horizontal = 16.dp),
+//                    thickness = 1.dp,
+//                    color = Color.Gray
+//                )
+//            }
+
 
             item {
                 SettingSwitchItem(
