@@ -211,7 +211,6 @@ class MainActivity : ComponentActivity() {
     private var countdownJob: Job? = null
 
 
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -283,13 +282,13 @@ class MainActivity : ComponentActivity() {
                         currentScreen = "Home"
                     }
                     "Info" -> {
-                        currentScreen = "Home"
+                        currentScreen = "Debug"
                     }
                     "Runner" -> {
-                        currentScreen = "Home"
+                        currentScreen = "Debug"
                     }
                     "Login" -> {
-                        currentScreen = "Home"
+                        currentScreen = "Debug"
                     }
                     else -> {
                         // Let the system handle the back press
