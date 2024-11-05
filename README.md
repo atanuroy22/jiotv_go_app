@@ -4,7 +4,7 @@
     <img src="https://i.imgur.com/Nn0IAkK.png" alt="" width="200">
   </a>
   <br>
-  📺 JGO Server
+  📺 JTV-GO Server
   <br>
 </h1>
 
