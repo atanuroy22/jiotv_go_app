@@ -981,38 +981,48 @@ class MainActivity : ComponentActivity() {
     private suspend fun checkServerStatus(): Boolean {
         val savedPortNumber = preferenceManager.getKey("isCustomSetForPORT")?.toIntOrNull() ?: 5350
         val url = URL("http://localhost:$savedPortNumber")
-        Log.d("DIXx", url.toString())
+        Log.d("ServerStatusChecker", "Constructed URL: $url")
 
-        repeat(3) { attempt ->
+        repeat(5) { attempt ->  // Change from 3 to 5 attempts
             try {
-                Log.d("DIXx", "om1")
+                Log.d("ServerStatusChecker", "Attempt ${attempt + 1} to check server status")
+
                 val connection = url.openConnection() as HttpURLConnection
                 connection.requestMethod = "HEAD"
                 connection.connectTimeout = 5000 // 5 seconds timeout
                 connection.readTimeout = 5000 // 5 seconds timeout
+
+                Log.d("ServerStatusChecker", "Connection established. Requesting server headers...")
+
                 val responseCode = connection.responseCode
+                Log.d("ServerStatusChecker", "Received response code: $responseCode")
+
                 connection.disconnect()
 
                 // If we get a successful response, return true
                 if (responseCode == HttpURLConnection.HTTP_OK) {
-                    Log.d("DIXx", responseCode.toString())
+                    Log.d("ServerStatusChecker", "Server is up and running (HTTP_OK response).")
                     return true
+                } else {
+                    Log.d("ServerStatusChecker", "Unexpected response code: $responseCode. Server might be down.")
                 }
             } catch (e: Exception) {
-                Log.d("DIXx", "om2")
-                Log.e("DIXx", "Error checking server status (attempt ${attempt + 1})", e)
+                Log.d("ServerStatusChecker", "Error occurred during attempt ${attempt + 1}")
+                Log.e("ServerStatusChecker", "Error checking server status (attempt ${attempt + 1})", e)
             }
 
             // Only introduce a delay if an error occurs
-            if (attempt < 2) { // Avoid sleeping after the last attempt
-                Log.d("DIXx", "om1.1")
+            if (attempt < 4) { // Change to 4 to avoid sleeping after the last attempt
+                Log.d("ServerStatusChecker", "Retrying after 1 second delay (attempt ${attempt + 1})")
                 delay(1000) // Use delay instead of Thread.sleep
             }
         }
 
         // If all attempts fail, return false
+        Log.d("ServerStatusChecker", "All 5 attempts failed. Server is not reachable.")
         return false
     }
+
 
 
 
@@ -1025,7 +1035,7 @@ class MainActivity : ComponentActivity() {
 
         repeat(5) { attempt ->
             try {
-                Log.d("DIXx", "xom1")
+                Log.d("ServerLoginCheck", "Attempt #${attempt + 1}: Checking server status...")
                 val connection = url.openConnection() as HttpURLConnection
                 connection.requestMethod = "HEAD"
                 connection.connectTimeout = 5000 // 5 seconds timeout
@@ -1035,38 +1045,38 @@ class MainActivity : ComponentActivity() {
 
                 return when (responseCode) {
                     HttpURLConnection.HTTP_OK -> {
-                        Log.d("DIX", "Response Code: $responseCode")
+                        Log.d("ServerLoginCheck", "Response Code: $responseCode - Server is up!")
                         consecutiveFailures = 0 // Reset on success
                         200
                     }
                     HttpURLConnection.HTTP_INTERNAL_ERROR -> {
-                        Log.d("DIX", "Response Code: $responseCode")
+                        Log.d("ServerLoginCheck", "Response Code: $responseCode - Server error!")
                         consecutiveFailures = 0 // Reset on success
                         500
                     }
                     else -> {
                         consecutiveFailures++ // Increment failure counter
-                        Log.d("DIX", "Unexpected Response Code: $responseCode")
+                        Log.d("ServerLoginCheck", "Unexpected Response Code: $responseCode")
                         if (consecutiveFailures >= maxFailures) {
-                            Log.d("DIX", "Reached maximum consecutive failures.")
+                            Log.d("ServerLoginCheck", "Reached maximum consecutive failures.")
                             return 0 // Stop checking after 5 failures
                         }
                         0
                     }
                 }
             } catch (e: Exception) {
-                Log.d("DIXx", "xom2")
-                Log.e("DIX", "Error checking server status (attempt ${attempt + 1})", e)
+                Log.d("ServerLoginCheck", "Attempt #${attempt + 1}: Error occurred")
+                Log.e("ServerLoginCheck", "Error checking server status (attempt ${attempt + 1})", e)
                 consecutiveFailures++ // Increment failure counter
                 if (consecutiveFailures >= maxFailures) {
-                    Log.d("DIX", "Reached maximum consecutive failures.")
+                    Log.d("ServerLoginCheck", "Reached maximum consecutive failures.")
                     return 0 // Stop checking after 5 failures
                 }
             }
 
             // Only introduce a delay if an error occurs
             if (attempt < 2) { // Avoid sleeping after the last attempt
-                Log.d("DIXx", "xom1.1")
+                Log.d("ServerLoginCheck", "Delaying before next attempt...")
                 delay(1000) // Use delay instead of Thread.sleep
             }
         }
@@ -1074,6 +1084,7 @@ class MainActivity : ComponentActivity() {
         // If all attempts fail, return 0
         return 0
     }
+
 
 
 
