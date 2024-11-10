@@ -274,16 +274,16 @@ fun ButtonContent(text: String, icon: ImageVector) {
 
 // Separate onClick functions for each button
 fun handleButton1Click(context: Context) {
-    Toast.makeText(context, "Demo 11 - Code-11", Toast.LENGTH_SHORT).show()
+//    Toast.makeText(context, "Demo 11 - Code-11", Toast.LENGTH_SHORT).show()
 }
 
 fun handleButton2Click(context: Context) {
-    Toast.makeText(context, "Demo 12 - Code-12", Toast.LENGTH_SHORT).show()
+//    Toast.makeText(context, "Demo 12 - Code-12", Toast.LENGTH_SHORT).show()
 }
 
 // Separate onClick functions for each new button
 fun handleButton3Click(context: Context) {
-    Toast.makeText(context, "Demo 13 - Code-13", Toast.LENGTH_SHORT).show()
+//    Toast.makeText(context, "Demo 13 - Code-13", Toast.LENGTH_SHORT).show()
 }
 
 fun handleButton4Click(context: Context) {
