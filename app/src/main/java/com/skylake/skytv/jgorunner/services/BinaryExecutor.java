@@ -8,7 +8,7 @@ import android.widget.Toast;
 
 import com.skylake.skytv.jgorunner.R;
 import com.skylake.skytv.jgorunner.data.SkySharedPref;
-import com.skylake.skytv.jgorunner.utils.Config2DL;
+import com.skylake.skytv.jgorunner.utils.RemoteBinaryFetcher;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -64,7 +64,7 @@ public class BinaryExecutor {
         }
 
         if (!binaryFile.exists()) {
-            Config2DL.INSTANCE.startDownloadAndSave(context, callback);
+            RemoteBinaryFetcher.INSTANCE.startDownloadAndSave(context, callback);
             /* DEBUG CASE */
             boolean skipper = false;
             if (skipper) {
@@ -106,7 +106,9 @@ public class BinaryExecutor {
 
     private static void setBinaryExecutable(File binaryFile) {
         if (binaryFile.exists()) {
-            binaryFile.setExecutable(true, false);
+            boolean success = binaryFile.setExecutable(true, false);
+            // Intentionally ignore the result without further action
+            Log.d(TAG,"binaryPermissions: " + success);
         }
     }
 
@@ -115,6 +117,7 @@ public class BinaryExecutor {
         String __Port = preferenceManager.getKey("__Port");
         String __Public = preferenceManager.getKey("__Public");
 
+        /* DEBUG CASE */
 //        commandBuilder.append(" run").append(__Port).append(__Public).append(" --config \"jiotv-config.json\"");
 
         // Internal storage
@@ -142,6 +145,7 @@ public class BinaryExecutor {
                     .append(jsonFile.getAbsolutePath())
                     .append("\"");
 
+            /* DEBUG CASE: DRM */
             if (false){
                 commandBuilder.append(" run")
                         .append(__Port)
