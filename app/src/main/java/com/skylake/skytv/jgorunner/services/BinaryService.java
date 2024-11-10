@@ -34,19 +34,13 @@ public class BinaryService extends Service {
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
+        Log.d("BinaryService", "Service created.");
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (ACTION_STOP_BINARY.equals(intent.getAction())) {
-            BinaryExecutor.stopBinary();
-            Log.d("BinaryService", "Binary stopped by user.");
-
-            Intent broadcastIntent = new Intent(ACTION_BINARY_STOPPED);
-            sendBroadcast(broadcastIntent);
-
-            stopForeground(true);
-            stopSelf();
+            stopBinaryService();
             return START_NOT_STICKY;
         }
 
@@ -61,21 +55,7 @@ public class BinaryService extends Service {
             arguments = new String[]{"Boot Start"};
         }
 
-        if (binaryUri != null) {
-            if (binaryUri.toString().startsWith("android.resource://")) {
-                Log.d("BinaryService1", "BinaryService started in the background. ? "+ Arrays.toString(arguments));
-                BinaryExecutor.executeBinary(this, arguments, output -> {
-                    Log.d("BinaryOutput", output);
-                });
-            } else {
-                Log.d("BinaryService2", "BinaryService started in the background. ? "+ Arrays.toString(arguments));
-                BinaryExecutor.executeBinary(this, arguments, output -> {
-                    Log.d("BinaryOutput", output);
-                });
-            }
-        } else {
-            Log.e("BinaryService", "No binary selected");
-        }
+        executeBinary();
 
         Notification notification = createNotification();
         startForeground(NOTIFICATION_ID, notification);
@@ -83,8 +63,50 @@ public class BinaryService extends Service {
         return START_STICKY;
     }
 
+    private void stopBinaryService() {
+        BinaryExecutor.stopBinary();
+        Log.d("BinaryService", "Binary stopped by user.");
+
+        Intent broadcastIntent = new Intent(ACTION_BINARY_STOPPED);
+        sendBroadcast(broadcastIntent);
+
+        stopForeground(true);
+        stopSelf();
+    }
+
+    private void executeBinary() {
+        if (binaryUri != null) {
+            String uriString = binaryUri.toString();
+            Log.d("BinaryService", "Binary service started in the background. Arguments: " + Arrays.toString(arguments));
+
+            if (uriString.startsWith("android.resource://")) {
+                // Handle resource URI
+                handleResourceBinary();
+            } else {
+                // Handle file URI or other sources
+                handleCustomBinary();
+            }
+        } else {
+            Log.e("BinaryService", "No binary selected.");
+        }
+    }
+
+    private void handleResourceBinary() {
+        Log.d("BinaryService", "Using resource binary.");
+        BinaryExecutor.executeBinary(this, arguments, output -> {
+            Log.d("BinaryOutput", output);
+        });
+    }
+
+    private void handleCustomBinary() {
+        Log.d("BinaryService", "Handling custom binary from URI: " + binaryUri);
+        // Add logic for handling external files if needed
+        // For now, we use the default binary.
+        handleDefaultBinary();
+    }
+
     private void handleDefaultBinary() {
-        File binaryFile = new File(getFilesDir(), "defaultBinary"); // Changed file name to defaultBinary
+        File binaryFile = new File(getFilesDir(), "defaultBinary");
         if (!binaryFile.exists()) {
             try (InputStream in = getResources().openRawResource(R.raw.majorbin);
                  FileOutputStream out = new FileOutputStream(binaryFile)) {
@@ -96,6 +118,7 @@ public class BinaryService extends Service {
                 }
 
                 binaryFile.setExecutable(true, false);
+                Log.d("BinaryService", "Default binary copied to: " + binaryFile.getAbsolutePath());
 
             } catch (Exception e) {
                 Log.e("BinaryService", "Failed to handle default binary", e);
@@ -107,9 +130,6 @@ public class BinaryService extends Service {
         });
     }
 
-
-
-
     private Notification createNotification() {
         // Create the Stop Binary intent and PendingIntent
         Intent stopIntent = new Intent(this, BinaryService.class);
@@ -118,12 +138,11 @@ public class BinaryService extends Service {
         PendingIntent stopPendingIntent = PendingIntent.getService(
                 this, 0, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-        Notification notification;
-
         // Check for Android O and above for notification channel
+        Notification notification;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder notificationBuilder = new Notification.Builder(this, CHANNEL_ID)
-                    .setContentTitle("JGO Service Running")
+                    .setContentTitle("JTV-GO Service Running")
                     .setContentText("The server is running in the background.")
                     .setSmallIcon(R.drawable.notifications_24px)
                     .setOngoing(true)
@@ -131,7 +150,7 @@ public class BinaryService extends Service {
             notification = notificationBuilder.build();
         } else {
             NotificationCompat.Builder notificationBuilder = new NotificationCompat.Builder(this)
-                    .setContentTitle("JGO Service Running")
+                    .setContentTitle("JTV-GO Service Running")
                     .setContentText("The server is running in the background.")
                     .setSmallIcon(R.drawable.notifications_24px)
                     .setOngoing(true)
@@ -142,10 +161,10 @@ public class BinaryService extends Service {
         return notification;
     }
 
-
     @Override
     public void onDestroy() {
         super.onDestroy();
+        Log.d("BinaryService", "Service destroyed.");
     }
 
     @Override
