@@ -43,7 +43,9 @@ public class BinaryService extends Service {
             Log.d("BinaryService", "Binary stopped by user.");
 
             Intent broadcastIntent = new Intent(ACTION_BINARY_STOPPED);
+            broadcastIntent.setPackage(getPackageName()); // Ensure the broadcast is internal-only
             sendBroadcast(broadcastIntent);
+
 
             stopForeground(true);
             stopSelf();
