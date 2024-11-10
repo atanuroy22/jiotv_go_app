@@ -525,7 +525,7 @@ public class WebPlayerActivity extends ComponentActivity {
             String formattedPlayId = channel.playId.contains("?")
                     ? channel.playId.indexOf('?') == 0
                     ? "??" + channel.playId.substring(1)
-                    : channel.playId.replaceFirst("\\?", "??") 
+                    : channel.playId.replaceFirst("\\?", "??")
                     : channel.playId + "??";
 
             Log.d(TAG, "Injecting Channel into WebView - Name: " + channel.channelName + ", Play ID: " + formattedPlayId);
