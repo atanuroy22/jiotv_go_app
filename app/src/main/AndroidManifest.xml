@@ -50,11 +50,14 @@
             android:exported="true">
         </activity>
 
-        <activity android:name=".activity.WebPlayerActivity"
-            android:exported="true">
+        <activity
+            android:name=".activity.WebPlayerActivity"
+            android:configChanges="orientation|screenSize"
+            android:resizeableActivity="true"
+            android:supportsPictureInPicture="true" >
         </activity>
 
-        <activity android:name=".utils.DemoConfigDownloader"
+        <activity android:name=".utils.ConfigSyncHandler"
             android:exported="true">
         </activity>
 
