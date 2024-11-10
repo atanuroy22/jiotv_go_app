@@ -26,6 +26,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -46,26 +47,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.twotone.ExitToApp
-import androidx.compose.material.icons.automirrored.twotone.Login
 import androidx.compose.material.icons.filled.DeveloperMode
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.DeveloperMode
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.twotone.Close
 import androidx.compose.material.icons.twotone.Deblur
-import androidx.compose.material.icons.twotone.ExitToApp
-import androidx.compose.material.icons.twotone.Key
 import androidx.compose.material.icons.twotone.LiveTv
-import androidx.compose.material.icons.twotone.LocalPolice
-import androidx.compose.material.icons.twotone.Login
 import androidx.compose.material.icons.twotone.PlayArrow
 import androidx.compose.material.icons.twotone.ResetTv
-import androidx.compose.material.icons.twotone.Sailing
-import androidx.compose.material.icons.twotone.Shield
 import androidx.compose.material.icons.twotone.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
@@ -89,10 +80,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -104,6 +95,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
 import com.skylake.skytv.jgorunner.activity.DebugScreen
 import com.skylake.skytv.jgorunner.activity.InfoScreen
 import com.skylake.skytv.jgorunner.activity.LoginScreen
@@ -116,8 +108,8 @@ import com.skylake.skytv.jgorunner.data.jsonmaker
 import com.skylake.skytv.jgorunner.services.BinaryExecutor
 import com.skylake.skytv.jgorunner.services.BinaryService
 import com.skylake.skytv.jgorunner.ui.theme.JGOTheme
-import com.skylake.skytv.jgorunner.utils.Config2DL
-import com.skylake.skytv.jgorunner.utils.ConfigUtil
+import com.skylake.skytv.jgorunner.utils.RemoteBinaryFetcher
+import com.skylake.skytv.jgorunner.utils.ConfigHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -337,11 +329,11 @@ class MainActivity : ComponentActivity() {
 
 
             val expectedFileSize: Int? = preferenceManager.getKey("expectedFileSize")?.toIntOrNull()
-            Config2DL.isFileSizeSame(expectedFileSize) { result ->
+            RemoteBinaryFetcher.isFileSizeSame(expectedFileSize) { result ->
                 if (result) {
                     if (expectedFileSize == 69){
                         isOutputShowing = true
-                        Config2DL.startDownloadAndSave(this@MainActivity) { output ->
+                        RemoteBinaryFetcher.startDownloadAndSave(this@MainActivity) { output ->
                             Handler(Looper.getMainLooper()).post {
                                 outputText += "\n$output"
                             }
@@ -427,6 +419,7 @@ class MainActivity : ComponentActivity() {
                         RedirectPopup(
                             isVisible = showRedirectPopup,
                             countdownTime = countdownTimeF,
+                            context = this@MainActivity,
                             onDismiss = {
                                 showRedirectPopup = false
                                 shouldLaunchIPTV = false // Cancel IPTV launch if dismissed
@@ -512,7 +505,7 @@ class MainActivity : ComponentActivity() {
                                 showAutoUpdatePopup = false
                                 preferenceManager.setKey("expectedFileSize", "0")
                                 isOutputShowing = true
-                                Config2DL.startDownloadAndSave(this@MainActivity
+                                RemoteBinaryFetcher.startDownloadAndSave(this@MainActivity
                                 ) { output ->
                                     runOnUiThread {
                                             outputText += "\n$output"
@@ -610,7 +603,7 @@ class MainActivity : ComponentActivity() {
         }
 
         // Use the utility function to fetch and save config
-        ConfigUtil.fetchAndSaveConfig(this)
+        ConfigHandler.fetchAndSaveConfig(this)
 
         val isUpdate = preferenceManager.getKey("isUpdate")
         val isEngine = preferenceManager.getKey("isEngine")
@@ -854,14 +847,30 @@ class MainActivity : ComponentActivity() {
 
 
 
-
-
     @Composable
-    fun RedirectPopup(isVisible: Boolean, countdownTime: Int, onDismiss: () -> Unit) {
+    fun RedirectPopup(
+        isVisible: Boolean,
+        countdownTime: Int,
+        onDismiss: () -> Unit,
+        context: Context // Add context as a parameter to access PackageManager
+    ) {
         var currentTime by remember { mutableIntStateOf(countdownTime) }
+        val appIPTV = preferenceManager.getKey("app_name") ?: "IPTV app"
+        val appIPTVpkg = preferenceManager.getKey("app_packagename")
+
+        // Retrieve the app icon from the package name
+        val appIcon = remember {
+            try {
+                val pm = context.packageManager
+                pm.getApplicationIcon(appIPTVpkg ?: "")
+            } catch (e: Exception) {
+                null
+            }
+        }
 
         if (isVisible) {
             Log.d("RedirectPopup", "Popup is visible.")
+
             // Countdown logic
             LaunchedEffect(isVisible) {
                 currentTime = countdownTime
@@ -877,10 +886,55 @@ class MainActivity : ComponentActivity() {
 
             AlertDialog(
                 onDismissRequest = { onDismiss() },
-                title = { Text("Redirecting") },
-                text = { Text("You will be redirected to the IPTV app in $currentTime seconds.") },
+//                title = {
+//                    Row(verticalAlignment = Alignment.CenterVertically) {
+//                        Icon(
+//                            imageVector = Icons.Filled.Flare,
+//                            contentDescription = "Timer Icon",
+//                            modifier = Modifier.padding(end = 8.dp)
+//                        )
+//                        Text("Redirecting")
+//                    }
+//                },
+                text = {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        appIcon?.let {
+                            Image(
+                                bitmap = it.toBitmap().asImageBitmap(),
+                                contentDescription = "App Icon",
+                                modifier = Modifier.size(48.dp).padding(bottom = 8.dp)
+                            )
+                        }
+
+                        Text(
+                            text = "Redirecting to $appIPTV",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            ),
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+
+                        Text(
+                            text = "$currentTime seconds remaining",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.secondary
+                            ),
+                            modifier = Modifier.alpha(if (currentTime % 2 == 0) 1f else 0.7f) // subtle flicker effect
+                        )
+                    }
+                },
                 confirmButton = {
-                    Button(onClick = { onDismiss() }) {
+                    Button(
+                        onClick = { onDismiss() },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    ) {
                         Text("Dismiss")
                     }
                 },
@@ -890,6 +944,11 @@ class MainActivity : ComponentActivity() {
             Log.d("RedirectPopup", "Popup is NOT visible.")
         }
     }
+
+
+
+
+
 
     @Composable
     fun CustPopup(isVisible: Boolean, xtitle: String, xsubtitle: String, xokbtn: String, xendbtn: String, onOk: () -> Unit, onDismiss: () -> Unit) {
@@ -1154,7 +1213,7 @@ class MainActivity : ComponentActivity() {
                     .fillMaxWidth()
                     .border(2.dp, Color.Gray, RoundedCornerShape(8.dp))
                     .background(
-                        if (isGlowBox) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
+                        if (isGlowBox) MaterialTheme.colorScheme.errorContainer else  Color(0xFFA5D6A7),
                         RoundedCornerShape(8.dp)
                     )
                     .padding(5.dp)
@@ -1165,7 +1224,7 @@ class MainActivity : ComponentActivity() {
                 Text(
                     text = wifiIpAddress,
                     fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = if (isGlowBox) MaterialTheme.colorScheme.onSurface else  Color.Black,
                     modifier = Modifier
                         .align(Alignment.Center)
                         .clickable {
