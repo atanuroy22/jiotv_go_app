@@ -521,16 +521,18 @@ public class WebPlayerActivity extends ComponentActivity {
             }
         }
 
-        // Inject each recent channel into the UI
         for (Channel channel : recentChannels) {
             String formattedPlayId = channel.playId.contains("?")
-                    ? channel.playId.equals("?") ? "??" : channel.playId
+                    ? channel.playId.indexOf('?') == 0
+                    ? "??" + channel.playId.substring(1)
+                    : channel.playId.replaceFirst("\\?", "??") 
                     : channel.playId + "??";
 
             Log.d(TAG, "Injecting Channel into WebView - Name: " + channel.channelName + ", Play ID: " + formattedPlayId);
 
             injectTVChannel(channel.channelName, formattedPlayId, channel.logoUrl);
         }
+
     }
 
 
