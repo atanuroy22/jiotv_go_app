@@ -1,28 +1,37 @@
 package com.skylake.skytv.jgorunner.utils
 
-import android.content.Context
+import android.os.Bundle
 import android.util.Log
+import androidx.activity.ComponentActivity
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import kotlinx.coroutines.*
 import java.net.HttpURLConnection
 import java.net.URL
 
-object ConfigUtil {
+class ConfigSyncHandler : ComponentActivity() {
 
-    private const val TAG = "ConfigUtils"
+    private lateinit var preferenceManager: SkySharedPref
+    private val TAG = "ConfigDownloader"
 
-    fun fetchAndSaveConfig(context: Context) {
-        val preferenceManager = SkySharedPref(context)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
 
-        // Launch coroutine to handle background network operations
+        preferenceManager = SkySharedPref(this)
+
+        // Fetch and parse the config file
+        fetchAndParseConfig()
+    }
+
+    private fun fetchAndParseConfig() {
+        // Use a coroutine to perform network requests on a background thread
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val configUrl = "https://raw.githubusercontent.com/siddharthsky/Extrix/main/JGO/syncrunner1.cfg"
                 val configData = downloadFile(configUrl)
 
                 if (configData != null) {
-                    // Parse and save the config data into preferences
-                    parseAndSaveConfigData(configData, preferenceManager)
+                    // Parse the file contents and save to preferences
+                    parseConfigData(configData)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error fetching or parsing config: ${e.message}")
@@ -30,7 +39,6 @@ object ConfigUtil {
         }
     }
 
-    // Download the configuration file
     private suspend fun downloadFile(fileUrl: String): String? {
         return withContext(Dispatchers.IO) {
             try {
@@ -50,19 +58,31 @@ object ConfigUtil {
         }
     }
 
-    // Parse the file contents and save each key-value pair to preferences
-    private fun parseAndSaveConfigData(configData: String, preferenceManager: SkySharedPref) {
+    private fun parseConfigData(configData: String) {
+        // Split the content into lines
         val lines = configData.split("\n")
+
+        // Loop through each line and extract key-value pairs
         for (line in lines) {
             if (line.contains("=")) {
                 val parts = line.split("=")
                 if (parts.size == 2) {
                     val key = parts[0].trim()
-                    val value = parts[1].replace("\"", "").trim() // Remove any quotes
-                    preferenceManager.setKey(key, value)
-                    Log.d(TAG, "Saved Key: $key with Value: $value")
+                    val value = parts[1].replace("\"", "").trim() // Remove quotes if present
+                    saveToPreferences(key, value)
                 }
             }
         }
+    }
+
+    private fun saveToPreferences(key: String, value: String) {
+        // Log the key-value pair before saving it
+        //Log.d(TAG, "Saving to preferences: Key = $key, Value = $value")
+
+        // Store the key-value pair in SkySharedPref
+        preferenceManager.setKey(key, value)
+
+        // Log confirmation after saving
+        Log.d(TAG, "Saved Key: $key with Value: $value")
     }
 }

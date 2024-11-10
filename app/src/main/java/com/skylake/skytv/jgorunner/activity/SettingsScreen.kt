@@ -6,7 +6,6 @@ import android.content.Intent
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -32,6 +31,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.nativeKeyCode
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import com.skylake.skytv.jgorunner.data.SkySharedPref
@@ -39,7 +40,8 @@ import com.skylake.skytv.jgorunner.data.applyConfigurations
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.skylake.skytv.jgorunner.MainActivity
-import com.skylake.skytv.jgorunner.utils.Config2DL
+import com.skylake.skytv.jgorunner.R
+import com.skylake.skytv.jgorunner.utils.RemoteBinaryFetcher
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,6 +51,8 @@ fun SettingsScreen(context: Context) {
     val preferenceManager = remember { SkySharedPref(context) }
 
     val focusRequester = remember { FocusRequester() }
+
+    val customFontFamily = FontFamily(Font(R.font.chakrapetch_bold))
 
     // Retrieve saved switch states
     val savedSwitchStateForLOCAL = preferenceManager.getKey("isFlagSetForLOCAL") == "Yes"
@@ -68,6 +72,9 @@ fun SettingsScreen(context: Context) {
 
     val savedSwitchStateForAutoIPTV = preferenceManager.getKey("isFlagSetForAutoIPTV") == "Yes"
     var isSwitchOnForAutoIPTV by remember { mutableStateOf(savedSwitchStateForAutoIPTV) }
+
+    val savedisCheckForUpdate = preferenceManager.getKey("isCheckForUpdate") == "Yes"
+    var isSwitchOnCheckForUpdate by remember { mutableStateOf(savedisCheckForUpdate) }
 
     val savedSwitchStateForAutoStartIPTVOnBoot = preferenceManager.getKey("isFlagSetForAutoBootIPTV") == "Yes"
     var isSwitchOnForisFlagSetForAutoBootIPTV by remember { mutableStateOf(savedSwitchStateForAutoStartIPTVOnBoot) }
@@ -131,6 +138,11 @@ fun SettingsScreen(context: Context) {
         }
     }
 
+    LaunchedEffect(isSwitchOnCheckForUpdate) {
+        preferenceManager.setKey("isCheckForUpdate", if (isSwitchOnCheckForUpdate) "Yes" else "No")
+        applyConfigurations(context, preferenceManager)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -138,7 +150,7 @@ fun SettingsScreen(context: Context) {
     ) {
         // TopAppBar
         TopAppBar(
-            title = { Text(text = "Settings", fontSize = 30.sp) },
+            title = { Text(text = "Settings", fontSize = 30.sp,fontFamily = customFontFamily) },
         )
 
         // Content
@@ -165,22 +177,27 @@ fun SettingsScreen(context: Context) {
                 )
             }
 
-            // Conditionally render the Auto Start IPTV on Boot switch
-            if (false) {
+
+
+            // Conditionally render the Boot switch
+            if (isSwitchOnForAutoStartOnBoot) {
                 item {
+                    val stateBG = if (isSwitchOnForisFlagSetForAutoBootIPTV) "background" else "foreground"
                     SettingSwitchItem(
-                        icon = Icons.Filled.PlayArrow,
-                        title = "Auto Start IPTV on Boot",
-                        subtitle = "Automatically start IPTV on boot",
+                        icon = Icons.Filled.CenterFocusStrong,
+                        title = "Server Start Mode",
+                        subtitle =  "The server will start in $stateBG mode",
                         isChecked = isSwitchOnForisFlagSetForAutoBootIPTV,
-                        onCheckedChange = { isChecked -> isSwitchOnForisFlagSetForAutoBootIPTV = isChecked }
+                        onCheckedChange = {
+                            isChecked -> isSwitchOnForisFlagSetForAutoBootIPTV = isChecked
+                        }
                     )
                 }
             }
 
             item {
                 SettingSwitchItem(
-                    icon = Icons.Filled.NetworkWifi,
+                    icon = Icons.Filled.Public,
                     title = "Use Server Publicly",
                     subtitle = "Allow access to server from other devices",
                     isChecked = isSwitchOnForLOCAL,
@@ -197,6 +214,14 @@ fun SettingsScreen(context: Context) {
                     onClick = { showPortDialog = true }
                 )
             }
+
+//            item {
+//                HorizontalDivider(
+//                    modifier = Modifier.padding(horizontal = 16.dp),
+//                    thickness = 1.dp,
+//                    color = MaterialTheme.colorScheme.surface
+//                )
+//            }
 
             if (false) {
                 item {
@@ -269,6 +294,25 @@ fun SettingsScreen(context: Context) {
 
             }
 
+//            item {
+//                HorizontalDivider(
+//                    modifier = Modifier.padding(horizontal = 16.dp),
+//                    thickness = 1.dp,
+//                    color = Color.Gray
+//                )
+//            }
+
+
+            item {
+                SettingSwitchItem(
+                    icon = Icons.Filled.SoupKitchen,
+                    title = "Check for updates",
+                    subtitle = "Check for updates when the app starts",
+                    isChecked = isSwitchOnCheckForUpdate,
+                    onCheckedChange = { isChecked -> isSwitchOnCheckForUpdate = isChecked }
+                )
+            }
+
             item {
                 SettingItem(
                     icon = Icons.Filled.ArrowCircleUp,
@@ -276,7 +320,7 @@ fun SettingsScreen(context: Context) {
                     subtitle = "Update to the latest binary version.",
                     onClick = {
                         preferenceManager.setKey("expectedFileSize", "0")
-                        Config2DL.startDownloadAndSave(context) { output ->
+                        RemoteBinaryFetcher.startDownloadAndSave(context) { output ->
                             Handler(Looper.getMainLooper()).post {
                                 Toast.makeText(context, output, Toast.LENGTH_LONG).show()
                             }
@@ -296,6 +340,23 @@ fun SettingsScreen(context: Context) {
                         }
 
                     }
+                )
+            }
+
+
+            item {
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp),
+                    thickness = 1.dp,
+                )
+            }
+
+            item {
+                Text(
+                    text = "Note: EPG is not supported.",
+                    fontSize = 14.sp,
+                    color = Color.Gray,
+                    modifier = Modifier.padding(horizontal = 16.dp)
                 )
             }
 

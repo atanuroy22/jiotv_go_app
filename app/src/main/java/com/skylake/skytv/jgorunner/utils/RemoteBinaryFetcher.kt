@@ -12,7 +12,7 @@ import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
-object Config2DL {
+object RemoteBinaryFetcher {
 
     private const val TAG = "Config2DL"
     private const val FILE_NAME = "majorbin"

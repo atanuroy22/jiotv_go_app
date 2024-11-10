@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -56,7 +57,27 @@ fun AppListScreen(onAppSelected: (AppInfo) -> Unit) {
 
     LaunchedEffect(Unit) {
         coroutineScope.launch {
-            apps.addAll(getInstalledApps(context))
+            val installedApps = getInstalledApps(context)
+
+            val addedOptions = listOf(
+                AppInfo(
+                    appName = "No IPTV",
+                    icon = context.getDrawable(R.drawable.ic_menu_close_clear_cancel)!!,
+                    packageName = "",
+                    launchActivity = ""
+                ),
+                AppInfo(
+                    appName = "WEB TV",
+                    icon = context.getDrawable(com.skylake.skytv.jgorunner.R.mipmap.ic_launcher_neo)!!,
+                    packageName = "webtv",
+                    launchActivity = ""
+                )
+            )
+
+
+            val sortedInstalledApps = installedApps.sortedBy { it.appName }
+            apps.addAll(addedOptions)
+            apps.addAll(sortedInstalledApps)
         }
     }
 
@@ -67,6 +88,8 @@ fun AppListScreen(onAppSelected: (AppInfo) -> Unit) {
         }
     }
 }
+
+
 
 @Composable
 fun AppListItem(appInfo: AppInfo, onAppSelected: (AppInfo) -> Unit) {
@@ -88,9 +111,20 @@ fun AppListItem(appInfo: AppInfo, onAppSelected: (AppInfo) -> Unit) {
 
         Spacer(modifier = Modifier.width(16.dp))
 
-        Text(text = appInfo.appName, style = MaterialTheme.typography.bodyMedium)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        ) {
+            Text(
+                text = appInfo.appName,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.align(Alignment.CenterStart)
+            )
+        }
     }
 }
+
 
 data class AppInfo(
     val appName: String,

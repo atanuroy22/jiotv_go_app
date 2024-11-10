@@ -8,6 +8,8 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import java.net.InetAddress
 import java.text.SimpleDateFormat
@@ -34,21 +37,12 @@ fun InfoScreen(context: Context) {
     val totalStorage = getTotalStorageSpace(context)
     val dateTime = getCurrentDateTime()
 
-//    // Creating a formatted device information string
-//    val deviceInfo = """
-//        JGO Version: $appVersion
-//        IP Address: $ipAddress
-//        Android Version: $androidVersion
-//        SDK Version: $sdkVersion
-//        Country Code: $countryCode
-//        Architecture: $architecture
-//        Storage Space: $totalStorage GB
-//        Date and Time: $dateTime
-//    """.trimIndent()
+    // Checking permissions
+    val permissionsStatus = checkPermissions(context)
 
     // Creating a formatted device information string
     val deviceInfo = """
-        JGO Version: $appVersion
+        JTV-GO Version: $appVersion
         Binary Version: $binVersion
         IP Address: $ipAddress
         Android Version: $androidVersion
@@ -60,13 +54,14 @@ fun InfoScreen(context: Context) {
 
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
+            . fillMaxSize()
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()), // Make it scrollable
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "### JGO Server ###",
+            text = "### JTV-GO Server ###",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 8.dp)
@@ -81,11 +76,41 @@ fun InfoScreen(context: Context) {
         // Device Info Section
         Text(text = deviceInfo, fontSize = 16.sp, modifier = Modifier.padding(16.dp))
 
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Divider for permissions section
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+        // Permissions Status Section
+        Text(
+            text = "Permissions Status:",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(vertical = 8.dp)
+        )
+        Column {
+            permissionsStatus.forEach { status ->
+                Text(
+                    text = status,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(vertical = 2.dp)
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(32.dp))
 
         Button(
             onClick = {
-                copyToClipboard(context, deviceInfo)
+                val allInfo = buildString {
+                    append(deviceInfo)
+                    append("\n\nPermissions Status:\n")
+                    permissionsStatus.forEach { status ->
+                        append("$status\n")
+                    }
+                }
+
+                copyToClipboard(context, allInfo)
                 Toast.makeText(context, "Information copied to clipboard", Toast.LENGTH_SHORT).show()
             },
             modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -94,6 +119,7 @@ fun InfoScreen(context: Context) {
         }
     }
 }
+
 
 
 // Function to get the app version
@@ -141,4 +167,24 @@ fun copyToClipboard(context: Context, text: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     val clip = ClipData.newPlainText("Device Info", text)
     clipboard.setPrimaryClip(clip)
+}
+
+// Function to check permissions
+fun checkPermissions(context: Context): List<String> {
+    val requiredPermissions = listOf(
+        android.Manifest.permission.READ_EXTERNAL_STORAGE,
+        android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {android.Manifest.permission.POST_NOTIFICATIONS} else {
+            TODO("VERSION.SDK_INT < TIRAMISU") },
+        android.Manifest.permission.SYSTEM_ALERT_WINDOW,
+    )
+
+    return requiredPermissions.map { permission ->
+        val permissionName = permission.substringAfterLast(".")
+        if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED) {
+            "$permissionName: Granted"
+        } else {
+            "$permissionName: Denied"
+        }
+    }
 }

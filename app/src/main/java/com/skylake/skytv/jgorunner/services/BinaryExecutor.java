@@ -2,10 +2,13 @@ package com.skylake.skytv.jgorunner.services;
 
 import android.content.Context;
 import android.os.Build;
+import android.os.Environment;
 import android.util.Log;
+import android.widget.Toast;
+
 import com.skylake.skytv.jgorunner.R;
 import com.skylake.skytv.jgorunner.data.SkySharedPref;
-import com.skylake.skytv.jgorunner.utils.Config2DL;
+import com.skylake.skytv.jgorunner.utils.RemoteBinaryFetcher;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -28,9 +31,18 @@ public class BinaryExecutor {
             File binaryFile = new File(context.getFilesDir(), "majorbin");
 
             try {
+
+                String arch =  preferenceManager.getKey("ARCHx");
+                Log.d(TAG, "Device architecture: " + arch);
+
+                assert arch != null;
+                if (!arch.toLowerCase().contains("arm") && !arch.toLowerCase().contains("aarch")) {
+                    Toast.makeText(context, "The device architecture["+arch+"] is not supported.", Toast.LENGTH_SHORT).show();
+                }
+
                 handleBinaryFile(preferenceManager, binaryFile, context, callback);
                 setBinaryExecutable(binaryFile);
-                String command = buildCommand(preferenceManager, arguments, binaryFile);
+                String command = buildCommand(preferenceManager, arguments, binaryFile,context);
 
                 String command_log = preferenceManager.getKey("__MasterArgs_final");
                 Log.d("DIX.Runner",command_log);
@@ -52,7 +64,7 @@ public class BinaryExecutor {
         }
 
         if (!binaryFile.exists()) {
-            Config2DL.INSTANCE.startDownloadAndSave(context, callback);
+            RemoteBinaryFetcher.INSTANCE.startDownloadAndSave(context, callback);
             /* DEBUG CASE */
             boolean skipper = false;
             if (skipper) {
@@ -94,16 +106,64 @@ public class BinaryExecutor {
 
     private static void setBinaryExecutable(File binaryFile) {
         if (binaryFile.exists()) {
-            binaryFile.setExecutable(true, false);
+            boolean success = binaryFile.setExecutable(true, false);
+            // Intentionally ignore the result without further action
+            Log.d(TAG,"binaryPermissions: " + success);
         }
     }
 
-    private static String buildCommand(SkySharedPref preferenceManager, String[] arguments, File binaryFile) {
+    private static String buildCommand(SkySharedPref preferenceManager, String[] arguments, File binaryFile, Context context) {
         StringBuilder commandBuilder = new StringBuilder(binaryFile.getAbsolutePath());
         String __Port = preferenceManager.getKey("__Port");
         String __Public = preferenceManager.getKey("__Public");
 
-        commandBuilder.append(" run").append(__Port).append(__Public);
+        /* DEBUG CASE */
+//        commandBuilder.append(" run").append(__Port).append(__Public).append(" --config \"jiotv-config.json\"");
+
+        // Internal storage
+        if (false) {
+            commandBuilder.append(" run")
+                    .append(__Port)
+                    .append(__Public)
+                    .append(" --config \"")
+                    .append(context.getFilesDir().getAbsolutePath())
+                    .append("/jiotv-config.json\"");
+        }
+
+        // External storage
+        if (true) {
+            String externalStoragePath = Environment.getExternalStorageDirectory().getPath();
+            File folder = new File(externalStoragePath, ".jiotv_go");
+            File jsonFile = new File(folder, "jiotv-config.json");
+            File keyFile = new File(folder, "key.pem");
+            File certFile = new File(folder, "cert.pem");
+
+            commandBuilder.append(" run")
+                    .append(__Port)
+                    .append(__Public)
+                    .append(" --config \"")
+                    .append(jsonFile.getAbsolutePath())
+                    .append("\"");
+
+            /* DEBUG CASE: DRM */
+            if (false){
+                commandBuilder.append(" run")
+                        .append(__Port)
+                        .append(__Public)
+                        .append(" --tls")
+                        .append(" --tls-key \"")
+                        .append(keyFile.getAbsolutePath())
+                        .append("\"")
+                        .append(" --tls-cert \"")
+                        .append(certFile.getAbsolutePath())
+                        .append("\"")
+                        .append(" --config \"")
+                        .append(jsonFile.getAbsolutePath())
+                        .append("\"");
+            }
+        }
+
+
 
         preferenceManager.setKey("__MasterArgs_final",commandBuilder.toString());
 
@@ -215,6 +275,7 @@ public class BinaryExecutor {
                 while ((bytesRead = inputStream.read(buffer)) != -1) {
                     String output = new String(buffer, 0, bytesRead);
                     outputBuilder.append(output).append("\n");
+                    Log.d(TAG, "Process output: " + output);
                     callback.onOutput(output);
                 }
             } catch (Exception e) {
@@ -223,3 +284,4 @@ public class BinaryExecutor {
         }
     }
 }
+
