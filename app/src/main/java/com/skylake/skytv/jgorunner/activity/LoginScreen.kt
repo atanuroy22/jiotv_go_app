@@ -68,7 +68,7 @@ fun LoginScreen(context: Context) {
                 .alpha(0.1f)
         ) {
             Text(
-                text = "NOT WORKING",
+                text = "NOT WORKING - EXPERIMENTAL",
                 fontSize = 50.sp,
                 color = Color.Red,
                 modifier = Modifier.align(Alignment.Center)
