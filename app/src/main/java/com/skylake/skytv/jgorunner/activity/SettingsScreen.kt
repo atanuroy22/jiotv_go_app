@@ -6,7 +6,6 @@ import android.content.Intent
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -42,7 +41,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.skylake.skytv.jgorunner.MainActivity
 import com.skylake.skytv.jgorunner.R
-import com.skylake.skytv.jgorunner.utils.Config2DL
+import com.skylake.skytv.jgorunner.utils.RemoteBinaryFetcher
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -186,7 +185,7 @@ fun SettingsScreen(context: Context) {
                     val stateBG = if (isSwitchOnForisFlagSetForAutoBootIPTV) "background" else "foreground"
                     SettingSwitchItem(
                         icon = Icons.Filled.CenterFocusStrong,
-                        title = "Start Server Mode",
+                        title = "Server Start Mode",
                         subtitle =  "The server will start in $stateBG mode",
                         isChecked = isSwitchOnForisFlagSetForAutoBootIPTV,
                         onCheckedChange = {
@@ -321,7 +320,7 @@ fun SettingsScreen(context: Context) {
                     subtitle = "Update to the latest binary version.",
                     onClick = {
                         preferenceManager.setKey("expectedFileSize", "0")
-                        Config2DL.startDownloadAndSave(context) { output ->
+                        RemoteBinaryFetcher.startDownloadAndSave(context) { output ->
                             Handler(Looper.getMainLooper()).post {
                                 Toast.makeText(context, output, Toast.LENGTH_LONG).show()
                             }
@@ -341,6 +340,23 @@ fun SettingsScreen(context: Context) {
                         }
 
                     }
+                )
+            }
+
+
+            item {
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp),
+                    thickness = 1.dp,
+                )
+            }
+
+            item {
+                Text(
+                    text = "Note: EPG is not supported.",
+                    fontSize = 14.sp,
+                    color = Color.Gray,
+                    modifier = Modifier.padding(horizontal = 16.dp)
                 )
             }
 
