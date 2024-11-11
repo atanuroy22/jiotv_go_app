@@ -2,7 +2,7 @@ name: 🚀 Generate and Upload Release APK
 
 env:
   main_project_module: app
-  app_name: JGO-Server
+  app_name: JTV-GO-Server
 
 on:
   push:
