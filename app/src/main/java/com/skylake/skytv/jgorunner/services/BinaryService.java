@@ -24,8 +24,8 @@ public class BinaryService extends Service {
 
     private static final String CHANNEL_ID = "BinaryServiceChannel";
     private static final int NOTIFICATION_ID = 1;
-    public static final String ACTION_STOP_BINARY = "com.skylake.sky7t.jgo.action.STOP_BINARY";
-    public static final String ACTION_BINARY_STOPPED = "com.skylake.sky7t.jgo.action.BINARY_STOPPED";
+    public static final String ACTION_STOP_BINARY = "com.skylake.skytv.jgorunner.action.STOP_BINARY";
+    public static final String ACTION_BINARY_STOPPED = "com.skylake.skytv.jgorunner.action.BINARY_STOPPED";
 
     private Uri binaryUri;
     private String[] arguments;
@@ -125,7 +125,7 @@ public class BinaryService extends Service {
         // Check for Android O and above for notification channel
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder notificationBuilder = new Notification.Builder(this, CHANNEL_ID)
-                    .setContentTitle("JGO Service Running")
+                    .setContentTitle("JTV-GO Service Running")
                     .setContentText("The server is running in the background.")
                     .setSmallIcon(R.drawable.notifications_24px)
                     .setOngoing(true)
@@ -133,7 +133,7 @@ public class BinaryService extends Service {
             notification = notificationBuilder.build();
         } else {
             NotificationCompat.Builder notificationBuilder = new NotificationCompat.Builder(this)
-                    .setContentTitle("JGO Service Running")
+                    .setContentTitle("JTV-GO Service Running")
                     .setContentText("The server is running in the background.")
                     .setSmallIcon(R.drawable.notifications_24px)
                     .setOngoing(true)
