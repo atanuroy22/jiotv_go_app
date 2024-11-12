@@ -56,7 +56,7 @@
 
 3. **Using an IPTV Player**:
    - To access channels via an IPTV player, add the IPTV playlist URL in your preferred IPTV player app.
-   - Format of URL for JTV-GO: `[http://<IP>:<port>/playlist.m3u]` (if set up locally).
+   - Format of URL for JTV-GO: `[http://<IP>:<port>/playlist.m3u]`
    - Open the IPTV player and go to the section for adding playlists.
    - Input the JTV-GO IPTV playlist URL and save it.
    - Select the playlist to browse and play available channels.

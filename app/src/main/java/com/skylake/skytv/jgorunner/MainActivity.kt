@@ -91,6 +91,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
@@ -852,7 +853,7 @@ class MainActivity : ComponentActivity() {
         isVisible: Boolean,
         countdownTime: Int,
         onDismiss: () -> Unit,
-        context: Context // Add context as a parameter to access PackageManager
+        context: Context
     ) {
         var currentTime by remember { mutableIntStateOf(countdownTime) }
         val appIPTV = preferenceManager.getKey("app_name") ?: "IPTV app"
@@ -886,26 +887,21 @@ class MainActivity : ComponentActivity() {
 
             AlertDialog(
                 onDismissRequest = { onDismiss() },
-//                title = {
-//                    Row(verticalAlignment = Alignment.CenterVertically) {
-//                        Icon(
-//                            imageVector = Icons.Filled.Flare,
-//                            contentDescription = "Timer Icon",
-//                            modifier = Modifier.padding(end = 8.dp)
-//                        )
-//                        Text("Redirecting")
-//                    }
-//                },
                 text = {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxWidth()
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp)
                     ) {
                         appIcon?.let {
                             Image(
                                 bitmap = it.toBitmap().asImageBitmap(),
                                 contentDescription = "App Icon",
-                                modifier = Modifier.size(48.dp).padding(bottom = 8.dp)
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .padding(bottom = 8.dp)
                             )
                         }
 
@@ -916,6 +912,7 @@ class MainActivity : ComponentActivity() {
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
                             ),
+                            textAlign = TextAlign.Center,
                             modifier = Modifier.padding(vertical = 8.dp)
                         )
 
@@ -926,14 +923,19 @@ class MainActivity : ComponentActivity() {
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.secondary
                             ),
-                            modifier = Modifier.alpha(if (currentTime % 2 == 0) 1f else 0.7f) // subtle flicker effect
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .alpha(if (currentTime % 2 == 0) 1f else 0.7f)
+                                .padding(top = 8.dp)
                         )
                     }
                 },
                 confirmButton = {
                     Button(
                         onClick = { onDismiss() },
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
                         Text("Dismiss")
                     }
@@ -950,10 +952,11 @@ class MainActivity : ComponentActivity() {
 
 
 
+
     @Composable
     fun CustPopup(isVisible: Boolean, xtitle: String, xsubtitle: String, xokbtn: String, xendbtn: String, onOk: () -> Unit, onDismiss: () -> Unit) {
         if (isVisible) {
-            Log.d("CustPopup", "Popup is visible.")
+            Log.d("CustPopup", "CustPopup [$xtitle] is visible.")
 
             AlertDialog(
                 onDismissRequest = { onDismiss() },
@@ -972,7 +975,7 @@ class MainActivity : ComponentActivity() {
                 properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
             )
         } else {
-            Log.d("CustPopup", "CustPopup is NOT visible.")
+            Log.d("CustPopup", "CustPopup [$xtitle] is NOT visible.")
         }
     }
 
