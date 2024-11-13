@@ -62,9 +62,9 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
     LaunchedEffect(Unit) {
         launch(Dispatchers.IO) {
             repeat(3) {
-                val savedSwitchState = preferenceManager.getKey("isFlagSetForLOCAL")
+                val savedSwitchState = preferenceManager.getBoolean("isFlagSetForLOCAL")
                 Log.d("PreferenceCheck", "isFlagSetForLOCAL: $savedSwitchState")
-                isGlowing = savedSwitchState == "Yes"
+                isGlowing = savedSwitchState
                 delay(3000)
             }
         }

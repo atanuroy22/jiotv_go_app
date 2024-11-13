@@ -5,61 +5,45 @@ import android.util.Log
 import com.skylake.skytv.jgorunner.utils.createJsonFile
 
 fun applyConfigurations(context: Context, preferenceManager: SkySharedPref) {
-    val isFlagSetForLOCAL = preferenceManager.getKey("isFlagSetForLOCAL")
-    if (isFlagSetForLOCAL == "No") {
+    val isFlagSetForLOCAL = preferenceManager.getBoolean("isFlagSetForLOCAL")
+    if (!isFlagSetForLOCAL) {
         preferenceManager.setKey("__Public", "")
-        Log.d("DIX-isFlagSetForLOCAL", isFlagSetForLOCAL)
+        Log.d("DIX-isFlagSetForLOCAL", "No")
     } else {
         preferenceManager.setKey("__Public", " --public")
         Log.d("DIX-isFlagSetForLOCAL", "Public")
     }
 
-    val isCustomSetForPORT = preferenceManager.getKey("isCustomSetForPORT")
-    if (isCustomSetForPORT == "5350") {
-        preferenceManager.setKey("__Port", " --port 5350")
-        Log.d("DIX-isCustomSetForPORT", isCustomSetForPORT)
-    } else {
-        preferenceManager.setKey("__Port", " --port $isCustomSetForPORT")
-        Log.d("DIX-isCustomSetForPORT", "Custom Port $isCustomSetForPORT")
-    }
+    val isCustomSetForPORT = preferenceManager.getInt("isCustomSetForPORT", 5350)
+    preferenceManager.setKey("__Port", " --port $isCustomSetForPORT")
+    Log.d("DIX-isCustomSetForPORT", isCustomSetForPORT.toString())
 
-    val isFlagSetForAutoStartOnBoot = preferenceManager.getKey("isFlagSetForAutoStartOnBoot")
-    if (isFlagSetForAutoStartOnBoot == "Yes") {
-        Log.d("DIX-isAutoStartOnBoot", " $isFlagSetForAutoStartOnBoot")
-    } else {
-        Log.d("DIX-isAutoStartOnBoot", " $isFlagSetForAutoStartOnBoot")
-    }
+    val isFlagSetForAutoStartOnBoot = preferenceManager.getBoolean("isFlagSetForAutoStartOnBoot")
+    Log.d("DIX-isAutoStartOnBoot", isFlagSetForAutoStartOnBoot.toString())
 
-    val isFlagSetForAutoBootIPTV = preferenceManager.getKey("isFlagSetForAutoBootIPTV")
-    if (isFlagSetForAutoBootIPTV == "Yes") {
-        Log.d("DIX-isAutoBootIPTV", " $isFlagSetForAutoBootIPTV")
-    } else {
-        Log.d("DIX-isAutoBootIPTV", " $isFlagSetForAutoBootIPTV")
-    }
+    val isFlagSetForAutoBootIPTV = preferenceManager.getBoolean("isFlagSetForAutoBootIPTV")
+    Log.d("DIX-isAutoBootIPTV", isFlagSetForAutoBootIPTV.toString())
 
-    val isFlagSetForEPG = preferenceManager.getKey("isFlagSetForEPG")
-    if (isFlagSetForEPG == "Yes") {
+    val isFlagSetForEPG = preferenceManager.getBoolean("isFlagSetForEPG")
+    if (isFlagSetForEPG) {
 
         jsonmaker(context);
 
         preferenceManager.setKey("__EPG", " --config 'configtv.json'")
-
-        Log.d("DIX-isFlagSetForEPG", isFlagSetForEPG)
     } else {
         preferenceManager.setKey("__EPG", " ")
-        Log.d("DIX-isFlagSetForEPG", "No EPG")
     }
+    Log.d("DIX-isFlagSetForEPG", isFlagSetForEPG.toString())
 
-    val isFlagSetForAutoStartServer = preferenceManager.getKey("isFlagSetForAutoStartServer")
-    if (isFlagSetForAutoStartServer == "Yes") {
-        Log.d("DIX-AutoStartServer", isFlagSetForAutoStartServer)
+    val isFlagSetForAutoStartServer = preferenceManager.getBoolean("isFlagSetForAutoStartServer")
+    if (isFlagSetForAutoStartServer) {
+        Log.d("DIX-AutoStartServer", "true")
 
-        val isFlagSetForAutoIPTV = preferenceManager.getKey("isFlagSetForAutoIPTV")
-        if (isFlagSetForAutoIPTV == "No") {
-            Log.d("DIX-ForAutoIPTV", isFlagSetForAutoIPTV)
+        val isFlagSetForAutoIPTV = preferenceManager.getBoolean("isFlagSetForAutoIPTV")
+        if (!isFlagSetForAutoIPTV) {
+            Log.d("DIX-ForAutoIPTV", "false")
         }
     }
-
 
     val __Port = preferenceManager.getKey("__Port")
     val __Public = preferenceManager.getKey("__Public")

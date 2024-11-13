@@ -1,170 +1,162 @@
-package com.skylake.skytv.jgorunner.services;
+package com.skylake.skytv.jgorunner.services
 
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
-import android.app.Service;
-import android.content.Intent;
-import android.net.Uri;
-import android.os.Build;
-import android.os.IBinder;
-import android.util.Log;
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.Intent
+import android.graphics.drawable.Icon
+import android.os.Build
+import android.os.IBinder
+import android.util.Log
+import androidx.core.app.NotificationCompat
+import androidx.lifecycle.MutableLiveData
+import com.skylake.skytv.jgorunner.R
 
-import androidx.core.app.NotificationCompat;
+class BinaryService : Service() {
+    companion object {
+        // Constants
+        private const val CHANNEL_ID = "BinaryServiceChannel"
+        private const val NOTIFICATION_ID = 1
+        const val ACTION_STOP_BINARY: String = "com.skylake.skytv.jgorunner.action.STOP_BINARY"
+        const val ACTION_BINARY_STOPPED: String =
+            "com.skylake.skytv.jgorunner.action.BINARY_STOPPED"
 
-import com.skylake.skytv.jgorunner.R;
+        // Singleton instance of the BinaryService
+        var instance: BinaryService? = null
+            private set
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.util.Arrays;
-
-public class BinaryService extends Service {
-
-    private static final String CHANNEL_ID = "BinaryServiceChannel";
-    private static final int NOTIFICATION_ID = 1;
-    public static final String ACTION_STOP_BINARY = "com.skylake.skytv.jgorunner.action.STOP_BINARY";
-    public static final String ACTION_BINARY_STOPPED = "com.skylake.skytv.jgorunner.action.BINARY_STOPPED";
-
-    private Uri binaryUri;
-    private String[] arguments;
-
-    @Override
-    public void onCreate() {
-        super.onCreate();
-        createNotificationChannel();
+        val isRunning: Boolean
+            get() = instance != null
     }
 
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        if (ACTION_STOP_BINARY.equals(intent.getAction())) {
-            BinaryExecutor.stopBinary();
-            Log.d("BinaryService", "Binary stopped by user.");
+    // LiveData to observe the output of the ran binary
+    val binaryOutput: MutableLiveData<String> = MutableLiveData("")
 
-            Intent broadcastIntent = new Intent(ACTION_BINARY_STOPPED);
-            broadcastIntent.setPackage(getPackageName()); // Ensure the broadcast is internal-only
-            sendBroadcast(broadcastIntent);
-
-
-            stopForeground(true);
-            stopSelf();
-            return START_NOT_STICKY;
-        }
-
-        binaryUri = Uri.parse(intent.getStringExtra("binaryUri"));
-        arguments = intent.getStringArrayExtra("arguments");
-
-        if (binaryUri == null) {
-            binaryUri = Uri.parse("android.resource://com.skylake.skytv.jgorunner/raw/majorbin");
-        }
-
-        if (arguments == null) {
-            arguments = new String[]{"Boot Start"};
-        }
-
-        if (binaryUri != null) {
-            if (binaryUri.toString().startsWith("android.resource://")) {
-                Log.d("BinaryService1", "BinaryService started in the background. ? "+ Arrays.toString(arguments));
-                BinaryExecutor.executeBinary(this, arguments, output -> {
-                    Log.d("BinaryOutput", output);
-                });
-            } else {
-                Log.d("BinaryService2", "BinaryService started in the background. ? "+ Arrays.toString(arguments));
-                BinaryExecutor.executeBinary(this, arguments, output -> {
-                    Log.d("BinaryOutput", output);
-                });
-            }
-        } else {
-            Log.e("BinaryService", "No binary selected");
-        }
-
-        Notification notification = createNotification();
-        startForeground(NOTIFICATION_ID, notification);
-
-        return START_STICKY;
+    override fun onCreate() {
+        super.onCreate()
+        createNotificationChannel()
     }
 
-    private void handleDefaultBinary() {
-        File binaryFile = new File(getFilesDir(), "defaultBinary"); // Changed file name to defaultBinary
-        if (!binaryFile.exists()) {
-            try (InputStream in = getResources().openRawResource(R.raw.majorbin);
-                 FileOutputStream out = new FileOutputStream(binaryFile)) {
+    override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
+        if (intent.action == ACTION_STOP_BINARY) {
+            // Stop the binary
+            BinaryExecutor.stopBinary()
+            Log.d("BinaryService", "Binary stopped by user.")
 
-                byte[] buffer = new byte[1024];
-                int bytesRead;
-                while ((bytesRead = in.read(buffer)) != -1) {
-                    out.write(buffer, 0, bytesRead);
-                }
+            // Broadcast that the binary has stopped
+            val broadcastIntent = Intent(ACTION_BINARY_STOPPED)
 
-                binaryFile.setExecutable(true, false);
+            // Ensure the broadcast is internal-only
+            broadcastIntent.setPackage(packageName)
 
-            } catch (Exception e) {
-                Log.e("BinaryService", "Failed to handle default binary", e);
-            }
+            // Send the broadcast
+            sendBroadcast(broadcastIntent)
+
+            // Set the singleton instance to null
+            instance = null
+
+            @Suppress("deprecation")
+            stopForeground(true)
+            stopSelf()
+            return START_NOT_STICKY
         }
 
-        BinaryExecutor.executeBinary(this, arguments, output -> {
-            Log.d("BinaryOutput", output);
-        });
+        // Prevents the service from being running again if it's already running
+        if (isRunning) return START_STICKY
+
+        // Set the singleton instance to this
+        instance = this
+
+        // Get the arguments from the intent
+        var arguments = intent.getStringArrayExtra("arguments")
+
+        // If the arguments are null, set it to the default arguments
+        if (arguments == null)
+            arguments = arrayOf("Boot Start")
+
+        Log.d(
+            "BinaryService",
+            "BinaryService started in the background. ? " + arguments.contentToString()
+        )
+
+        // Execute the binary
+        BinaryExecutor.executeBinary(
+            this, arguments
+        ) { output: String ->
+            binaryOutput.postValue("${binaryOutput.value}\n$output")
+            Log.d("BinaryOutput", output)
+        }
+
+        // Create the notification for the service
+        val notification = createNotification()
+        startForeground(NOTIFICATION_ID, notification)
+
+        return START_STICKY
     }
 
-
-
-
-    private Notification createNotification() {
+    private fun createNotification(): Notification {
         // Create the Stop Binary intent and PendingIntent
-        Intent stopIntent = new Intent(this, BinaryService.class);
-        stopIntent.setAction(ACTION_STOP_BINARY);
+        val stopIntent = Intent(this, BinaryService::class.java)
+        stopIntent.setAction(ACTION_STOP_BINARY)
 
-        PendingIntent stopPendingIntent = PendingIntent.getService(
-                this, 0, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        val stopPendingIntent = PendingIntent.getService(
+            this, 0, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
 
-        Notification notification;
+        val notification: Notification
 
         // Check for Android O and above for notification channel
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Builder notificationBuilder = new Notification.Builder(this, CHANNEL_ID)
-                    .setContentTitle("JTV-GO Service Running")
-                    .setContentText("The server is running in the background.")
-                    .setSmallIcon(R.drawable.notifications_24px)
-                    .setOngoing(true)
-                    .addAction(R.drawable.cancel_24px, "Stop Server", stopPendingIntent);
-            notification = notificationBuilder.build();
+            val notificationBuilder = Notification.Builder(this, CHANNEL_ID)
+                .setContentTitle("JTV-GO Service Running")
+                .setContentText("The server is running in the background.")
+                .setSmallIcon(R.drawable.notifications_24px)
+                .setOngoing(true)
+                .addAction(
+                    Notification.Action.Builder(
+                        Icon.createWithResource(this, R.drawable.cancel_24px),
+                        "Stop Server",
+                        stopPendingIntent
+                    ).build()
+                )
+            notification = notificationBuilder.build()
         } else {
-            NotificationCompat.Builder notificationBuilder = new NotificationCompat.Builder(this)
-                    .setContentTitle("JTV-GO Service Running")
-                    .setContentText("The server is running in the background.")
-                    .setSmallIcon(R.drawable.notifications_24px)
-                    .setOngoing(true)
-                    .addAction(R.drawable.cancel_24px, "Stop Server", stopPendingIntent);
-            notification = notificationBuilder.build();
+            val notificationBuilder = NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("JTV-GO Service Running")
+                .setContentText("The server is running in the background.")
+                .setSmallIcon(R.drawable.notifications_24px)
+                .setOngoing(true)
+                .addAction(R.drawable.cancel_24px, "Stop Server", stopPendingIntent)
+            notification = notificationBuilder.build()
         }
 
-        return notification;
+        return notification
     }
 
 
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
+    override fun onDestroy() {
+        super.onDestroy()
+        instance = null
     }
 
-    @Override
-    public IBinder onBind(Intent intent) {
-        return null;
+    override fun onBind(intent: Intent): IBinder? {
+        return null
     }
 
-    private void createNotificationChannel() {
+    private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationManager manager = getSystemService(NotificationManager.class);
+            val manager = getSystemService(
+                NotificationManager::class.java
+            )
             if (manager.getNotificationChannel(CHANNEL_ID) == null) {
-                NotificationChannel serviceChannel = new NotificationChannel(
-                        CHANNEL_ID,
-                        "Binary Service Channel",
-                        NotificationManager.IMPORTANCE_DEFAULT
-                );
-                manager.createNotificationChannel(serviceChannel);
+                val serviceChannel = NotificationChannel(
+                    CHANNEL_ID,
+                    "Binary Service Channel",
+                    NotificationManager.IMPORTANCE_DEFAULT
+                )
+                manager.createNotificationChannel(serviceChannel)
             }
         }
     }

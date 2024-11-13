@@ -1,6 +1,7 @@
 package com.skylake.skytv.jgorunner.services;
 
 import android.content.Context;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
 import android.util.Log;
@@ -31,7 +32,6 @@ public class BinaryExecutor {
             File binaryFile = new File(context.getFilesDir(), "majorbin");
 
             try {
-
                 String arch =  preferenceManager.getKey("ARCHx");
                 Log.d(TAG, "Device architecture: " + arch);
 

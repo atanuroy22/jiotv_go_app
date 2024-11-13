@@ -19,13 +19,12 @@ object RemoteBinaryFetcher {
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
 
     fun startDownloadAndSave(context: Context, callback: BinaryExecutor.OutputCallback?) {
-
         val preferenceManager = SkySharedPref(context)
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                var expectedFileSize = preferenceManager.getKey("expectedFileSize")?.toIntOrNull()
-                if (expectedFileSize == null || expectedFileSize == 0 || expectedFileSize == 69) {
+                var expectedFileSize = preferenceManager.getInt("expectedFileSize")
+                if (expectedFileSize == 0 || expectedFileSize == 69) {
                     expectedFileSize = fetchExpectedFileSize(context, callback)
                 }
 
@@ -47,7 +46,7 @@ object RemoteBinaryFetcher {
     }
 
 
-    private suspend fun fetchExpectedFileSize(context: Context, callback: BinaryExecutor.OutputCallback?): Int? {
+    private suspend fun fetchExpectedFileSize(context: Context, callback: BinaryExecutor.OutputCallback?): Int {
         return withContext(Dispatchers.IO) {
             val preferenceManager = SkySharedPref(context)
             try {
@@ -69,7 +68,7 @@ object RemoteBinaryFetcher {
                         if (asset.getString("name") == decodedName) {
                             val size = asset.getInt("size") // Get expected file size
                             preferenceManager.setKey("releaseName", releaseName) // Get expected file size
-                            preferenceManager.setKey("expectedFileSize", size.toString())
+                            preferenceManager.setInt("expectedFileSize", size)
                             Log.d(TAG, "Expected file size: $size bytes, "+"Downloading: ${size / (1024 * 1024)} MB")
 //                            callback?.onOutput("[#] Downloading: ${size / (1024 * 1024)} MB")
 //                            callback?.onOutput("[#] Downloading Binary: ${size / (1024 * 1024)} MB")
@@ -85,7 +84,7 @@ object RemoteBinaryFetcher {
                 Log.e(TAG, "Error fetching expected file size: ${e.message}")
                 callback?.onOutput("[#] Error fetching expected file size: ${e.message}")
             }
-            return@withContext null
+            return@withContext -1
         }
     }
 

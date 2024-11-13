@@ -1,7 +1,6 @@
 package com.skylake.skytv.jgorunner.activity;
 
 import android.annotation.SuppressLint;
-import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.os.Bundle;
 import android.util.Log;
@@ -29,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 
 public class WebPlayerActivity extends ComponentActivity {
 
@@ -71,7 +71,7 @@ public class WebPlayerActivity extends ComponentActivity {
         setContentView(R.layout.activity_web_player);
 
         int savedPortNumber = getSavedPortNumber();
-        url = String.format(DEFAULT_URL_TEMPLATE, savedPortNumber);
+        url = String.format(Locale.getDefault(), DEFAULT_URL_TEMPLATE, savedPortNumber);
 
         Log.d(TAG, "URL: " + url);
 
@@ -136,7 +136,6 @@ public class WebPlayerActivity extends ComponentActivity {
         super.onConfigurationChanged(newConfig);
         updateSystemUiVisibility();  // This maintains full-screen mode in both orientations
     }
-
 
 
     private void updateSystemUiVisibility() {
@@ -315,7 +314,7 @@ public class WebPlayerActivity extends ComponentActivity {
             return false;
         }
 
-            @Override
+        @Override
         public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
             loadingSpinner.setVisibility(View.VISIBLE);
         }
@@ -327,7 +326,7 @@ public class WebPlayerActivity extends ComponentActivity {
                 Log.d(TAG, "Playing: " + url);
                 setupFullScreenMode();
                 playVideoInFullScreen(view);
-            } else{
+            } else {
                 moveSearchInput(view);
                 extractChannelNumbers();
                 loadRecentChannels();
@@ -424,13 +423,6 @@ public class WebPlayerActivity extends ComponentActivity {
         webView.evaluateJavascript(jsCode, null);
         Log.d("ChannelInjection", "JavaScript code injected into the WebView.");
     }
-
-
-
-
-
-
-
 
 
     private void saveRecentChannel(String playId, String logoUrl, String channelName) {

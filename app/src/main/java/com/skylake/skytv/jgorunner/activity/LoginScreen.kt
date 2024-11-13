@@ -42,7 +42,7 @@ fun LoginScreen(context: Context) {
     var password by remember { mutableStateOf("") }
 
     val isGlowing by rememberUpdatedState(newValue = run {
-        preferenceManager.getKey("isFlagSetForLOCAL") == "Yes"
+        preferenceManager.getBoolean("isFlagSetForLOCAL")
     })
 
     // Focus requesters for managing focus on fields

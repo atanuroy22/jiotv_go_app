@@ -1,6 +1,7 @@
 package com.skylake.skytv.jgorunner
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -86,6 +87,7 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -109,8 +111,8 @@ import com.skylake.skytv.jgorunner.data.jsonmaker
 import com.skylake.skytv.jgorunner.services.BinaryExecutor
 import com.skylake.skytv.jgorunner.services.BinaryService
 import com.skylake.skytv.jgorunner.ui.theme.JGOTheme
-import com.skylake.skytv.jgorunner.utils.RemoteBinaryFetcher
 import com.skylake.skytv.jgorunner.utils.ConfigHandler
+import com.skylake.skytv.jgorunner.utils.RemoteBinaryFetcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -125,7 +127,6 @@ import java.util.concurrent.Executors
 
 
 class MainActivity : ComponentActivity() {
-
     private var selectedBinaryUri: Uri? = null
     private var isBinaryRunning by mutableStateOf(false)
     private var isOutputShowing by mutableStateOf(false)
@@ -133,8 +134,6 @@ class MainActivity : ComponentActivity() {
 
     // SharedPreferences for saving binary selection
     private lateinit var preferenceManager: SkySharedPref
-
-    private val REQUEST_STORAGE_PERMISSION = 100
 
     private val customFontFamily = FontFamily(Font(R.font.chakrapetch_bold))
 
@@ -156,7 +155,11 @@ class MainActivity : ComponentActivity() {
         if (readGranted) {
             Toast.makeText(this, "Storage permission granted", Toast.LENGTH_SHORT).show()
         } else {
-            Toast.makeText(this, "Storage permission is required to run the binary", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                this,
+                "Storage permission is required to run the binary",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -166,10 +169,12 @@ class MainActivity : ComponentActivity() {
     ) { permissions ->
         val notificationGranted = permissions[Manifest.permission.POST_NOTIFICATIONS] ?: false
 
-        if (notificationGranted) {
-            //Toast.makeText(this, "Notification permission granted", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(this, "Notification permission is required to show alerts", Toast.LENGTH_SHORT).show()
+        if (!notificationGranted) {
+            Toast.makeText(
+                this,
+                "Notification permission is required to show alerts",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -178,8 +183,6 @@ class MainActivity : ComponentActivity() {
     private fun requestNotificationPermissions() {
         notificationPermissionLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
     }
-
-
 
     private var outputText by mutableStateOf("ℹ️ Output logs")
     private var currentScreen by mutableStateOf("Home") // Manage current screen
@@ -204,6 +207,7 @@ class MainActivity : ComponentActivity() {
     private var countdownJob: Job? = null
 
 
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -212,25 +216,22 @@ class MainActivity : ComponentActivity() {
 
         checkStoragePermission()
 
-        val overlayRequestCounter: Int = preferenceManager.getKey("REQcounter")?.toIntOrNull() ?: 0
+        val overlayRequestCounter: Int = preferenceManager.getInt("REQcounter")
         fun checkOverlayPermission() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 if (overlayRequestCounter < 2) {
                     requestOverlayPermission()
-                    preferenceManager.setKey("REQcounter", (overlayRequestCounter + 1).toString())
+                    preferenceManager.setInt("REQcounter", (overlayRequestCounter + 1))
                 } else {
                     Log.d("MainActivity", "Overlay permission request skipped")
                 }
             }
         }
-
         checkOverlayPermission()
-
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             requestNotificationPermissions()
         }
-
 
         val preferenceManager = SkySharedPref(this)
         applyConfigurations(this, preferenceManager)
@@ -241,28 +242,18 @@ class MainActivity : ComponentActivity() {
         selectedBinaryUri = savedUriString?.let { Uri.parse(it) }
         selectedBinaryName = savedName ?: "JTV-GO SERVER"
 
-        val selectBinaryLauncher = registerForActivityResult(
-            ActivityResultContracts.StartActivityForResult()
-        ) { result ->
-            if (result.resultCode == Activity.RESULT_OK) {
-                selectedBinaryUri = result.data?.data
-                selectedBinaryName =
-                    selectedBinaryUri?.path?.substringAfterLast('/') ?: "Unknown file"
-
-                preferenceManager.setKey("selectedBinaryUri", selectedBinaryUri.toString())
-                preferenceManager.setKey("selectedBinaryName", selectedBinaryName)
-            }
-        }
-
-//        registerReceiver(binaryStoppedReceiver, IntentFilter(BinaryService.ACTION_BINARY_STOPPED))
-
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(binaryStoppedReceiver, IntentFilter(BinaryService.ACTION_BINARY_STOPPED), RECEIVER_NOT_EXPORTED)
+            registerReceiver(
+                binaryStoppedReceiver,
+                IntentFilter(BinaryService.ACTION_BINARY_STOPPED),
+                RECEIVER_NOT_EXPORTED
+            )
         } else {
-            registerReceiver(binaryStoppedReceiver, IntentFilter(BinaryService.ACTION_BINARY_STOPPED))
+            registerReceiver(
+                binaryStoppedReceiver,
+                IntentFilter(BinaryService.ACTION_BINARY_STOPPED)
+            )
         }
-
 
         // Register the OnBackPressedCallback
         backPressedCallback = object : OnBackPressedCallback(true) {
@@ -271,18 +262,23 @@ class MainActivity : ComponentActivity() {
                     "Settings" -> {
                         currentScreen = "Home"
                     }
+
                     "Debug" -> {
                         currentScreen = "Home"
                     }
+
                     "Info" -> {
                         currentScreen = "Debug"
                     }
+
                     "Runner" -> {
                         currentScreen = "Debug"
                     }
+
                     "Login" -> {
                         currentScreen = "Debug"
                     }
+
                     else -> {
                         // Let the system handle the back press
                         isEnabled = false
@@ -294,7 +290,6 @@ class MainActivity : ComponentActivity() {
         }
         onBackPressedDispatcher.addCallback(this, backPressedCallback)
 
-
         fun updateSizeIfExist(context: Context, fileName: String) {
             val fileDir = context.filesDir
             val file = File(fileDir, fileName)
@@ -302,37 +297,23 @@ class MainActivity : ComponentActivity() {
             if (file.exists()) {
                 val fileSize = file.length()
                 Log.d("DIX", "File size of $fileName: $fileSize bytes")
-                preferenceManager.setKey("expectedFileSize", fileSize.toString())
+                preferenceManager.setInt("expectedFileSize", fileSize.toInt())
 
             } else {
                 Log.e("DIX", "File not found: $fileName")
-                preferenceManager.setKey("expectedFileSize", "69")
-//                try {
-//                    context.resources.openRawResource(R.raw.majorbin).use { `in` ->
-//                        FileOutputStream(file).use { out ->
-//                            val buffer = ByteArray(1024)
-//                            var bytesRead: Int
-//                            while ((`in`.read(buffer).also { bytesRead = it }) != -1) {
-//                                out.write(buffer, 0, bytesRead)
-//                            }
-//                        }
-//                    }
-//                } catch (e: java.lang.Exception) {
-//                    Log.e("DIX", "Error copying binary from resources: ", e)
-//                }
+                preferenceManager.setInt("expectedFileSize", 69)
             }
         }
 
-        val isCheckForUpdate = preferenceManager.getKey("isCheckForUpdate")
+        val isCheckForUpdate = preferenceManager.getBoolean("isCheckForUpdate")
 
-        if (isCheckForUpdate.isNullOrEmpty() || isCheckForUpdate == "Yes") {
-            updateSizeIfExist(this@MainActivity,"majorbin")
+        if (isCheckForUpdate) {
+            updateSizeIfExist(this@MainActivity, "majorbin")
 
-
-            val expectedFileSize: Int? = preferenceManager.getKey("expectedFileSize")?.toIntOrNull()
+            val expectedFileSize = preferenceManager.getInt("expectedFileSize")
             RemoteBinaryFetcher.isFileSizeSame(expectedFileSize) { result ->
                 if (result) {
-                    if (expectedFileSize == 69){
+                    if (expectedFileSize == 69) {
                         isOutputShowing = true
                         RemoteBinaryFetcher.startDownloadAndSave(this@MainActivity) { output ->
                             Handler(Looper.getMainLooper()).post {
@@ -342,26 +323,17 @@ class MainActivity : ComponentActivity() {
                     } else {
                         showAutoUpdatePopup = true
                     }
-
                 }
             }
         } else {
-           Log.d("DIX","Auto Update OFF")
+            Log.d("DIX", "Auto Update OFF")
         }
-
-
-
 
         setContent {
             JGOTheme {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                    bottomBar = { BottomNavigationBar(selectBinaryLauncher) },
-//                    floatingActionButton = {
-//                        FloatingActionButton(onClick = {  }) {
-//                            Icon(Icons.Default.Add, contentDescription = "Add")
-//                        }
-//                    }
+                    bottomBar = { BottomNavigationBar() },
                 ) { innerPadding ->
                     Column(
                         modifier = Modifier
@@ -374,46 +346,20 @@ class MainActivity : ComponentActivity() {
                                 selectedBinaryUri = selectedBinaryUri,
                                 isBinaryRunning = isBinaryRunning,
                                 outputText = outputText,
-                                selectBinaryLauncher = selectBinaryLauncher,
-                                onRunBinary = { uri, arguments ->
-                                    val intent = Intent(this@MainActivity, BinaryService::class.java).apply {
-                                        putExtra("binaryUri", uri.toString())
-                                        putExtra("arguments", arguments)
-                                    }
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                        startForegroundService(intent)
-                                    } else {
-                                        startService(intent)
-                                    }
-
-                                    outputText = "Server is running in the background"
-                                    isBinaryRunning = true
-
-                                    BinaryExecutor.executeBinary(
-                                        this@MainActivity,
-                                        arguments
-                                    ) { output ->
-                                        outputText += "\n$output"
-                                    }
-                                },
-                                onStopBinary = {
-                                    //BinaryExecutor.stopBinary()
-                                    val intent = Intent(this@MainActivity, BinaryService::class.java)
-                                    intent.action = BinaryService.ACTION_STOP_BINARY
-                                    startService(intent)
-                                    outputText = "Server stopped"
-                                    isBinaryRunning = false
-                                }
                             )
+
                             "Settings" -> SettingsScreen(context = this@MainActivity)
                             "Info" -> InfoScreen(context = this@MainActivity)
-                            "Debug" -> DebugScreen(context = this@MainActivity, onNavigate = { title -> currentScreen = title })
+                            "Debug" -> DebugScreen(
+                                context = this@MainActivity,
+                                onNavigate = { title -> currentScreen = title })
+
                             "Runner" -> RunnerScreen(context = this@MainActivity)
                             "Login" -> LoginScreen(context = this@MainActivity)
                         }
 
-
-                        val savedIPTVRedirectTime = preferenceManager.getKey("isFlagSetForIPTVtime")?.toInt() ?: 5000
+                        val savedIPTVRedirectTime =
+                            preferenceManager.getKey("isFlagSetForIPTVtime")?.toInt() ?: 5000
                         val countdownTimeF = savedIPTVRedirectTime / 1000
 
                         // Show the redirect popup
@@ -423,51 +369,53 @@ class MainActivity : ComponentActivity() {
                             context = this@MainActivity,
                             onDismiss = {
                                 showRedirectPopup = false
-                                shouldLaunchIPTV = false // Cancel IPTV launch if dismissed
+
+                                // Cancel IPTV launch if dismissed
+                                shouldLaunchIPTV = false
                             }
                         )
 
-//                        CustPopup(
-//                            isVisible = showCustUpdatePopup,
-//                            xtitle ="Update Available",
-//                            xsubtitle="A new version of the app is available. Please update to the latest version for improved features and performance.",
-//                            xokbtn="Update!",
-//                            xendbtn="Dismiss",
-//                            onOk = { showCustUpdatePopup = false },
-//                            onDismiss = { showCustUpdatePopup = false }
-//                        )
+                        val isUpdateXtitle =
+                            preferenceManager.getKey("isUpdate_xtitle")?.takeIf { it.isNotEmpty() }
+                                ?: "WARNING"
+                        val isUpdateXsubtitle = preferenceManager.getKey("isUpdate_xsubtitle")
+                            ?.takeIf { it.isNotEmpty() }
+                            ?: "If you are seeing this message, it indicates an error has occurred."
+                        val isUpdateXokbtn =
+                            preferenceManager.getKey("isUpdate_xokbtn")?.takeIf { it.isNotEmpty() }
+                                ?: "OK"
 
-                        val isUpdate_xtitle = preferenceManager.getKey("isUpdate_xtitle")?.takeIf { it.isNotEmpty() } ?: "WARNING"
-                        val isUpdate_xsubtitle = preferenceManager.getKey("isUpdate_xsubtitle")?.takeIf { it.isNotEmpty() } ?: "If you are seeing this message, it indicates an error has occurred."
-                        val isUpdate_xokbtn = preferenceManager.getKey("isUpdate_xokbtn")?.takeIf { it.isNotEmpty() } ?: "OK"
-
-                        val isEngine_xtitle = preferenceManager.getKey("isEngine_xtitle")?.takeIf { it.isNotEmpty() } ?: "WARNING"
-                        val isEngine_xsubtitle = preferenceManager.getKey("isEngine_xsubtitle")?.takeIf { it.isNotEmpty() } ?: "If you are seeing this message, it indicates an error has occurred."
-                        val isEngine_xokbtn = preferenceManager.getKey("isEngine_xokbtn")?.takeIf { it.isNotEmpty() } ?: "OK"
-
-
+                        val isEngineXtitle =
+                            preferenceManager.getKey("isEngine_xtitle")?.takeIf { it.isNotEmpty() }
+                                ?: "WARNING"
+                        val isEngineXsubtitle = preferenceManager.getKey("isEngine_xsubtitle")
+                            ?.takeIf { it.isNotEmpty() }
+                            ?: "If you are seeing this message, it indicates an error has occurred."
+                        val isEngineXokbtn =
+                            preferenceManager.getKey("isEngine_xokbtn")?.takeIf { it.isNotEmpty() }
+                                ?: "OK"
 
                         CustPopup(
                             isVisible = showCustUpdatePopup,
-                            xtitle = isUpdate_xtitle,
-                            xsubtitle=isUpdate_xsubtitle,
-                            xokbtn=isUpdate_xokbtn,
-                            xendbtn="Dismiss",
+                            xtitle = isUpdateXtitle,
+                            xsubtitle = isUpdateXsubtitle,
+                            xokbtn = isUpdateXokbtn,
+                            xendbtn = "Dismiss",
                             onOk = { showCustUpdatePopup = false },
                             onDismiss = { showCustUpdatePopup = false }
                         )
 
                         CustPopup(
                             isVisible = showCustENDPopup,
-                            xtitle = isEngine_xtitle,
-                            xsubtitle= isEngine_xsubtitle,
-                            xokbtn= isEngine_xokbtn,
+                            xtitle = isEngineXtitle,
+                            xsubtitle = isEngineXsubtitle,
+                            xokbtn = isEngineXokbtn,
                             xendbtn = "Dismiss",
                             onOk = {
                                 showCustENDPopup = false
                                 finishAffinity()
                                 return@CustPopup
-                                   },
+                            },
                             onDismiss = {
                                 showCustENDPopup = false
                                 finishAffinity()
@@ -483,9 +431,14 @@ class MainActivity : ComponentActivity() {
                             xendbtn = "Cancel",
                             onOk = {
                                 showLoginPopup = false
-                                val intent = Intent(this@MainActivity, WebPlayerActivity::class.java)
+                                val intent =
+                                    Intent(this@MainActivity, WebPlayerActivity::class.java)
                                 startActivity(intent)
-                                Toast.makeText(this@MainActivity, "Opening WEBTV", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    "Opening WEBTV",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                                 Log.d("DIX", "Opening WEBTV")
                                 return@CustPopup
                             },
@@ -495,7 +448,6 @@ class MainActivity : ComponentActivity() {
                             }
                         )
 
-
                         CustPopup(
                             isVisible = showAutoUpdatePopup,
                             xtitle = "Binary Update Available",
@@ -504,12 +456,13 @@ class MainActivity : ComponentActivity() {
                             xendbtn = "Dismiss",
                             onOk = {
                                 showAutoUpdatePopup = false
-                                preferenceManager.setKey("expectedFileSize", "0")
+                                preferenceManager.setInt("expectedFileSize", 0)
                                 isOutputShowing = true
-                                RemoteBinaryFetcher.startDownloadAndSave(this@MainActivity
+                                RemoteBinaryFetcher.startDownloadAndSave(
+                                    this@MainActivity
                                 ) { output ->
                                     runOnUiThread {
-                                            outputText += "\n$output"
+                                        outputText += "\n$output"
                                     }
                                 }
                             },
@@ -522,8 +475,8 @@ class MainActivity : ComponentActivity() {
                         CustPopup(
                             isVisible = showPARAM,
                             xtitle = "Request Permission",
-                            xsubtitle= "Draw over other apps permission is required for the app to function properly.",
-                            xokbtn= "Grant",
+                            xsubtitle = "Draw over other apps permission is required for the app to function properly.",
+                            xokbtn = "Grant",
                             xendbtn = "Dismiss",
                             onOk = {
                                 showPARAM = false
@@ -537,7 +490,11 @@ class MainActivity : ComponentActivity() {
                             },
                             onDismiss = {
                                 showPARAM = false
-                                Toast.makeText(this@MainActivity, "Permission is required to continue", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    "Permission is required to continue",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                                 return@CustPopup
                             }
                         )
@@ -545,16 +502,6 @@ class MainActivity : ComponentActivity() {
 
                     }
                 }
-
-//                // Handle delayed IPTV launch
-//                LaunchedEffect(shouldLaunchIPTV) {
-//                    if (shouldLaunchIPTV) {
-//                        val savedIPTVRedirectTime = preferenceManager.getKey("isFlagSetForIPTVtime")?.toInt() ?: 5000
-//                        delay(savedIPTVRedirectTime.toLong())
-//                        startIPTV()
-//                    }
-//                }
-
             }
         }
     }
@@ -566,12 +513,8 @@ class MainActivity : ComponentActivity() {
     }
 
 
-
     override fun onStart() {
         super.onStart()
-
-        val wifiIpAddress = getWifiIpAddress(this)
-
         val nekoFirstTime = preferenceManager.getKey("nekoFirstTime")
 
         if (nekoFirstTime.isNullOrEmpty()) {
@@ -582,25 +525,24 @@ class MainActivity : ComponentActivity() {
             preferenceManager.setKey("ARCHx", arch)
 
             // Set default values
-            preferenceManager.setKey("isFlagSetForLOCAL", "Yes") // Reverse
-            preferenceManager.setKey("isFlagSetForAutoStartServer", "No")
-            preferenceManager.setKey("isFlagSetForAutoStartOnBoot", "No")
-            preferenceManager.setKey("isFlagSetForAutoBootIPTV", "Yes")
+            preferenceManager.setBoolean("isFlagSetForLOCAL", true) // Reverse
+            preferenceManager.setBoolean("isFlagSetForAutoStartServer", false)
+            preferenceManager.setBoolean("isFlagSetForAutoStartOnBoot", false)
+            preferenceManager.setBoolean("isFlagSetForAutoBootIPTV", false)
             preferenceManager.setKey("app_packagename", "")
-            preferenceManager.setKey("isFlagSetForEPG", "No")
+            preferenceManager.setBoolean("isFlagSetForEPG", false)
             preferenceManager.setKey("app_name", "")
-            preferenceManager.setKey("isFlagSetForAutoIPTV", "No")
+            preferenceManager.setBoolean("isFlagSetForAutoIPTV", false)
             preferenceManager.setKey("app_launch_activity", "")
-            preferenceManager.setKey("isCustomSetForPORT", "5350")
+            preferenceManager.setInt("isCustomSetForPORT", 5350)
             preferenceManager.setKey("__Port", " --port 5350")
             preferenceManager.setKey("__Public", " --public")
             preferenceManager.setKey("__EPG", " --config configtv.json")
             preferenceManager.setKey("BinaryFileName", "majorbin")
-            preferenceManager.setKey("isAutoUpdate", "No")
+            preferenceManager.setBoolean("isAutoUpdate", false)
             preferenceManager.setKey("VersionNumber", "v3.11")
-            preferenceManager.setKey("expectedFileSize", "69")
-            preferenceManager.setKey("isCheckForUpdate", "Yes")
-
+            preferenceManager.setInt("expectedFileSize", 69)
+            preferenceManager.setBoolean("isCheckForUpdate", true)
         }
 
         // Use the utility function to fetch and save config
@@ -609,22 +551,17 @@ class MainActivity : ComponentActivity() {
         val isUpdate = preferenceManager.getKey("isUpdate")
         val isEngine = preferenceManager.getKey("isEngine")
 
-
-//        Debug Values
-//        val isUpdate = "Yes"
-//        val isEngine = "2"
-
-
         if (isUpdate == "Yes") {
             showCustUpdatePopup = true
-            Toast.makeText(this@MainActivity, "Update Available please update", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this@MainActivity, "Update Available please update", Toast.LENGTH_SHORT)
+                .show()
         }
 
         if (isEngine?.toIntOrNull()?.let { it > 1 } == true) {
             showCustENDPopup = true
-            Toast.makeText(this@MainActivity, "App support period ended.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this@MainActivity, "App support period ended.", Toast.LENGTH_SHORT)
+                .show()
         }
-
 
         fun checkAndRun() {
             val externalStoragePath = Environment.getExternalStorageDirectory().path
@@ -632,7 +569,7 @@ class MainActivity : ComponentActivity() {
             val jsonFile = File(folder, "jiotv-config.json")
 
             if (jsonFile.exists()) {
-                Log.d("DIX","Config exist")
+                Log.d("DIX", "Config exist")
             } else {
                 jsonmaker(this@MainActivity);
             }
@@ -640,10 +577,9 @@ class MainActivity : ComponentActivity() {
 
         checkAndRun()
 
-
         // Check if server should start automatically
-        val isFlagSetForAutoStartServer = preferenceManager.getKey("isFlagSetForAutoStartServer")
-        if (isFlagSetForAutoStartServer == "Yes") {
+        val isFlagSetForAutoStartServer = preferenceManager.getBoolean("isFlagSetForAutoStartServer")
+        if (isFlagSetForAutoStartServer) {
             Log.d("DIX-AutoStartServer", "Starting server automatically")
 
             val uriToUse = selectedBinaryUri
@@ -653,23 +589,18 @@ class MainActivity : ComponentActivity() {
             startServer(uriToUse, arguments)
         }
 
-        val isFlagSetForAutoIPTV = preferenceManager.getKey("isFlagSetForAutoIPTV")
-
-//        val isServerRunning = checkServerStatus()
-
-        Log.i("DIX::","UP")
+        Log.i("DIX::", "UP")
         checkServerStatusInCoroutine()
-        Log.i("DIX::","DOWN")
+        Log.i("DIX::", "DOWN")
 
-
-
-
+//        val isFlagSetForAutoIPTV = preferenceManager.getKey("isFlagSetForAutoIPTV")
 //        if (isFlagSetForAutoIPTV == "Yes" && isServerLoginRunning) {
 //            showRedirectPopup = true
 //            shouldLaunchIPTV = true
 //
 //            countdownJob?.cancel() // Cancel any existing countdown job
-//            val savedIPTVRedirectTime = preferenceManager.getKey("isFlagSetForIPTVtime")?.toInt() ?: 4000
+//            val savedIPTVRedirectTime =
+//                preferenceManager.getKey("isFlagSetForIPTVtime")?.toInt() ?: 4000
 //            var countdownTime = savedIPTVRedirectTime / 1000
 //            countdownJob = CoroutineScope(Dispatchers.Main).launch {
 //                while (countdownTime > 0) {
@@ -734,7 +665,8 @@ class MainActivity : ComponentActivity() {
                             shouldLaunchIPTV = true
 
                             countdownJob?.cancel() // Cancel any existing countdown job
-                            val savedIPTVRedirectTime = preferenceManager.getKey("isFlagSetForIPTVtime")?.toInt() ?: 4000
+                            val savedIPTVRedirectTime =
+                                preferenceManager.getKey("isFlagSetForIPTVtime")?.toInt() ?: 4000
                             var countdownTime = savedIPTVRedirectTime / 1000
                             countdownJob = CoroutineScope(Dispatchers.Main).launch {
                                 while (countdownTime > 0) {
@@ -748,13 +680,16 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+
                     500 -> {
                         Log.e("DIX", "Server returned an internal error (500).")
                         showLoginPopup = true
                     }
+
                     0 -> {
                         Log.e("DIX", "Error checking server status or server is down.")
                     }
+
                     else -> {
                         Log.e("DIX", "Unexpected return value: $statusCode")
                     }
@@ -767,61 +702,77 @@ class MainActivity : ComponentActivity() {
         executor.execute {
             try {
                 runOnUiThread {
-                        val appPackageName = preferenceManager.getKey("app_packagename")
-                        if (appPackageName.isNotEmpty()) {
-                            Log.d("DIX", appPackageName)
-                            val appName = preferenceManager.getKey("app_name")
+                    val appPackageName = preferenceManager.getKey("app_packagename")
+                    if (appPackageName.isNotEmpty()) {
+                        Log.d("DIX", appPackageName)
+                        val appName = preferenceManager.getKey("app_name")
 
-                            if (appPackageName == "webtv") {
-                                val intent = Intent(this@MainActivity, WebPlayerActivity::class.java)
-                                startActivity(intent)
-                                Toast.makeText(this@MainActivity, "Opening WEBTV", Toast.LENGTH_SHORT).show()
-                                Log.d("DIX", "Opening WEBTV")
-                            } else if (appPackageName.isNotEmpty() && appName.isNotEmpty()) {
-                                val launchIntent = packageManager.getLaunchIntentForPackage(appPackageName)
-                                launchIntent?.let {
-                                    startActivity(it)
-                                    Toast.makeText(this@MainActivity, "Opening $appName", Toast.LENGTH_SHORT).show()
-                                    Log.d("DIX", "Opening $appName")
-                                } ?: run {
-                                    Toast.makeText(this@MainActivity, "Cannot find the specified application", Toast.LENGTH_SHORT).show()
-                                    Log.d("DIX", "Cannot find the specified application")
-                                }
-                            } else {
-                                Toast.makeText(this@MainActivity, "No application details found", Toast.LENGTH_SHORT).show()
-                                Log.d("DIX", "No application details found")
+                        if (appPackageName == "webtv") {
+                            val intent = Intent(this@MainActivity, WebPlayerActivity::class.java)
+                            startActivity(intent)
+                            Toast.makeText(this@MainActivity, "Opening WEBTV", Toast.LENGTH_SHORT)
+                                .show()
+                            Log.d("DIX", "Opening WEBTV")
+                        } else if (appPackageName.isNotEmpty() && appName.isNotEmpty()) {
+                            val launchIntent =
+                                packageManager.getLaunchIntentForPackage(appPackageName)
+                            launchIntent?.let {
+                                startActivity(it)
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    "Opening $appName",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                Log.d("DIX", "Opening $appName")
+                            } ?: run {
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    "Cannot find the specified application",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                Log.d("DIX", "Cannot find the specified application")
                             }
                         } else {
-                            Toast.makeText(this@MainActivity, "IPTV not set.", Toast.LENGTH_SHORT).show()
-                            Log.d("DIX", "IPTV not set")
+                            Toast.makeText(
+                                this@MainActivity,
+                                "No application details found",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            Log.d("DIX", "No application details found")
                         }
+                    } else {
+                        Toast.makeText(this@MainActivity, "IPTV not set.", Toast.LENGTH_SHORT)
+                            .show()
+                        Log.d("DIX", "IPTV not set")
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("DIX", "Error starting IPTV", e)
                 runOnUiThread {
-                    Toast.makeText(this@MainActivity, "Error starting IPTV", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "Error starting IPTV", Toast.LENGTH_SHORT)
+                        .show()
                     Log.d("DIX", "Error starting IPTV: ${e.message}")
                 }
             }
         }
-
     }
 
-
     private fun getWifiIpAddress(context: Context): String? {
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val connectivityManager =
+            context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+
+        val savedPortNumber =
+            preferenceManager.getInt("isCustomSetForPORT", 5350)
 
         // CODE TWISTER XD
-        val isPublic = preferenceManager.getKey("isFlagSetForLOCAL")
-        if (isPublic != "Yes") {
-            val savedPortNumber = preferenceManager.getKey("isCustomSetForPORT")?.toIntOrNull() ?: 5350
+        val isPublic = preferenceManager.getBoolean("isFlagSetForLOCAL")
+        if (!isPublic)
             return "http://localhost:$savedPortNumber/playlist.m3u"
-        }
-
 
         val activeNetwork = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             connectivityManager.activeNetwork
         } else {
+            @Suppress("deprecation")
             val networks = connectivityManager.allNetworks
             if (networks.isNotEmpty()) networks[0] else null
         }
@@ -829,24 +780,20 @@ class MainActivity : ComponentActivity() {
         if (activeNetwork != null) {
             val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
             if (networkCapabilities != null && networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
-                val linkProperties: LinkProperties? = connectivityManager.getLinkProperties(activeNetwork)
+                val linkProperties: LinkProperties? =
+                    connectivityManager.getLinkProperties(activeNetwork)
                 val ipAddresses = linkProperties?.linkAddresses
                     ?.filter { it.address is Inet4Address } // Filter for IPv4 addresses
                     ?.map { it.address.hostAddress }
                 val ipAddress = ipAddresses?.firstOrNull() // Get the first IPv4 address
 
-                if (ipAddress != null) {
-                    val savedPortNumber = preferenceManager.getKey("isCustomSetForPORT")?.toIntOrNull() ?: 5350
+                if (ipAddress != null)
                     return "http://$ipAddress:$savedPortNumber/playlist.m3u"
-                }
             }
         }
-        return null // Return null if not connected to Wi-Fi or no valid IP is found
+        // Return default localhost url if not connected to Wi-Fi or no valid IP is found
+        return null
     }
-
-
-
-
 
     @Composable
     fun RedirectPopup(
@@ -873,7 +820,7 @@ class MainActivity : ComponentActivity() {
             Log.d("RedirectPopup", "Popup is visible.")
 
             // Countdown logic
-            LaunchedEffect(isVisible) {
+            LaunchedEffect(Unit) {
                 currentTime = countdownTime
                 while (currentTime > 0) {
                     delay(1000)
@@ -940,7 +887,10 @@ class MainActivity : ComponentActivity() {
                         Text("Dismiss")
                     }
                 },
-                properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
+                properties = DialogProperties(
+                    dismissOnBackPress = false,
+                    dismissOnClickOutside = false
+                )
             )
         } else {
             Log.d("RedirectPopup", "Popup is NOT visible.")
@@ -948,13 +898,16 @@ class MainActivity : ComponentActivity() {
     }
 
 
-
-
-
-
-
     @Composable
-    fun CustPopup(isVisible: Boolean, xtitle: String, xsubtitle: String, xokbtn: String, xendbtn: String, onOk: () -> Unit, onDismiss: () -> Unit) {
+    fun CustPopup(
+        isVisible: Boolean,
+        xtitle: String,
+        xsubtitle: String,
+        xokbtn: String,
+        xendbtn: String,
+        onOk: () -> Unit,
+        onDismiss: () -> Unit
+    ) {
         if (isVisible) {
             Log.d("CustPopup", "CustPopup [$xtitle] is visible.")
 
@@ -972,17 +925,21 @@ class MainActivity : ComponentActivity() {
                         Text(xendbtn)
                     }
                 },
-                properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
+                properties = DialogProperties(
+                    dismissOnBackPress = false,
+                    dismissOnClickOutside = false
+                )
             )
         } else {
             Log.d("CustPopup", "CustPopup [$xtitle] is NOT visible.")
         }
     }
 
-
-
     private suspend fun checkServerStatus(): Boolean {
-        val savedPortNumber = preferenceManager.getKey("isCustomSetForPORT")?.toIntOrNull() ?: 5350
+        // BinaryService is NOT running
+        if (!BinaryService.isRunning) return false
+
+        val savedPortNumber = preferenceManager.getInt("isCustomSetForPORT", 5350)
         val url = URL("http://localhost:$savedPortNumber")
         Log.d("ServerStatusChecker", "Constructed URL: $url")
 
@@ -1007,16 +964,26 @@ class MainActivity : ComponentActivity() {
                     Log.d("ServerStatusChecker", "Server is up and running (HTTP_OK response).")
                     return true
                 } else {
-                    Log.d("ServerStatusChecker", "Unexpected response code: $responseCode. Server might be down.")
+                    Log.d(
+                        "ServerStatusChecker",
+                        "Unexpected response code: $responseCode. Server might be down."
+                    )
                 }
             } catch (e: Exception) {
                 Log.d("ServerStatusChecker", "Error occurred during attempt ${attempt + 1}")
-                Log.e("ServerStatusChecker", "Error checking server status (attempt ${attempt + 1})", e)
+                Log.e(
+                    "ServerStatusChecker",
+                    "Error checking server status (attempt ${attempt + 1})",
+                    e
+                )
             }
 
             // Only introduce a delay if an error occurs
             if (attempt < 4) { // Change to 4 to avoid sleeping after the last attempt
-                Log.d("ServerStatusChecker", "Retrying after 1 second delay (attempt ${attempt + 1})")
+                Log.d(
+                    "ServerStatusChecker",
+                    "Retrying after 1 second delay (attempt ${attempt + 1})"
+                )
                 delay(1000) // Use delay instead of Thread.sleep
             }
         }
@@ -1027,11 +994,8 @@ class MainActivity : ComponentActivity() {
     }
 
 
-
-
-
     private suspend fun checkServerLoginStatus(): Int {
-        val savedPortNumber = preferenceManager.getKey("isCustomSetForPORT")?.toIntOrNull() ?: 5350
+        var savedPortNumber = preferenceManager.getInt("isCustomSetForPORT", 5350)
         val url = URL("http://localhost:$savedPortNumber/live/144.m3u8")
         var consecutiveFailures = 0 // Counter for consecutive failures
         val maxFailures = 5 // Maximum allowed consecutive failures
@@ -1052,11 +1016,13 @@ class MainActivity : ComponentActivity() {
                         consecutiveFailures = 0 // Reset on success
                         200
                     }
+
                     HttpURLConnection.HTTP_INTERNAL_ERROR -> {
                         Log.d("ServerLoginCheck", "Response Code: $responseCode - Server error!")
                         consecutiveFailures = 0 // Reset on success
                         500
                     }
+
                     else -> {
                         consecutiveFailures++ // Increment failure counter
                         Log.d("ServerLoginCheck", "Unexpected Response Code: $responseCode")
@@ -1069,7 +1035,11 @@ class MainActivity : ComponentActivity() {
                 }
             } catch (e: Exception) {
                 Log.d("ServerLoginCheck", "Attempt #${attempt + 1}: Error occurred")
-                Log.e("ServerLoginCheck", "Error checking server status (attempt ${attempt + 1})", e)
+                Log.e(
+                    "ServerLoginCheck",
+                    "Error checking server status (attempt ${attempt + 1})",
+                    e
+                )
                 consecutiveFailures++ // Increment failure counter
                 if (consecutiveFailures >= maxFailures) {
                     Log.d("ServerLoginCheck", "Reached maximum consecutive failures.")
@@ -1088,10 +1058,6 @@ class MainActivity : ComponentActivity() {
         return 0
     }
 
-
-
-
-
     private fun checkStoragePermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val isPermissionGranted = ContextCompat.checkSelfPermission(
@@ -1107,7 +1073,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun BottomNavigationBar(selectBinaryLauncher: ActivityResultLauncher<Intent>) {
+    fun BottomNavigationBar() {
         val items = listOf(
             BottomNavigationItem(
                 title = "Home",
@@ -1128,7 +1094,7 @@ class MainActivity : ComponentActivity() {
                 hasNews = false,
             ),
         )
-        var selectedItemIndex by rememberSaveable { mutableStateOf(0) }
+        var selectedItemIndex by rememberSaveable { mutableIntStateOf(0) }
 
         NavigationBar {
             items.forEachIndexed { index, item ->
@@ -1137,13 +1103,6 @@ class MainActivity : ComponentActivity() {
                     onClick = {
                         selectedItemIndex = index
                         currentScreen = item.title
-//                        if (index == 1) {
-//                            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-//                                type = "*/*"
-//                                addCategory(Intent.CATEGORY_OPENABLE)
-//                            }
-//                            selectBinaryLauncher.launch(intent)
-//                        }
                     },
                     label = {
                         Text(text = item.title)
@@ -1176,10 +1135,7 @@ class MainActivity : ComponentActivity() {
         selectedBinaryName: String,
         selectedBinaryUri: Uri?,
         isBinaryRunning: Boolean,
-        outputText: String,
-        selectBinaryLauncher: ActivityResultLauncher<Intent>,
-        onRunBinary: (Uri, Array<String>) -> Unit,
-        onStopBinary: () -> Unit
+        outputText: String
     ) {
         val scrollState = rememberScrollState()
 
@@ -1191,12 +1147,11 @@ class MainActivity : ComponentActivity() {
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-//            Text(
-//                text = selectedBinaryName,
-//                fontSize = 24.sp,
-//                fontFamily = customFontFamily,
-//                color = MaterialTheme.colorScheme.onBackground
-//            )
+            Image(
+                painter = painterResource(id = R.mipmap.ic_launcher_neo_foreground),
+                contentDescription = "App Icon",
+                modifier = Modifier.size(200.dp)
+            )
             Text(
                 text = selectedBinaryName,
                 fontSize = 24.sp,
@@ -1218,16 +1173,14 @@ class MainActivity : ComponentActivity() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-//            Text(text = "✨")
-//
-//            Spacer(modifier = Modifier.height(16.dp))
-
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .border(2.dp, Color.Gray, RoundedCornerShape(8.dp))
                     .background(
-                        if (isGlowBox) MaterialTheme.colorScheme.errorContainer else  Color(0xFFA5D6A7),
+                        if (isGlowBox) MaterialTheme.colorScheme.errorContainer else Color(
+                            0xFFA5D6A7
+                        ),
                         RoundedCornerShape(8.dp)
                     )
                     .padding(5.dp)
@@ -1238,7 +1191,7 @@ class MainActivity : ComponentActivity() {
                 Text(
                     text = wifiIpAddress,
                     fontSize = 16.sp,
-                    color = if (isGlowBox) MaterialTheme.colorScheme.onSurface else  Color.Black,
+                    color = if (isGlowBox) MaterialTheme.colorScheme.onSurface else Color.Black,
                     modifier = Modifier
                         .align(Alignment.Center)
                         .clickable {
@@ -1247,16 +1200,14 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
-
-
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                Button1(selectedBinaryUri)
-                Button2()
+                RunServerButton(selectedBinaryUri)
+                StopServerButton()
             }
 
             Spacer(modifier = Modifier.height(4.dp)) // Space between rows
@@ -1265,17 +1216,17 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                Button3()
-                Button4()
-                Button5()
-                Button6()
+                RunIPTVButton()
+                WebTVButton()
+                DebugButton()
+                ExitButton()
             }
 
 
             Spacer(modifier = Modifier.height(16.dp))
 
 
-            Column (
+            Column(
                 modifier = Modifier.alpha(if (isBinaryRunning || isOutputShowing) 1f else 0f)
             ) {
                 Text(
@@ -1294,16 +1245,52 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun onRunBinary(uriToUse: Uri?, arguments: Array<String>) {
+        val intent = Intent(this@MainActivity, BinaryService::class.java).apply {
+            putExtra("binaryUri", uriToUse.toString())
+            putExtra("arguments", arguments)
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+
+        CoroutineScope(Dispatchers.IO).launch {
+            // Wait until the binary service is running
+            while (!BinaryService.isRunning) delay(100)
+
+            withContext(Dispatchers.Main) {
+                isBinaryRunning = true
+                BinaryService.instance?.binaryOutput?.observe(this@MainActivity) { output ->
+                    outputText = "Server is running in the background"
+                    outputText += output
+                }
+            }
+        }
+    }
+
+    private fun onStopBinary() {
+        val intent = Intent(this@MainActivity, BinaryService::class.java).apply {
+            action = BinaryService.ACTION_STOP_BINARY
+        }
+
+        startService(intent)
+        outputText = "Server stopped"
+        isBinaryRunning = false
+    }
 
     @Composable
-    fun RowScope.Button1(selectedBinaryUri: Uri?) {
+    fun RowScope.RunServerButton(selectedBinaryUri: Uri?) {
         val colorPRIME = MaterialTheme.colorScheme.primary
         val colorSECOND = MaterialTheme.colorScheme.secondary
         val buttonColor = remember { mutableStateOf(colorPRIME) }
 
         Button(
             onClick = {
-                val uriToUse = selectedBinaryUri ?: Uri.parse("android.resource://com.skylake.skytv.jgorunner/raw/majorbin")
+                val uriToUse = selectedBinaryUri
+                    ?: Uri.parse("android.resource://com.skylake.skytv.jgorunner/raw/majorbin")
                 val arguments = emptyArray<String>()
                 onRunBinary(uriToUse, arguments)
             },
@@ -1325,47 +1312,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun onRunBinary(uriToUse: Uri?, arguments: Array<String>) {
-        val intent = Intent(this@MainActivity, BinaryService::class.java).apply {
-            putExtra("binaryUri", uriToUse.toString())
-            putExtra("arguments", arguments)
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
-        }
-
-        outputText = "Server is running in the background"
-        isBinaryRunning = true
-
-        BinaryExecutor.executeBinary(
-            this@MainActivity,
-            arguments
-        ) { output ->
-            outputText += "\n$output"
-        }
-    }
-
-    private fun onStopBinary() {
-
-        // BinaryExecutor.stopBinary()
-
-        val intent = Intent(this@MainActivity, BinaryService::class.java).apply {
-            action = BinaryService.ACTION_STOP_BINARY
-        }
-
-        startService(intent)
-        outputText = "Server stopped"
-        isBinaryRunning = false
-    }
-
-
-
-
     @Composable
-    fun RowScope.Button2() {
+    fun RowScope.StopServerButton() {
         val colorPRIME = MaterialTheme.colorScheme.primary
         val colorSECOND = MaterialTheme.colorScheme.secondary
         val buttonColor = remember { mutableStateOf(colorPRIME) }
@@ -1382,16 +1330,16 @@ class MainActivity : ComponentActivity() {
                         colorPRIME
                     }
                 },
-        shape = RoundedCornerShape(8.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
-        contentPadding = PaddingValues(2.dp)
+            shape = RoundedCornerShape(8.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
+            contentPadding = PaddingValues(2.dp)
         ) {
             ButtonContent("Stop Server", Icons.TwoTone.Stop) // Different icon
         }
     }
 
     @Composable
-    fun RowScope.Button3() {
+    fun RowScope.RunIPTVButton() {
         val colorPRIME = MaterialTheme.colorScheme.primary
         val colorSECOND = MaterialTheme.colorScheme.secondary
         val buttonColor = remember { mutableStateOf(colorPRIME) }
@@ -1411,18 +1359,20 @@ class MainActivity : ComponentActivity() {
             colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
             contentPadding = PaddingValues(2.dp)
         ) {
-            ButtonContent("Run IPTV", Icons.TwoTone.ResetTv) // Different icon
+            ButtonContent("Run IPTV", Icons.TwoTone.ResetTv)
         }
     }
 
     @Composable
-    fun RowScope.Button4() {
+    fun RowScope.WebTVButton() {
         val colorPRIME = MaterialTheme.colorScheme.primary
         val colorSECOND = MaterialTheme.colorScheme.secondary
         val buttonColor = remember { mutableStateOf(colorPRIME) }
         Button(
-            onClick = {  val intent = Intent(this@MainActivity, WebPlayerActivity::class.java)
-                    startActivity(intent) },
+            onClick = {
+                val intent = Intent(this@MainActivity, WebPlayerActivity::class.java)
+                startActivity(intent)
+            },
             modifier = Modifier
                 .weight(1f)
                 .padding(8.dp)
@@ -1437,19 +1387,19 @@ class MainActivity : ComponentActivity() {
             colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
             contentPadding = PaddingValues(2.dp)
         ) {
-            ButtonContent("Web TV", Icons.TwoTone.LiveTv) // Different icon
+            ButtonContent("Web TV", Icons.TwoTone.LiveTv)
         }
     }
 
     @Composable
-    fun RowScope.Button5() {
+    fun RowScope.DebugButton() {
         val colorPRIME = MaterialTheme.colorScheme.primary
         val colorSECOND = MaterialTheme.colorScheme.secondary
         val buttonColor = remember { mutableStateOf(colorPRIME) }
         Button(
             onClick = {
                 currentScreen = "Debug"
-                },
+            },
             modifier = Modifier
                 .weight(1f)
                 .padding(8.dp)
@@ -1464,12 +1414,12 @@ class MainActivity : ComponentActivity() {
             colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
             contentPadding = PaddingValues(2.dp)
         ) {
-            ButtonContent("Debug", Icons.TwoTone.Deblur) // Different icon
+            ButtonContent("Debug", Icons.TwoTone.Deblur)
         }
     }
 
     @Composable
-    fun RowScope.Button6() {
+    fun RowScope.ExitButton() {
         val colorPRIME = MaterialTheme.colorScheme.primary
         val colorSECOND = MaterialTheme.colorScheme.secondary
         val buttonColor = remember { mutableStateOf(colorPRIME) }
@@ -1495,7 +1445,7 @@ class MainActivity : ComponentActivity() {
             colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
             contentPadding = PaddingValues(2.dp)
         ) {
-            ButtonContent("Exit", Icons.AutoMirrored.TwoTone.ExitToApp) // Different icon
+            ButtonContent("Exit", Icons.AutoMirrored.TwoTone.ExitToApp)
         }
     }
 
@@ -1519,30 +1469,23 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-
-
-    fun handleButton1Click(context: Context) {
-        Toast.makeText(context, "Debug Mode : ON", Toast.LENGTH_SHORT).show()
-    }
-
-
     private fun iptvRedirectFunc() {
         // Retrieve the app package name from shared preferences
         val appPackageName = preferenceManager.getKey("app_packagename")
 
         if (appPackageName.isNotEmpty()) {
-            Log.d("DIX",appPackageName)
+            Log.d("DIX", appPackageName)
             // Retrieve other details
             val appLaunchActivity = preferenceManager.getKey("app_launch_activity")
             val appName = preferenceManager.getKey("app_name")
 
-            if (appPackageName=="webtv") {
+            if (appPackageName == "webtv") {
                 val intent = Intent(this@MainActivity, WebPlayerActivity::class.java)
                 startActivity(intent)
                 Toast.makeText(this@MainActivity, "Starting: $appName", Toast.LENGTH_SHORT).show()
             } else {
                 if (appLaunchActivity.isNotEmpty()) {
-                    Log.d("DIX",appLaunchActivity)
+                    Log.d("DIX", appLaunchActivity)
                     // Create an intent to launch the app
                     val launchIntent = Intent().apply {
                         setClassName(appPackageName, appLaunchActivity)
@@ -1553,14 +1496,20 @@ class MainActivity : ComponentActivity() {
                     if (launchIntent.resolveActivity(packageManager) != null) {
                         // Start the activity
                         startActivity(launchIntent)
-                        Toast.makeText(this@MainActivity, "Starting: $appName", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MainActivity, "Starting: $appName", Toast.LENGTH_SHORT)
+                            .show()
                     } else {
                         // Handle the case where the app can't be resolved
-                        Toast.makeText(this@MainActivity, "App not found", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MainActivity, "App not found", Toast.LENGTH_SHORT)
+                            .show()
                     }
                 } else {
                     // Handle the case where app_launch_activity is not found
-                    Toast.makeText(this@MainActivity, "App launch activity not found", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this@MainActivity,
+                        "App launch activity not found",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         } else {
@@ -1572,14 +1521,14 @@ class MainActivity : ComponentActivity() {
     @RequiresApi(Build.VERSION_CODES.M)
     private val overlayPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
-    ) { result ->
+    ) { _ ->
         // Handle the result of the permission request
         if (Settings.canDrawOverlays(this)) {
             // Permission granted
-            Log.d("KOX","granted")
+            Log.d("KOX", "granted")
         } else {
             // Permission not granted
-            Log.d("KOX","not granted")
+            Log.d("KOX", "not granted")
         }
     }
 
@@ -1596,15 +1545,9 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-
-
-
 data class BottomNavigationItem(
     val title: String,
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector,
     val hasNews: Boolean
 )
-
-
-
