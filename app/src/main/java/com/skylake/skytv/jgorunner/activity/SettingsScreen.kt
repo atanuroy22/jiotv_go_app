@@ -125,7 +125,7 @@ fun SettingsScreen(context: Context) {
     var selectedIPTVTime by remember { mutableIntStateOf(savedIPTVRedirectTime) }
 
     // Retrieve saved port number
-    var savedPortNumber = preferenceManager.getInt("isCustomSetForPORT", 5350)
+    val savedPortNumber = preferenceManager.getInt("isCustomSetForPORT", 5350)
     var portNumber by remember { mutableStateOf(savedPortNumber.toString()) }
 
     // Retrieve saved version number
@@ -552,7 +552,7 @@ fun resetFunc(context: Context) {
     if (binaryFile.exists()) {
         binaryFile.delete()
     } else {
-        Toast.makeText(context, "Reset successfully.", Toast.LENGTH_SHORT).show();
+        Toast.makeText(context, "Reset successfully.", Toast.LENGTH_SHORT).show()
     }
 }
 

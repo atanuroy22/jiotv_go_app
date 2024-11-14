@@ -24,7 +24,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.Image
@@ -571,7 +570,7 @@ class MainActivity : ComponentActivity() {
             if (jsonFile.exists()) {
                 Log.d("DIX", "Config exist")
             } else {
-                jsonmaker(this@MainActivity);
+                jsonmaker(this@MainActivity)
             }
         }
 
@@ -995,7 +994,7 @@ class MainActivity : ComponentActivity() {
 
 
     private suspend fun checkServerLoginStatus(): Int {
-        var savedPortNumber = preferenceManager.getInt("isCustomSetForPORT", 5350)
+        val savedPortNumber = preferenceManager.getInt("isCustomSetForPORT", 5350)
         val url = URL("http://localhost:$savedPortNumber/live/144.m3u8")
         var consecutiveFailures = 0 // Counter for consecutive failures
         val maxFailures = 5 // Maximum allowed consecutive failures

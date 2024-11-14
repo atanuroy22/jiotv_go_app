@@ -1,95 +1,106 @@
 package com.skylake.skytv.jgorunner.activity
 
-import android.R
 import android.content.Context
-import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
-import android.content.pm.ResolveInfo
 import android.graphics.drawable.Drawable
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.Color
 import androidx.core.graphics.drawable.toBitmap
+import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.data.SkySharedPref
+import com.skylake.skytv.jgorunner.ui.theme.JGOTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 
 class AppListActivity : ComponentActivity() {
-
     private lateinit var preferenceManager: SkySharedPref
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         preferenceManager = SkySharedPref(this)
+        enableEdgeToEdge()
 
         setContent {
-            AppListScreen(
-                onAppSelected = { selectedApp ->
-                    preferenceManager.setKey("app_name", selectedApp.appName)
-                    preferenceManager.setKey("app_packagename", selectedApp.packageName)
-                    preferenceManager.setKey("app_launch_activity", selectedApp.launchActivity)
-                    finish()
+            JGOTheme {
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                ) { innerPadding ->
+                    AppListScreen(
+                        modifier = Modifier.padding(innerPadding),
+                        onAppSelected = { selectedApp ->
+                            preferenceManager.setKey("app_name", selectedApp.appName)
+                            preferenceManager.setKey("app_packagename", selectedApp.packageName)
+                            preferenceManager.setKey(
+                                "app_launch_activity",
+                                selectedApp.launchActivity
+                            )
+                            finish()
+                        }
+                    )
                 }
-            )
+            }
         }
     }
 }
 
 @Composable
-fun AppListScreen(onAppSelected: (AppInfo) -> Unit) {
+fun AppListScreen(modifier: Modifier = Modifier, onAppSelected: (AppInfo) -> Unit) {
     val context = LocalContext.current
     val apps = remember { mutableStateListOf<AppInfo>() }
     val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         coroutineScope.launch {
-            val installedApps = getInstalledApps(context)
-
-            val addedOptions = listOf(
-                AppInfo(
-                    appName = "No IPTV",
-                    icon = context.getDrawable(R.drawable.ic_menu_close_clear_cancel)!!,
-                    packageName = "",
-                    launchActivity = ""
-                ),
-                AppInfo(
-                    appName = "WEB TV",
-                    icon = context.getDrawable(com.skylake.skytv.jgorunner.R.mipmap.ic_launcher_neo)!!,
-                    packageName = "webtv",
-                    launchActivity = ""
-                )
-            )
-
-
-            val sortedInstalledApps = installedApps.sortedBy { it.appName }
-            apps.addAll(addedOptions)
-            apps.addAll(sortedInstalledApps)
+            getInstalledApps(context).collect {
+                apps.add(it)
+            }
         }
     }
 
-    LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+    ) {
         items(apps) { app ->
             AppListItem(appInfo = app, onAppSelected = onAppSelected)
             HorizontalDivider(color = Color.Gray, thickness = 1.dp)
         }
     }
 }
-
-
 
 @Composable
 fun AppListItem(appInfo: AppInfo, onAppSelected: (AppInfo) -> Unit) {
@@ -133,39 +144,46 @@ data class AppInfo(
     val launchActivity: String
 )
 
-fun getInstalledApps(context: Context): List<AppInfo> {
+fun getInstalledApps(context: Context): Flow<AppInfo> = flow {
     val packageManager: PackageManager = context.packageManager
-    val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
-        addCategory(Intent.CATEGORY_LAUNCHER)
-    }
 
-    val resolveInfos: List<ResolveInfo> = packageManager.queryIntentActivities(mainIntent, 0)
-    val apps = mutableListOf<AppInfo>()
+    // Get installed applications
+    val apps = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+        .filter { appInfo ->
+            // Filter out system apps
+            appInfo.flags and ApplicationInfo.FLAG_SYSTEM == 0
+        }
+        .sortedBy { appInfo ->
+            // Sort by app name
+            packageManager.getApplicationLabel(appInfo).toString().lowercase()
+        }
 
+    // Add a none action
     val noneOption = AppInfo(
         appName = "No IPTV",
-        icon = context.getDrawable(R.drawable.ic_menu_close_clear_cancel)!!,
+        icon = context.getDrawable(R.drawable.cancel_24px)!!,
         packageName = "",
         launchActivity = ""
     )
-    apps.add(noneOption)
+    emit(noneOption)
 
+    // Add WebTV action
     val webOption = AppInfo(
         appName = "WEB TV",
-        icon = context.getDrawable(com.skylake.skytv.jgorunner.R.mipmap.ic_launcher_neo)!!,
+        icon = context.getDrawable(R.mipmap.ic_launcher_neo)!!,
         packageName = "webtv",
         launchActivity = ""
     )
-    apps.add(webOption)
+    emit(webOption)
 
-    for (info in resolveInfos) {
-        val appInfo: ApplicationInfo = info.activityInfo.applicationInfo
-        val appName = appInfo.loadLabel(packageManager).toString()
-        val appIcon = appInfo.loadIcon(packageManager)
+    for (appInfo in apps) {
+        val appName = packageManager.getApplicationLabel(appInfo).toString()
+        val appIcon = packageManager.getApplicationIcon(appInfo)
         val packageName = appInfo.packageName
-        val launchActivity = info.activityInfo.name
-
-        apps.add(AppInfo(appName, appIcon, packageName, launchActivity))
+        val launchActivity =
+            packageManager.getLaunchIntentForPackage(packageName)?.component?.className
+                ?: ""
+        emit(AppInfo(appName, appIcon, packageName, launchActivity))
     }
-    return apps
-}
+}.flowOn(Dispatchers.IO)
+
