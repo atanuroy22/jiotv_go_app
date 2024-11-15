@@ -12,16 +12,21 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.MutableLiveData
+import com.skylake.skytv.jgorunner.BuildConfig
 import com.skylake.skytv.jgorunner.R
+import com.skylake.skytv.jgorunner.core.execution.BinaryExecutor
+import com.skylake.skytv.jgorunner.data.SkySharedPref
+import java.io.File
 
 class BinaryService : Service() {
     companion object {
         // Constants
         private const val CHANNEL_ID = "BinaryServiceChannel"
         private const val NOTIFICATION_ID = 1
-        const val ACTION_STOP_BINARY: String = "com.skylake.skytv.jgorunner.action.STOP_BINARY"
+        const val ACTION_STOP_BINARY: String =
+            "${BuildConfig.APPLICATION_ID}.action.STOP_BINARY"
         const val ACTION_BINARY_STOPPED: String =
-            "com.skylake.skytv.jgorunner.action.BINARY_STOPPED"
+            "${BuildConfig.APPLICATION_ID}.action.BINARY_STOPPED"
 
         // Singleton instance of the BinaryService
         var instance: BinaryService? = null
@@ -29,6 +34,7 @@ class BinaryService : Service() {
 
         val isRunning: Boolean
             get() = instance != null
+
     }
 
     // LiveData to observe the output of the ran binary
@@ -40,26 +46,12 @@ class BinaryService : Service() {
     }
 
     override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
+        // Create the notification for the service
+        val notification = createNotification()
+        startForeground(NOTIFICATION_ID, notification)
+
         if (intent.action == ACTION_STOP_BINARY) {
-            // Stop the binary
-            BinaryExecutor.stopBinary()
-            Log.d("BinaryService", "Binary stopped by user.")
-
-            // Broadcast that the binary has stopped
-            val broadcastIntent = Intent(ACTION_BINARY_STOPPED)
-
-            // Ensure the broadcast is internal-only
-            broadcastIntent.setPackage(packageName)
-
-            // Send the broadcast
-            sendBroadcast(broadcastIntent)
-
-            // Set the singleton instance to null
-            instance = null
-
-            @Suppress("deprecation")
-            stopForeground(true)
-            stopSelf()
+            stopService()
             return START_NOT_STICKY
         }
 
@@ -70,30 +62,71 @@ class BinaryService : Service() {
         instance = this
 
         // Get the arguments from the intent
-        var arguments = intent.getStringArrayExtra("arguments")
+        var binaryFileLocation = intent.getStringExtra("binaryFileLocation")
+        val arguments = intent.getStringArrayExtra("arguments")
 
-        // If the arguments are null, set it to the default arguments
-        if (arguments == null)
-            arguments = arrayOf("Boot Start")
+        // Default binary file location
+        if (binaryFileLocation == null) {
+            val binaryFileName = SkySharedPref.getInstance(this).myPrefs.jtvGoBinaryName
+            if (binaryFileName.isNullOrEmpty()) {
+                Log.e("BinaryService", "Binary file location not provided.")
+                stopService()
+                return START_NOT_STICKY
+            }
+            binaryFileLocation =
+                File(filesDir, binaryFileName).absolutePath
+        }
+
+        val binaryFile = File(binaryFileLocation!!)
+
+        // Execute the binary
+        BinaryExecutor.executeBinary(
+            this, binaryFile, arguments,
+            onOutput = { output ->
+                var temp = binaryOutput.value
+                if (temp == null) {
+                    binaryOutput.postValue(output)
+                    return@executeBinary
+                }
+                temp += output
+                if (temp.length > 2000)
+                    temp = temp.substring(2000)
+                binaryOutput.postValue(temp.toString())
+            },
+            onError = {
+                Log.e("BinaryService", "Error executing binary: ${it.errorType.name}", it)
+                stopService()
+            }
+        )
 
         Log.d(
             "BinaryService",
             "BinaryService started in the background. ? " + arguments.contentToString()
         )
 
-        // Execute the binary
-        BinaryExecutor.executeBinary(
-            this, arguments
-        ) { output: String ->
-            binaryOutput.postValue("${binaryOutput.value}\n$output")
-            Log.d("BinaryOutput", output)
-        }
-
-        // Create the notification for the service
-        val notification = createNotification()
-        startForeground(NOTIFICATION_ID, notification)
-
         return START_STICKY
+    }
+
+    private fun stopService() {
+        // Stop the binary
+        BinaryExecutor.stopBinary()
+        Log.d("BinaryService", "Binary stopping...")
+
+        // Broadcast that the binary has stopped
+        val broadcastIntent = Intent(ACTION_BINARY_STOPPED)
+
+        // Ensure the broadcast is internal-only
+        broadcastIntent.setPackage(packageName)
+
+        // Send the broadcast
+        sendBroadcast(broadcastIntent)
+
+        // Set the singleton instance to null
+        instance = null
+
+        @Suppress("deprecation")
+        stopForeground(true)
+        stopSelf()
     }
 
     private fun createNotification(): Notification {

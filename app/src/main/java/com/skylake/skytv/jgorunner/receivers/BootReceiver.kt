@@ -12,10 +12,6 @@ import com.skylake.skytv.jgorunner.services.BinaryService
 class BootReceiver : BroadcastReceiver() {
     companion object {
         private const val TAG = "BootReceiver"
-        private const val AUTO_BOOT_PREF_KEY = "isFlagSetForAutoStartOnBoot"
-        private const val AUTO_BOOT_ENABLED = true
-        private const val AUTO_BOOT_STATE_PREF_KEY = "isFlagSetForAutoBootIPTV"
-        private const val AUTO_BOOT_STATE = true
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -25,16 +21,17 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     private fun handleBootCompleted(context: Context) {
-        val preferenceManager = SkySharedPref(context)
-        val isAutobootEnabled = preferenceManager.getBoolean(AUTO_BOOT_PREF_KEY)
-        val stateBG = preferenceManager.getBoolean(AUTO_BOOT_STATE_PREF_KEY)
+        val preferenceManager = SkySharedPref.getInstance(context)
+        val isAutoStartOnBootEnabled = preferenceManager.myPrefs.autoStartOnBoot
+        val autoStartOnBootForeground = preferenceManager.myPrefs.autoStartOnBootForeground
 
-        if (isAutobootEnabled == AUTO_BOOT_ENABLED) {
-            if (AUTO_BOOT_STATE == stateBG) {
-                startBinaryService(context)
-            } else {
-                preferenceManager.setBoolean("isFlagSetForAutoStartServer", true)
+        if (isAutoStartOnBootEnabled) {
+            if (autoStartOnBootForeground) {
+                preferenceManager.myPrefs.autoStartServer = true
+                preferenceManager.savePreferences()
                 startBinaryServiceFG(context)
+            } else {
+                startBinaryService(context)
             }
         }
     }

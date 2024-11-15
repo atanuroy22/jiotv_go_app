@@ -1,85 +1,154 @@
-package com.skylake.skytv.jgorunner.data;
+package com.skylake.skytv.jgorunner.data
 
-import android.content.Context;
-import android.content.SharedPreferences;
+import android.content.Context
+import android.content.SharedPreferences
+import android.util.Log
+import kotlin.reflect.KMutableProperty
+import kotlin.reflect.full.findAnnotation
+import kotlin.reflect.full.memberProperties
+import kotlin.reflect.jvm.isAccessible
 
-import java.util.Map;
+class SkySharedPref private constructor(context: Context) {
+    companion object {
+        private const val PREF_NAME = "SkySharedPref"
 
-public class SkySharedPref {
+        @Volatile
+        private var instance: SkySharedPref? = null
 
-    private static final String PREF_NAME = "SkySharedPref";
-    private final SharedPreferences sharedPreferences;
-    private final SharedPreferences.Editor editor;
-
-    public SkySharedPref(Context context) {
-        sharedPreferences = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
-        editor = sharedPreferences.edit();
+        // Singleton
+        fun getInstance(context: Context): SkySharedPref {
+            return instance ?: synchronized(this) {
+                instance ?: SkySharedPref(context.applicationContext).also { instance = it }
+            }
+        }
     }
 
-    // Method to save key-value pairs
-    public void setKey(String key, String value) {
-        editor.putString(key, value);
-        editor.apply();
+    private val sharedPreferences: SharedPreferences =
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+    private val editor: SharedPreferences.Editor = sharedPreferences.edit()
+    val myPrefs = readFromSharedPreferences()
+
+    fun savePreferences() {
+        SharedPrefStructure::class.memberProperties.forEach { property ->
+            // Access the annotation
+            val annotation = property.findAnnotation<SharedPrefKey>()
+
+            // If annotation exists, save the value in SharedPreferences
+            annotation?.let { ann ->
+                // Make the property accessible (in case it's private)
+                property.isAccessible = true
+
+                // Get the value of the property
+                // Use the annotated key to save the value
+                val value = myPrefs.let {
+                    property.get(it)
+                }
+                if (value == null) {
+                    return@let
+                }
+                when (value) {
+                    is String -> editor.putString(ann.key, value)
+                    is Boolean -> editor.putBoolean(ann.key, value)
+                    is Int -> editor.putInt(ann.key, value)
+                    is Float -> editor.putFloat(ann.key, value)
+                    is Long -> editor.putLong(ann.key, value)
+                    else -> {
+                        Log.e("SkySharedPref", "Unsupported type")
+                        Log.e("SkySharedPref", "Type: ${value.javaClass}")
+                        throw IllegalArgumentException("Unsupported type")
+                    }
+                }
+            }
+        }
+        editor.apply()
     }
 
-    // Overloaded method to retrieve String by key with a default value
-    public String getKey(String key) {
-        return sharedPreferences.getString(key, null); // Default to null if no value exists
+    // Function to read data from SharedPreferences using annotated keys
+    private fun readFromSharedPreferences(): SharedPrefStructure {
+        val instance = SharedPrefStructure()
+
+        SharedPrefStructure::class.memberProperties.forEach { property ->
+            val annotation = property.findAnnotation<SharedPrefKey>()
+            annotation?.let {
+                property.isAccessible = true
+
+                // Check if the key exists in SharedPreferences
+                // If not, skip the property
+                if (sharedPreferences.contains(it.key).not()) {
+                    return@let
+                }
+
+                // Retrieve the value from SharedPreferences using the annotated key
+                val value = when (property.returnType.classifier) {
+                    String::class -> sharedPreferences.getString(it.key, null) as Any
+                    Boolean::class -> sharedPreferences.getBoolean(it.key, false)
+                    Int::class -> sharedPreferences.getInt(it.key, 0)
+                    Float::class -> sharedPreferences.getFloat(it.key, 0f)
+                    Long::class -> sharedPreferences.getLong(it.key, 0L)
+                    else -> throw IllegalArgumentException("Unsupported type")
+                }
+
+                // Set the value to the property
+                if (property is KMutableProperty<*>) {
+                    property.setter.call(instance, value)
+                }
+            }
+        }
+        return instance
     }
 
-    public String getKey(String key, String defaultValue) {
-        return sharedPreferences.getString(key, defaultValue); // Use provided default value
-    }
+    data class SharedPrefStructure(
+        @SharedPrefKey("serve_local")
+        var serveLocal: Boolean = false,
 
-    // Save int key-value pair
-    public void setInt(String key, int value) {
-        editor.putInt(key, value);
-        editor.apply();
-    }
+        @SharedPrefKey("auto_start_server")
+        var autoStartServer: Boolean = false,
 
-    // Overloaded method to retrieve int by key with a default value
-    public int getInt(String key) {
-        return sharedPreferences.getInt(key, 0); // Default to 0 if no value exists
-    }
+        @SharedPrefKey("auto_start_on_boot")
+        var autoStartOnBoot: Boolean = false,
 
-    public int getInt(String key, int defaultValue) {
-        return sharedPreferences.getInt(key, defaultValue); // Use provided default value
-    }
+        @SharedPrefKey("auto_start_on_boot_foreground")
+        var autoStartOnBootForeground: Boolean = false,
 
-    // Save boolean key-value pair
-    public void setBoolean(String key, boolean value) {
-        editor.putBoolean(key, value);
-        editor.apply();
-    }
+        @SharedPrefKey("auto_start_iptv")
+        var autoStartIPTV: Boolean = false,
 
-    // Overloaded method to retrieve boolean by key with a default value
-    public boolean getBoolean(String key) {
-        return sharedPreferences.getBoolean(key, false); // Default to false if no value exists
-    }
+        @SharedPrefKey("enable_epg")
+        var enableEPG: Boolean = false,
 
-    public boolean getBoolean(String key, boolean defaultValue) {
-        return sharedPreferences.getBoolean(key, defaultValue); // Use provided default value
-    }
+        @SharedPrefKey("enable_auto_update")
+        var enableAutoUpdate: Boolean = true,
 
-    // Remove a specific key
-    public void removeKey(String key) {
-        editor.remove(key);
-        editor.apply();
-    }
+        @SharedPrefKey("jtv_go_port")
+        var jtvGoServerPort: Int = 5350,
 
-    // Clear all preferences
-    public void clearAll() {
-        editor.clear();
-        editor.apply();
-    }
+        @SharedPrefKey("jtv_go_binary_name")
+        var jtvGoBinaryName: String? = null,
 
-    // Check if a key exists
-    public boolean containsKey(String key) {
-        return sharedPreferences.contains(key);
-    }
+        @SharedPrefKey("jtv_binary_version")
+        var jtvGoBinaryVersion: String? = "v0.0.0",
 
-    // Retrieve all stored preferences (key-value pairs)
-    public Map<String, ?> getAll() {
-        return sharedPreferences.getAll();
-    }
+        @SharedPrefKey("jtv_config_location")
+        var jtvConfigLocation: String? = null,
+
+        @SharedPrefKey("iptv_app_name")
+        var iptvAppName: String? = null,
+
+        @SharedPrefKey("iptv_app_package_name")
+        var iptvAppPackageName: String? = null,
+
+        @SharedPrefKey("iptv_app_launch_activity")
+        var iptvAppLaunchActivity: String? = null,
+
+        @SharedPrefKey("iptv_launch_countdown")
+        var iptvLaunchCountdown: Int = 5,
+
+        @SharedPrefKey("recent_channels_json")
+        var recentChannelsJson: String? = null
+    )
+
+    // Annotation class to define the key for SharedPreferences
+    @Target(AnnotationTarget.PROPERTY)
+    @Retention(AnnotationRetention.RUNTIME)
+    annotation class SharedPrefKey(val key: String)
 }

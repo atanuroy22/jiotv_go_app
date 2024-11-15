@@ -1,13 +1,9 @@
-package com.skylake.skytv.jgorunner.activity
+package com.skylake.skytv.jgorunner.ui.screens
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -22,7 +18,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -38,44 +33,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import com.skylake.skytv.jgorunner.R
-import com.skylake.skytv.jgorunner.data.SkySharedPref
-import com.skylake.skytv.jgorunner.ui.theme.JGOTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 
-class AppListActivity : ComponentActivity() {
-    private lateinit var preferenceManager: SkySharedPref
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        preferenceManager = SkySharedPref(this)
-        enableEdgeToEdge()
-
-        setContent {
-            JGOTheme {
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                ) { innerPadding ->
-                    AppListScreen(
-                        modifier = Modifier.padding(innerPadding),
-                        onAppSelected = { selectedApp ->
-                            preferenceManager.setKey("app_name", selectedApp.appName)
-                            preferenceManager.setKey("app_packagename", selectedApp.packageName)
-                            preferenceManager.setKey(
-                                "app_launch_activity",
-                                selectedApp.launchActivity
-                            )
-                            finish()
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
 
 @Composable
 fun AppListScreen(modifier: Modifier = Modifier, onAppSelected: (AppInfo) -> Unit) {
@@ -186,4 +149,3 @@ fun getInstalledApps(context: Context): Flow<AppInfo> = flow {
         emit(AppInfo(appName, appIcon, packageName, launchActivity))
     }
 }.flowOn(Dispatchers.IO)
-
