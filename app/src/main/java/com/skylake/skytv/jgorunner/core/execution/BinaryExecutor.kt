@@ -32,8 +32,8 @@ object BinaryExecutor {
                 }
 
                 setBinaryExecutable(binaryFile)
-                val command = buildCommand(context, arguments)
-                Log.d(TAG, "Executing binary: $command")
+                val args = buildArgsList(context, arguments)
+                Log.d(TAG, "Executing binary: $args")
                 binaryProcess =
                     Runtime.getRuntime().exec(
                         arrayOf(
@@ -41,7 +41,7 @@ object BinaryExecutor {
                             "-c",
                             arrayOf(
                                 binaryFile.absolutePath,
-                                *command.toTypedArray()
+                                *args.toTypedArray()
                             ).joinToString(" ")
                         )
                     )
@@ -81,7 +81,7 @@ object BinaryExecutor {
         }
     }
 
-    private fun buildCommand(
+    private fun buildArgsList(
         context: Context,
         arguments: Array<String>?
     ): List<String> {
