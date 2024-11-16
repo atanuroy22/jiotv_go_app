@@ -36,7 +36,6 @@ import androidx.compose.material.icons.filled.Stream
 import androidx.compose.material.icons.filled.Timelapse
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -74,6 +73,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.activities.AppListActivity
 import com.skylake.skytv.jgorunner.activities.MainActivity
+import com.skylake.skytv.jgorunner.core.data.JTVConfigurationManager
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import java.io.File
 
@@ -84,6 +84,7 @@ fun SettingsScreen(
     checkForUpdates: () -> Unit
 ) {
     // Initialize SkySharedPref
+    val jtvConfigurationManager = JTVConfigurationManager.getInstance(activity)
     val preferenceManager = SkySharedPref.getInstance(activity)
     val focusRequester = remember { FocusRequester() }
     val customFontFamily = FontFamily(Font(R.font.chakrapetch_bold))
@@ -96,7 +97,7 @@ fun SettingsScreen(
         mutableStateOf(preferenceManager.myPrefs.serveLocal)
     }
     var isSwitchOnForEPG by remember {
-        mutableStateOf(preferenceManager.myPrefs.enableEPG)
+        mutableStateOf(jtvConfigurationManager.jtvConfiguration.epg)
     }
     var isSwitchOnForAutoStartServer by remember {
         mutableStateOf(preferenceManager.myPrefs.autoStartServer)
@@ -169,6 +170,11 @@ fun SettingsScreen(
         applySettings()
     }
 
+    LaunchedEffect(isSwitchOnForEPG) {
+        jtvConfigurationManager.jtvConfiguration.epg = isSwitchOnForEPG
+        jtvConfigurationManager.saveJTVConfiguration()
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -227,14 +233,12 @@ fun SettingsScreen(
                     onClick = { showPortDialog = true })
             }
             item {
-                // TODO: Implement EPG
                 SettingSwitchItem(
                     icon = Icons.Filled.Info,
                     title = "Enable EPG",
                     subtitle = "Electronic program guide generation",
                     isChecked = isSwitchOnForEPG,
                     onCheckedChange = { isChecked -> isSwitchOnForEPG = isChecked },
-                    enabled = false
                 )
             }
             item {
@@ -318,20 +322,6 @@ fun SettingsScreen(
                     onClick = {
                         showRestartAppDialog = true
                     })
-            }
-            item {
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp),
-                    thickness = 1.dp,
-                )
-            }
-            item {
-                Text(
-                    text = "Note: EPG is not supported.",
-                    fontSize = 14.sp,
-                    color = Color.Gray,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
             }
         }
     }

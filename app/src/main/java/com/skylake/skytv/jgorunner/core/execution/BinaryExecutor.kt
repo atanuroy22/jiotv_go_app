@@ -34,17 +34,19 @@ object BinaryExecutor {
                 setBinaryExecutable(binaryFile)
                 val args = buildArgsList(context, arguments)
                 Log.d(TAG, "Executing binary: $args")
-                binaryProcess =
-                    Runtime.getRuntime().exec(
+                binaryProcess = Runtime.getRuntime().exec(
+                    arrayOf(
+                        "sh",
+                        "-c",
                         arrayOf(
-                            "sh",
-                            "-c",
-                            arrayOf(
-                                binaryFile.absolutePath,
-                                *args.toTypedArray()
-                            ).joinToString(" ")
-                        )
-                    )
+                            binaryFile.absolutePath,
+                            *args.toTypedArray()
+                        ).joinToString(" ")
+                    ),
+                    null, // Environment variables (null means inherit from parent process)
+                    binaryFile.parentFile // Set the working directory
+                )
+
                 Thread(
                     StreamGobbler(
                         binaryProcess!!.inputStream,

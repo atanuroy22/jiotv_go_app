@@ -21,7 +21,7 @@ class JTVConfigurationManager private constructor(context: Context) {
 
     // Configuration
     private val preferenceManager = SkySharedPref.getInstance(context.applicationContext)
-    private val jtvConfiguration = readFromJTVConfiguration()
+    val jtvConfiguration = readFromJTVConfiguration()
     private val filesDir = context.filesDir
 
     private fun readFromJTVConfiguration(): JTVConfiguration {

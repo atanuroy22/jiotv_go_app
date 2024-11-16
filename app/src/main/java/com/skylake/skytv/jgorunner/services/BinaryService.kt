@@ -89,8 +89,8 @@ class BinaryService : Service() {
                     return@executeBinary
                 }
                 temp += output
-                if (temp.length > 2000)
-                    temp = temp.substring(2000)
+                if (temp.length > 5000)
+                    temp = temp.substring(5000)
                 binaryOutput.postValue(temp.toString())
             },
             onError = {

@@ -113,9 +113,6 @@ class SkySharedPref private constructor(context: Context) {
         @SharedPrefKey("auto_start_iptv")
         var autoStartIPTV: Boolean = false,
 
-        @SharedPrefKey("enable_epg")
-        var enableEPG: Boolean = false,
-
         @SharedPrefKey("enable_auto_update")
         var enableAutoUpdate: Boolean = true,
 
