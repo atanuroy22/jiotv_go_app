@@ -91,6 +91,7 @@ class MainActivity : ComponentActivity() {
     private var countdownJob: Job? = null
 
     private var downloadModel by mutableStateOf<DownloadModel?>(null)
+    private var isSwitchOnForAutoStartForeground by mutableStateOf(false)
 
     override fun onStart() {
         super.onStart()
@@ -127,9 +128,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
-        requestOverlayPermission()
         requestNotificationPermissions()
+        preferenceManager = SkySharedPref.getInstance(this)
+        isSwitchOnForAutoStartForeground = preferenceManager.myPrefs.autoStartOnBootForeground
+        if (!checkOverlayPermission() && isSwitchOnForAutoStartForeground) {
+            isSwitchOnForAutoStartForeground = false
+            preferenceManager.myPrefs.autoStartOnBootForeground = false
+            preferenceManager.savePreferences()
+        }
 
         selectedBinaryName = "JTV-GO SERVER"
 
@@ -148,7 +154,6 @@ class MainActivity : ComponentActivity() {
 
         // Register the OnBackPressedCallback
         onBackPressedDispatcher.addCallback(this, backPressedCallback)
-        preferenceManager = SkySharedPref.getInstance(this)
 
         setContent {
             JGOTheme {
@@ -216,7 +221,17 @@ class MainActivity : ComponentActivity() {
 
                             "Settings" -> SettingsScreen(
                                 activity = this@MainActivity,
-                                checkForUpdates = { checkForUpdates() })
+                                checkForUpdates = { checkForUpdates() },
+                                isSwitchOnForAutoStartForeground = isSwitchOnForAutoStartForeground,
+                                onAutoStartForegroundSwitch = {
+                                    if (it) {
+                                        requestOverlayPermission()
+                                    } else {
+                                        preferenceManager.myPrefs.autoStartOnBootForeground = false
+                                        preferenceManager.savePreferences()
+                                        isSwitchOnForAutoStartForeground = false
+                                    }
+                                })
 
                             "Info" -> InfoScreen(context = this@MainActivity)
                             "Debug" -> DebugScreen(
@@ -327,13 +342,13 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             onDismiss = {
+                                isSwitchOnForAutoStartForeground = false
                                 showOverlayPermissionPopup = false
                                 Toast.makeText(
                                     this@MainActivity,
                                     "Permission is required to continue",
                                     Toast.LENGTH_SHORT
                                 ).show()
-                                return@CustPopup
                             }
                         )
                     }
@@ -747,15 +762,30 @@ class MainActivity : ComponentActivity() {
     ) { _ ->
         // Handle the result of the permission request
         if (!Settings.canDrawOverlays(this)) {
+            isSwitchOnForAutoStartForeground = false
             Toast.makeText(this, "Overlay permission Denied!", Toast.LENGTH_SHORT)
                 .show()
+        } else {
+            preferenceManager.myPrefs.autoStartOnBootForeground = true
+            preferenceManager.savePreferences()
+            isSwitchOnForAutoStartForeground = true
         }
+    }
+
+    private fun checkOverlayPermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Settings.canDrawOverlays(this)
+        } else true
     }
 
     private fun requestOverlayPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
                 showOverlayPermissionPopup = true
+            } else {
+                preferenceManager.myPrefs.autoStartOnBootForeground = true
+                preferenceManager.savePreferences()
+                isSwitchOnForAutoStartForeground = true
             }
         }
     }

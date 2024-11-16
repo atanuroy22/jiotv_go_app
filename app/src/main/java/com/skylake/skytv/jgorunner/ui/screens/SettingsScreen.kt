@@ -81,7 +81,9 @@ import java.io.File
 @Composable
 fun SettingsScreen(
     activity: ComponentActivity,
-    checkForUpdates: () -> Unit
+    checkForUpdates: () -> Unit,
+    isSwitchOnForAutoStartForeground: Boolean,
+    onAutoStartForegroundSwitch: (Boolean) -> Unit,
 ) {
     // Initialize SkySharedPref
     val jtvConfigurationManager = JTVConfigurationManager.getInstance(activity)
@@ -102,9 +104,7 @@ fun SettingsScreen(
     var isSwitchOnForAutoStartServer by remember {
         mutableStateOf(preferenceManager.myPrefs.autoStartServer)
     }
-    var isSwitchOnForAutoStartForeground by remember {
-        mutableStateOf(preferenceManager.myPrefs.autoStartOnBootForeground)
-    }
+
     var isSwitchOnForAutoStartOnBoot by remember {
         mutableStateOf(preferenceManager.myPrefs.autoStartOnBoot)
     }
@@ -165,11 +165,6 @@ fun SettingsScreen(
         applySettings()
     }
 
-    LaunchedEffect(isSwitchOnForAutoStartForeground) {
-        preferenceManager.myPrefs.autoStartOnBootForeground = isSwitchOnForAutoStartForeground
-        applySettings()
-    }
-
     LaunchedEffect(isSwitchOnForEPG) {
         jtvConfigurationManager.jtvConfiguration.epg = isSwitchOnForEPG
         jtvConfigurationManager.saveJTVConfiguration()
@@ -214,7 +209,7 @@ fun SettingsScreen(
                         subtitle = "The server will start in $stateBG mode",
                         isChecked = isSwitchOnForAutoStartForeground,
                         onCheckedChange = { isChecked ->
-                            isSwitchOnForAutoStartForeground = isChecked
+                            onAutoStartForegroundSwitch(isChecked)
                         })
                 }
             }
