@@ -31,6 +31,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -69,12 +70,11 @@ fun HomeScreen(
     onDebugButtonClick: () -> Unit,
     onExitButtonClick: () -> Unit
 ) {
-    val scrollState = rememberScrollState()
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
-            .verticalScroll(scrollState),
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -172,6 +172,13 @@ fun HomeScreen(
         Column(
             modifier = Modifier.alpha(if (isServerRunning) 1f else 0f)
         ) {
+            val outputScrollState = rememberScrollState()
+
+            // Scroll to the bottom whenever the text changes (recomposition)
+            LaunchedEffect(outputText) {
+                outputScrollState.animateScrollTo(outputScrollState.maxValue)
+            }
+
             Text(
                 text = outputText,
                 color = Color.White,
@@ -182,7 +189,7 @@ fun HomeScreen(
                     .height(160.dp)
                     .background(Color.Black)
                     .padding(8.dp)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(outputScrollState)
             )
         }
     }
