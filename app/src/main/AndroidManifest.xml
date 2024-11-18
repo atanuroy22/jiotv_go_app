@@ -12,6 +12,7 @@
         tools:ignore="LeanbackUsesWifi" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"
         tools:ignore="LeanbackUsesWifi" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
 
     <!-- Declaring the Leanback feature -->
     <uses-feature android:name="android.software.leanback" android:required="false" />

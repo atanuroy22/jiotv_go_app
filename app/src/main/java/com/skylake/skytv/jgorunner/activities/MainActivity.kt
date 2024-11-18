@@ -30,17 +30,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import com.ketch.DownloadConfig
 import com.ketch.DownloadModel
 import com.ketch.Ketch
+import com.ketch.NotificationConfig
 import com.ketch.Status
 import com.skylake.skytv.jgorunner.BuildConfig
+import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.core.checkServerStatus
 import com.skylake.skytv.jgorunner.core.data.JTVConfigurationManager
 import com.skylake.skytv.jgorunner.core.execution.runBinary
 import com.skylake.skytv.jgorunner.core.execution.stopBinary
 import com.skylake.skytv.jgorunner.core.update.ApplicationUpdater
 import com.skylake.skytv.jgorunner.core.update.BinaryUpdater
-import com.skylake.skytv.jgorunner.core.update.downloadFile
+import com.skylake.skytv.jgorunner.core.update.DownloadProgress
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.BinaryService
 import com.skylake.skytv.jgorunner.ui.components.BottomNavigationBar
@@ -58,10 +64,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
 import org.cthing.versionparser.semver.SemanticVersion
 import java.net.Inet4Address
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 
 class MainActivity : ComponentActivity() {
@@ -90,7 +99,7 @@ class MainActivity : ComponentActivity() {
     private var shouldLaunchIPTV by mutableStateOf(false)
     private var countdownJob: Job? = null
 
-    private var downloadModel by mutableStateOf<DownloadModel?>(null)
+    private var downloadProgress by mutableStateOf<DownloadProgress?>(null)
     private var isSwitchOnForAutoStartForeground by mutableStateOf(false)
 
     override fun onStart() {
@@ -136,8 +145,6 @@ class MainActivity : ComponentActivity() {
             preferenceManager.myPrefs.autoStartOnBootForeground = false
             preferenceManager.savePreferences()
         }
-
-        selectedBinaryName = "JTV-GO SERVER"
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(
@@ -307,21 +314,13 @@ class MainActivity : ComponentActivity() {
                                 performAppUpdate()
                                 showAppUpdatePopup = false
                             },
-                            onDismiss = {
-                                showAppUpdatePopup = false
-                            }
+                            onDismiss = null
                         )
 
-                        if (downloadModel != null) {
+                        if (downloadProgress != null) {
                             ProgressPopup(
-                                fileName = downloadModel!!.fileName,
-                                currentProgress = downloadModel!!.progress,
-                                onCancel = {
-                                    // Cancel the download
-                                    Ketch.builder().build(this@MainActivity)
-                                        .cancel(downloadModel!!.id)
-                                    downloadModel = null
-                                }
+                                fileName = downloadProgress!!.fileName,
+                                currentProgress = downloadProgress!!.progress,
                             )
                         }
 
@@ -447,26 +446,88 @@ class MainActivity : ComponentActivity() {
                 return@launch
             }
 
-            downloadStuff(
+            downloadFile(
+                activity = this@MainActivity,
                 url = latestBinaryReleaseInfo.downloadUrl,
                 fileName = latestBinaryReleaseInfo.name,
                 path = filesDir.absolutePath,
-                onDownloadCompleted = {
-                    // Delete previous binary
-                    val previousBinaryName = preferenceManager.myPrefs.jtvGoBinaryName
-                    if (!previousBinaryName.isNullOrEmpty()) {
-                        val previousBinaryFile = filesDir.resolve(previousBinaryName)
-                        if (previousBinaryFile.exists()) {
-                            previousBinaryFile.delete()
+                onDownloadStatusUpdate = { downloadModel ->
+
+                    when (downloadModel.status) {
+                        Status.CANCELLED -> {
+                            this@MainActivity.downloadProgress = null
+                        }
+
+                        Status.FAILED -> {
+                            Log.e("DIX", "Download failed")
+                            Log.e("DIX", downloadModel.failureReason)
+                            this@MainActivity.downloadProgress = null
+                        }
+
+                        Status.SUCCESS -> {
+                            val previousBinaryName = preferenceManager.myPrefs.jtvGoBinaryName
+                            if (!previousBinaryName.isNullOrEmpty()) {
+                                val previousBinaryFile = filesDir.resolve(previousBinaryName)
+                                if (previousBinaryFile.exists()) {
+                                    previousBinaryFile.delete()
+                                }
+                            }
+
+                            preferenceManager.myPrefs.jtvGoBinaryVersion =
+                                latestBinaryReleaseInfo.version.toString()
+                            preferenceManager.myPrefs.jtvGoBinaryName = latestBinaryReleaseInfo.name
+                            preferenceManager.savePreferences()
+                            this@MainActivity.downloadProgress = null
+                        }
+
+                        else -> {
+                            this@MainActivity.downloadProgress = DownloadProgress(
+                                fileName = downloadModel.fileName,
+                                progress = downloadModel.progress
+                            )
                         }
                     }
-
-                    preferenceManager.myPrefs.jtvGoBinaryVersion =
-                        latestBinaryReleaseInfo.version.toString()
-                    preferenceManager.myPrefs.jtvGoBinaryName = latestBinaryReleaseInfo.name
-                    preferenceManager.savePreferences()
                 }
             )
+        }
+    }
+
+    private fun downloadFile(
+        activity: ComponentActivity,
+        url: String,
+        fileName: String,
+        path: String = activity.filesDir.absolutePath,
+        onDownloadStatusUpdate: (DownloadModel) -> Unit
+    ) {
+        val ketch = Ketch.builder()
+            .setOkHttpClient(
+                okHttpClient = OkHttpClient
+                    .Builder()
+                    .followRedirects(true)
+                    .followSslRedirects(true)
+                    .connectTimeout(10, TimeUnit.SECONDS)
+                    .readTimeout(10, TimeUnit.SECONDS)
+                    .build()
+            ).setDownloadConfig(
+                config = DownloadConfig(
+                    connectTimeOutInMs = 20000L,
+                    readTimeOutInMs = 15000L
+                )
+            ).setNotificationConfig(
+                config = NotificationConfig(
+                    enabled = true, // Default: false
+                    smallIcon = R.drawable.notifications_24px,
+                )
+            ).build(activity)
+        val id = ketch.download(url, path, fileName)
+        activity.lifecycleScope.launch {
+            activity.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                ketch.observeDownloadById(id)
+                    .flowOn(Dispatchers.IO)
+                    .collect { downloadModel ->
+                        onDownloadStatusUpdate(downloadModel)
+                    }
+            }
         }
     }
 
@@ -477,65 +538,15 @@ class MainActivity : ComponentActivity() {
                 return@launch
             }
 
-            downloadStuff(
-                url = latestAppVersion.downloadUrl,
+            ApplicationUpdater.downloadAppUpdate(
+                context = this@MainActivity,
+                downloadUrl = latestAppVersion.downloadUrl,
                 fileName = latestAppVersion.name,
-                path = filesDir.absolutePath,
-                onDownloadCompleted = {
-                    // Install the downloaded APK
-                    val intent = Intent(Intent.ACTION_VIEW)
-                    intent.setDataAndType(
-                        Uri.parse("file://${filesDir.absolutePath}/${latestAppVersion.name}"),
-                        "application/vnd.android.package-archive"
-                    )
-                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    startActivity(intent)
+                onProgress = { progress ->
+                    downloadProgress = progress
                 }
             )
         }
-    }
-
-    private fun downloadStuff(
-        url: String,
-        fileName: String,
-        path: String,
-        onDownloadCompleted: () -> Unit
-    ) {
-        downloadFile(
-            activity = this@MainActivity,
-            url = url,
-            fileName = fileName,
-            path = path,
-            onDownloadStatusUpdate = { downloadModel ->
-                when (downloadModel.status) {
-                    Status.QUEUED -> {}
-                    Status.STARTED -> {
-                        this.downloadModel = downloadModel
-                    }
-
-                    Status.CANCELLED -> {
-                        this.downloadModel = null
-                    }
-
-                    Status.FAILED -> {
-                        Log.e("DIX", "Download failed")
-                        Log.e("DIX", downloadModel.failureReason)
-                        this.downloadModel = null
-                    }
-
-                    Status.PAUSED -> {}
-                    Status.DEFAULT -> {}
-                    Status.PROGRESS -> {
-                        this.downloadModel = downloadModel
-                    }
-
-                    Status.SUCCESS -> {
-                        this.downloadModel = null
-                        onDownloadCompleted()
-                    }
-                }
-            }
-        )
     }
 
     private fun onJTVServerRun() {

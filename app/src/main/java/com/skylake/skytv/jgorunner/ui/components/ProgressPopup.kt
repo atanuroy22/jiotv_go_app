@@ -21,10 +21,9 @@ import androidx.compose.ui.window.DialogProperties
 fun ProgressPopup(
     fileName: String,
     currentProgress: Int,
-    onCancel: () -> Unit
 ){
     AlertDialog(
-        onDismissRequest = { onCancel() },
+        onDismissRequest = {  },
         text = {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,

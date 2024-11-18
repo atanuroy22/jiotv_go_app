@@ -14,11 +14,11 @@ fun CustPopup(
     confirmButtonText: String,
     dismissButtonText: String,
     onConfirm: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: (() -> Unit)?
 ) {
     if (isVisible) {
         AlertDialog(
-            onDismissRequest = { onDismiss() },
+            onDismissRequest = { if (onDismiss != null) onDismiss() },
             title = { Text(title) },
             text = { Text(text) },
             confirmButton = {
@@ -27,9 +27,10 @@ fun CustPopup(
                 }
             },
             dismissButton = {
-                Button(onClick = { onDismiss() }) {
-                    Text(dismissButtonText)
-                }
+                if (onDismiss != null)
+                    Button(onClick = { onDismiss() }) {
+                        Text(dismissButtonText)
+                    }
             },
             properties = DialogProperties(
                 dismissOnBackPress = false,
