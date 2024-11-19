@@ -228,7 +228,7 @@ class MainActivity : ComponentActivity() {
 
                             "Settings" -> SettingsScreen(
                                 activity = this@MainActivity,
-                                checkForUpdates = { checkForUpdates() },
+                                checkForUpdates = { checkForUpdates(true) },
                                 isSwitchOnForAutoStartForeground = isSwitchOnForAutoStartForeground,
                                 onAutoStartForegroundSwitch = {
                                     if (it) {
@@ -401,7 +401,7 @@ class MainActivity : ComponentActivity() {
         unregisterReceiver(binaryStoppedReceiver)
     }
 
-    private fun checkForUpdates() {
+    private fun checkForUpdates(notify: Boolean = false) {
         // Binary update check
         CoroutineScope(Dispatchers.IO).launch {
             val currentBinaryVersion = preferenceManager.myPrefs.jtvGoBinaryVersion
@@ -423,6 +423,17 @@ class MainActivity : ComponentActivity() {
             ) {
                 showBinaryUpdatePopup = true
                 Log.d("DIX", "Binary update available")
+            } else {
+                if (notify) {
+                    CoroutineScope(Dispatchers.Main).launch {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "No binary updates available",
+                            Toast.LENGTH_SHORT
+                        )
+                            .show()
+                    }
+                }
             }
         }
 
@@ -436,6 +447,17 @@ class MainActivity : ComponentActivity() {
             if (latestAppVersion?.version?.compareTo(SemanticVersion.parse(currentAppVersion)) == 1) {
                 showAppUpdatePopup = true
                 Log.d("DIX", "App update available")
+            } else {
+                if (notify) {
+                    CoroutineScope(Dispatchers.Main).launch {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "No app updates available",
+                            Toast.LENGTH_SHORT
+                        )
+                            .show()
+                    }
+                }
             }
         }
     }

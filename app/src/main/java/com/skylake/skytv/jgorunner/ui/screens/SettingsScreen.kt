@@ -295,15 +295,15 @@ fun SettingsScreen(
             }
             item {
                 SettingSwitchItem(icon = Icons.Filled.SoupKitchen,
-                    title = "Check for updates",
+                    title = "Check for updates automatically",
                     subtitle = "Check for updates when the app starts",
                     isChecked = isSwitchOnCheckForUpdate,
                     onCheckedChange = { isChecked -> isSwitchOnCheckForUpdate = isChecked })
             }
             item {
                 SettingItem(icon = Icons.Filled.ArrowCircleUp,
-                    title = "Update Binary",
-                    subtitle = "Update to the latest binary version.",
+                    title = "Check for Updates Now",
+                    subtitle = "Update to the latest binary and application version.",
                     onClick = {
                         checkForUpdates()
                     })
