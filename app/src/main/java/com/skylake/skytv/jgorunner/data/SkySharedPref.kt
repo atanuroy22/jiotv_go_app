@@ -144,7 +144,7 @@ class SkySharedPref private constructor(context: Context) {
         var iptvAppLaunchActivity: String? = null,
 
         @SharedPrefKey("iptv_launch_countdown")
-        var iptvLaunchCountdown: Int = 5,
+        var iptvLaunchCountdown: Int = 4,
 
         @SharedPrefKey("recent_channels_json")
         var recentChannelsJson: String? = null
