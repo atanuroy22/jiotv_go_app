@@ -264,14 +264,14 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(
-                        text = "IPTV Redirect Time: ${selectedIPTVTime / 1000} sec",
+                        text = "IPTV Redirect Time: $selectedIPTVTime sec",
                         fontWeight = FontWeight.Bold
                     )
                 }
                 Slider(value = selectedIPTVTime.toFloat(),
                     onValueChange = { selectedIPTVTime = it.toInt() },
-                    valueRange = 2000f..10000f,
-                    steps = 5, // for 2, 4, 6, 8, 10 seconds
+                    valueRange = 2f..10f,
+                    steps = 3, // for 2, 4, 6, 8, 10 seconds
                     modifier = Modifier
                         .padding(horizontal = 16.dp)
                         .focusRequester(focusRequester) // Focus for keyboard handling
@@ -279,12 +279,12 @@ fun SettingsScreen(
                         .onKeyEvent { event ->
                             when (event.nativeKeyEvent.keyCode) {
                                 Key.DirectionRight.nativeKeyCode -> {
-                                    selectedIPTVTime = (selectedIPTVTime + 1000).coerceAtMost(10000)
+                                    selectedIPTVTime = (selectedIPTVTime + 2).coerceAtMost(10)
                                     true
                                 }
 
                                 Key.DirectionLeft.nativeKeyCode -> {
-                                    selectedIPTVTime = (selectedIPTVTime - 1000).coerceAtLeast(2000)
+                                    selectedIPTVTime = (selectedIPTVTime - 2).coerceAtLeast(2)
                                     true
                                 }
 
