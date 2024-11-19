@@ -401,7 +401,7 @@ class MainActivity : ComponentActivity() {
         unregisterReceiver(binaryStoppedReceiver)
     }
 
-    private fun checkForUpdates(notify: Boolean = false) {
+    private fun checkForUpdates(forceCheck: Boolean = false) {
         // Binary update check
         CoroutineScope(Dispatchers.IO).launch {
             val currentBinaryVersion = preferenceManager.myPrefs.jtvGoBinaryVersion
@@ -410,6 +410,9 @@ class MainActivity : ComponentActivity() {
                 performBinaryUpdate()
                 return@launch
             }
+
+            if (!preferenceManager.myPrefs.enableAutoUpdate && !forceCheck)
+                return@launch
 
             val latestBinaryReleaseInfo = BinaryUpdater.fetchLatestReleaseInfo()
             Log.d("DIX", "Current binary version: $currentBinaryVersion")
@@ -424,7 +427,7 @@ class MainActivity : ComponentActivity() {
                 showBinaryUpdatePopup = true
                 Log.d("DIX", "Binary update available")
             } else {
-                if (notify) {
+                if (forceCheck) {
                     CoroutineScope(Dispatchers.Main).launch {
                         Toast.makeText(
                             this@MainActivity,
@@ -439,7 +442,7 @@ class MainActivity : ComponentActivity() {
 
         // App Update check
         CoroutineScope(Dispatchers.IO).launch {
-            if (!preferenceManager.myPrefs.enableAutoUpdate)
+            if (!preferenceManager.myPrefs.enableAutoUpdate && !forceCheck)
                 return@launch
 
             val currentAppVersion = BuildConfig.VERSION_NAME
@@ -448,7 +451,7 @@ class MainActivity : ComponentActivity() {
                 showAppUpdatePopup = true
                 Log.d("DIX", "App update available")
             } else {
-                if (notify) {
+                if (forceCheck) {
                     CoroutineScope(Dispatchers.Main).launch {
                         Toast.makeText(
                             this@MainActivity,
@@ -469,6 +472,16 @@ class MainActivity : ComponentActivity() {
                 return@launch
             }
 
+            val previousBinaryName = preferenceManager.myPrefs.jtvGoBinaryName
+            if (!previousBinaryName.isNullOrEmpty()) {
+                val previousBinaryFile = filesDir.resolve(previousBinaryName)
+                if (previousBinaryFile.exists()) {
+                    previousBinaryFile.delete()
+                }
+            }
+            preferenceManager.myPrefs.jtvGoBinaryName = null
+            preferenceManager.myPrefs.jtvGoBinaryVersion = "v0.0.0"
+
             downloadFile(
                 activity = this@MainActivity,
                 url = latestBinaryReleaseInfo.downloadUrl,
@@ -487,14 +500,6 @@ class MainActivity : ComponentActivity() {
                         }
 
                         Status.SUCCESS -> {
-                            val previousBinaryName = preferenceManager.myPrefs.jtvGoBinaryName
-                            if (!previousBinaryName.isNullOrEmpty()) {
-                                val previousBinaryFile = filesDir.resolve(previousBinaryName)
-                                if (previousBinaryFile.exists()) {
-                                    previousBinaryFile.delete()
-                                }
-                            }
-
                             preferenceManager.myPrefs.jtvGoBinaryVersion =
                                 latestBinaryReleaseInfo.version.toString()
                             preferenceManager.myPrefs.jtvGoBinaryName = latestBinaryReleaseInfo.name
