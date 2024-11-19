@@ -110,9 +110,9 @@ fun HomeScreen(
                 .fillMaxWidth()
                 .border(2.dp, Color.Gray, RoundedCornerShape(8.dp))
                 .background(
-                    if (titleShouldGlow) MaterialTheme.colorScheme.errorContainer else Color(
+                    if (titleShouldGlow) Color(
                         0xFFA5D6A7
-                    ),
+                    ) else MaterialTheme.colorScheme.errorContainer,
                     RoundedCornerShape(8.dp)
                 )
                 .padding(5.dp)
@@ -122,7 +122,7 @@ fun HomeScreen(
             Text(
                 text = publicJTVServerURL,
                 fontSize = 16.sp,
-                color = if (titleShouldGlow) MaterialTheme.colorScheme.onSurface else Color.Black,
+                color = if (titleShouldGlow) Color.Black else MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
                     .align(Alignment.Center)
                     .clickable {
