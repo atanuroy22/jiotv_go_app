@@ -346,33 +346,35 @@ class WebPlayerActivity : ComponentActivity() {
 
         fun playVideoInFullScreen(view: WebView) {
             val orientation = resources.configuration.orientation
+            val isLandscape = orientation == Configuration.ORIENTATION_LANDSCAPE
 
-            if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-                view.loadUrl(
-                    "javascript:(function() { " +
-                            "var video = document.getElementsByTagName('video')[0]; " +
-                            "if (video) { " +
-                            "  video.style.width = '100vw'; " +  // Use full viewport width
-                            "  video.style.height = '100vh'; " +  // Use full viewport height
-                            "  video.style.objectFit = 'contain'; " +  // Maintain aspect ratio, contain in view
-                            "  video.play(); " +
-                            "} " +
-                            "})()"
-                )
-            } else if (orientation == Configuration.ORIENTATION_PORTRAIT) {
-                view.loadUrl(
-                    "javascript:(function() { " +
-                            "var video = document.getElementsByTagName('video')[0]; " +
-                            "if (video) { " +
-                            "  video.style.width = '100vw'; " +  // Use full viewport width
-                            "  video.style.height = 'auto'; " +  // Automatically adjust height based on width
-                            "  video.style.objectFit = 'contain'; " +  // Maintain aspect ratio
-                            "  video.play(); " +
-                            "} " +
-                            "})()"
-                )
+            val width = "100vw"
+            val height = if (isLandscape) "100vh" else "auto"
+            val objectFit = "contain"
+
+            val script = """
+        javascript:(function() {
+            try {
+                var video = document.getElementsByTagName('video')[0];
+                if (video) {
+                    video.style.width = '$width';
+                    video.style.height = '$height';
+                    video.style.objectFit = '$objectFit';
+                    video.play();
+                } else {
+                    console.error('No video element found');
+                }
+            } catch (e) {
+                console.error('Error in full-screen script:', e);
             }
+        })()
+    """.trimIndent()
+
+            // Use evaluateJavascript for better performance
+            view.evaluateJavascript(script, null)
         }
+
+
 
 
         fun moveSearchInput(view: WebView) {
@@ -452,11 +454,11 @@ class WebPlayerActivity : ComponentActivity() {
             }
         }
 
-        // Check if the channel with the given playId already exists and remove it if found
+        // Check if the channel with the given channelName already exists and remove it if found
         val iterator = recentChannels.iterator()
         while (iterator.hasNext()) {
             val channel = iterator.next()
-            if (channel.playId == playId) {
+            if (channel.channelName == channelName) {
                 iterator.remove()
             }
         }
@@ -496,7 +498,6 @@ class WebPlayerActivity : ComponentActivity() {
 
         if (!channelData.isNullOrEmpty()) {
             recentChannels.clear() // Clear existing list
-            Log.d("RIX", "I WAS HERE")
             try {
                 val jsonArray = JSONArray(channelData)
 
@@ -521,20 +522,21 @@ class WebPlayerActivity : ComponentActivity() {
         }
 
         for (channel in recentChannels) {
-            val formattedPlayId = if (channel.playId!!.contains("?"))
-                if (channel.playId!!.indexOf('?') == 0)
-                    "??" + channel.playId!!.substring(1)
-                else
-                    channel.playId!!.replaceFirst("\\?".toRegex(), "??")
-            else
-                channel.playId + "??"
+            val formattedPlayId = if (!channel.playId!!.endsWith("&&")) {
+                channel.playId + "&&"
+            } else {
+                channel.playId
+            }
 
             Log.d(
                 TAG,
-                "Injecting Channel into WebView - Name: " + channel.channelName + ", Play ID: " + formattedPlayId
+                "Injecting Channel into WebView - Name: ${channel.channelName}, Play ID: $formattedPlayId"
             )
 
-            injectTVChannel(channel.channelName, formattedPlayId, channel.logoUrl)
+            if (formattedPlayId != null) {
+                injectTVChannel(channel.channelName, formattedPlayId, channel.logoUrl)
+            }
         }
+
     }
 }
