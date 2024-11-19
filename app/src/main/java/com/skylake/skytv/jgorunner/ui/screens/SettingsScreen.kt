@@ -22,14 +22,14 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowCircleUp
+import androidx.compose.material.icons.filled.Attribution
+import androidx.compose.material.icons.filled.BrowserUpdated
 import androidx.compose.material.icons.filled.CenterFocusStrong
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Pix
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.ResetTv
 import androidx.compose.material.icons.filled.RestartAlt
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SoupKitchen
 import androidx.compose.material.icons.filled.Stream
 import androidx.compose.material.icons.filled.Timelapse
@@ -220,14 +220,14 @@ fun SettingsScreen(
             }
             // Port Number Setting
             item {
-                SettingItem(icon = Icons.Filled.Settings,
+                SettingItem(icon = Icons.Filled.Attribution,
                     title = "Server Port",
                     subtitle = "Current Port: $portNumber",
                     onClick = { showPortDialog = true })
             }
             item {
                 SettingSwitchItem(
-                    icon = Icons.Filled.Info,
+                    icon = Icons.Filled.BrowserUpdated,
                     title = "Enable EPG",
                     subtitle = "Electronic program guide generation",
                     isChecked = isSwitchOnForEPG,
@@ -279,12 +279,12 @@ fun SettingsScreen(
                         .onKeyEvent { event ->
                             when (event.nativeKeyEvent.keyCode) {
                                 Key.DirectionRight.nativeKeyCode -> {
-                                    selectedIPTVTime = (selectedIPTVTime + 2).coerceAtMost(10)
+                                    selectedIPTVTime = (selectedIPTVTime + 1).coerceAtMost(10)
                                     true
                                 }
 
                                 Key.DirectionLeft.nativeKeyCode -> {
-                                    selectedIPTVTime = (selectedIPTVTime - 2).coerceAtLeast(2)
+                                    selectedIPTVTime = (selectedIPTVTime - 1).coerceAtLeast(2)
                                     true
                                 }
 

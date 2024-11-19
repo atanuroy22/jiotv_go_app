@@ -10,27 +10,30 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 
 @Composable
 fun ProgressPopup(
     fileName: String,
     currentProgress: Int,
-){
+) {
     AlertDialog(
-        onDismissRequest = {  },
+        onDismissRequest = { },
         text = {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 16.dp)
+                    .padding(16.dp)
             ) {
                 Text(
                     text = "Downloading $fileName",
@@ -40,20 +43,23 @@ fun ProgressPopup(
                         color = MaterialTheme.colorScheme.primary
                     ),
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(vertical = 8.dp)
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
 
+                if (currentProgress == 0) {
+                    BufferBar()
+                } else {
+                    ProgressBar(currentProgress)
+                }
+
                 Text(
-                    text = "Current Progress: $currentProgress%",
+                    text = "Progress: $currentProgress%",
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.secondary
                     ),
                     textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .alpha(1f)
-                        .padding(top = 8.dp)
                 )
             }
         },
@@ -62,5 +68,28 @@ fun ProgressPopup(
             dismissOnBackPress = false,
             dismissOnClickOutside = false
         )
+    )
+}
+
+@Composable
+fun ProgressBar(currentProgress : Int) {
+    LinearProgressIndicator(
+        progress = { currentProgress.coerceIn(0, 100) / 100f },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(6.dp),
+        color = MaterialTheme.colorScheme.secondary,
+        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+    )
+}
+
+@Composable
+fun BufferBar() {
+    LinearProgressIndicator(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(6.dp),
+        color = MaterialTheme.colorScheme.secondary,
+        trackColor = MaterialTheme.colorScheme.surfaceVariant
     )
 }
