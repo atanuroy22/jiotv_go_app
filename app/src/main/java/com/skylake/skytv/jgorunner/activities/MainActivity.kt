@@ -405,8 +405,9 @@ class MainActivity : ComponentActivity() {
         // Binary update check
         CoroutineScope(Dispatchers.IO).launch {
             val currentBinaryVersion = preferenceManager.myPrefs.jtvGoBinaryVersion
-            if (currentBinaryVersion.isNullOrEmpty()) {
-                showBinaryUpdatePopup = true
+            val currentBinaryName = preferenceManager.myPrefs.jtvGoBinaryName
+            if (currentBinaryName.isNullOrEmpty() || currentBinaryVersion.isNullOrEmpty()) {
+                performBinaryUpdate()
                 return@launch
             }
 
