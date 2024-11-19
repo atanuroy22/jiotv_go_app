@@ -15,6 +15,7 @@ import androidx.lifecycle.MutableLiveData
 import com.skylake.skytv.jgorunner.BuildConfig
 import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.core.execution.BinaryExecutor
+import com.skylake.skytv.jgorunner.core.execution.ExecutionError
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import java.io.File
 
@@ -95,6 +96,17 @@ class BinaryService : Service() {
             },
             onError = {
                 Log.e("BinaryService", "Error executing binary: ${it.errorType.name}", it)
+                when (it.errorType) {
+                    ExecutionError.ExecutionErrorType.BINARY_NOT_FOUND -> {
+                        val preferenceManager = SkySharedPref.getInstance(this)
+                        preferenceManager.myPrefs.jtvGoBinaryName = null
+                        preferenceManager.myPrefs.jtvGoBinaryVersion = "v0.0.0"
+                        preferenceManager.savePreferences()
+                    }
+                    ExecutionError.ExecutionErrorType.BINARY_UNKNOWN_ERROR -> {
+                        Log.e("BinaryService", "Unknown error occurred while executing binary.")
+                    }
+                }
                 stopService()
             }
         )

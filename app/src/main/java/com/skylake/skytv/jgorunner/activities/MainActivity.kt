@@ -481,6 +481,7 @@ class MainActivity : ComponentActivity() {
             }
             preferenceManager.myPrefs.jtvGoBinaryName = null
             preferenceManager.myPrefs.jtvGoBinaryVersion = "v0.0.0"
+            preferenceManager.savePreferences()
 
             downloadFile(
                 activity = this@MainActivity,
