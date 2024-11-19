@@ -452,7 +452,6 @@ class MainActivity : ComponentActivity() {
                 fileName = latestBinaryReleaseInfo.name,
                 path = filesDir.absolutePath,
                 onDownloadStatusUpdate = { downloadModel ->
-
                     when (downloadModel.status) {
                         Status.CANCELLED -> {
                             this@MainActivity.downloadProgress = null
@@ -477,6 +476,7 @@ class MainActivity : ComponentActivity() {
                                 latestBinaryReleaseInfo.version.toString()
                             preferenceManager.myPrefs.jtvGoBinaryName = latestBinaryReleaseInfo.name
                             preferenceManager.savePreferences()
+                            Ketch.builder().build(this@MainActivity).clearAllDb(false)
                             this@MainActivity.downloadProgress = null
                         }
 
