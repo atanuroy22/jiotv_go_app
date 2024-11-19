@@ -21,8 +21,9 @@ class JTVConfigurationManager private constructor(context: Context) {
 
     // Configuration
     private val preferenceManager = SkySharedPref.getInstance(context.applicationContext)
-    val jtvConfiguration = readFromJTVConfiguration()
     private val filesDir = context.filesDir
+    var jtvConfiguration = readFromJTVConfiguration()
+        private set
 
     private fun readFromJTVConfiguration(): JTVConfiguration {
         val jtvConfigLocation = preferenceManager.myPrefs.jtvConfigLocation ?: return JTVConfiguration()
@@ -56,5 +57,13 @@ class JTVConfigurationManager private constructor(context: Context) {
         }
 
         jtvConfigFile.writeText(Gson().toJson(jtvConfiguration))
+    }
+
+    fun deleteJTVConfiguration() {
+        val jtvConfigLocation = preferenceManager.myPrefs.jtvConfigLocation ?: return
+        val jtvConfigFile = File(jtvConfigLocation)
+        if (jtvConfigFile.exists())
+            jtvConfigFile.delete()
+        jtvConfiguration = JTVConfiguration()
     }
 }

@@ -26,7 +26,8 @@ class SkySharedPref private constructor(context: Context) {
     private val sharedPreferences: SharedPreferences =
         context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
     private val editor: SharedPreferences.Editor = sharedPreferences.edit()
-    val myPrefs = readFromSharedPreferences()
+    var myPrefs = readFromSharedPreferences()
+    private set
 
     fun savePreferences() {
         SharedPrefStructure::class.memberProperties.forEach { property ->
@@ -95,6 +96,11 @@ class SkySharedPref private constructor(context: Context) {
             }
         }
         return instance
+    }
+
+    fun clearPreferences() {
+        editor.clear().apply()
+        myPrefs = SharedPrefStructure()
     }
 
     data class SharedPrefStructure(

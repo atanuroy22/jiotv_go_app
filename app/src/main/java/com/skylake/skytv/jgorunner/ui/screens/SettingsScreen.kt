@@ -3,7 +3,6 @@ package com.skylake.skytv.jgorunner.ui.screens
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.os.Environment
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.clickable
@@ -75,7 +74,6 @@ import com.skylake.skytv.jgorunner.activities.AppListActivity
 import com.skylake.skytv.jgorunner.activities.MainActivity
 import com.skylake.skytv.jgorunner.core.data.JTVConfigurationManager
 import com.skylake.skytv.jgorunner.data.SkySharedPref
-import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -467,22 +465,9 @@ fun restartApp(context: Context) {
 
 fun resetFunc(context: Context) {
     Toast.makeText(context, "[#] Clearing files.", Toast.LENGTH_LONG).show()
-
-    // Delete folder in external storage
-    val externalStoragePath = Environment.getExternalStorageDirectory().path
-    val folder = File("$externalStoragePath/.jiotv_go")
-
-    if (folder.exists() && folder.isDirectory) {
-        folder.deleteRecursively()
-    }
-
-    // Delete binary file in internal storage
-    val binaryFile = File(context.filesDir, "majorbin")
-    if (binaryFile.exists()) {
-        binaryFile.delete()
-    } else {
-        Toast.makeText(context, "Reset successfully.", Toast.LENGTH_SHORT).show()
-    }
+    JTVConfigurationManager.getInstance(context).deleteJTVConfiguration()
+    SkySharedPref.getInstance(context).clearPreferences()
+    context.filesDir.deleteRecursively()
 }
 
 
