@@ -345,12 +345,9 @@ class WebPlayerActivity : ComponentActivity() {
         }
 
         fun playVideoInFullScreen(view: WebView) {
-            val orientation = resources.configuration.orientation
-            val isLandscape = orientation == Configuration.ORIENTATION_LANDSCAPE
-
             val width = "100vw"
-            val height = if (isLandscape) "100vh" else "auto"
-            val objectFit = "contain"
+            val height = "auto"
+            val objectFit = "cover"
 
             val script = """
         javascript:(function() {
@@ -370,7 +367,6 @@ class WebPlayerActivity : ComponentActivity() {
         })()
     """.trimIndent()
 
-            // Use evaluateJavascript for better performance
             view.evaluateJavascript(script, null)
         }
 
