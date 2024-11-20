@@ -17,11 +17,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import com.skylake.skytv.jgorunner.data.SkySharedPref
+import java.io.File
 import java.net.InetAddress
 import java.text.SimpleDateFormat
 import java.util.*
+import java.io.FileOutputStream
+
 
 @Composable
 fun InfoScreen(context: Context) {
@@ -36,9 +38,6 @@ fun InfoScreen(context: Context) {
     val totalStorage = getTotalStorageSpace(context)
     val dateTime = getCurrentDateTime()
 
-    // Checking permissions
-    val permissionsStatus = checkPermissions(context)
-
     // Creating a formatted device information string
     val deviceInfo = """
         JTV-GO Version: $appVersion
@@ -51,11 +50,12 @@ fun InfoScreen(context: Context) {
         Date and Time: $dateTime
     """.trimIndent()
 
+
     Column(
         modifier = Modifier
-            . fillMaxSize()
+            .fillMaxSize()
             .padding(16.dp)
-            .verticalScroll(rememberScrollState()), // Make it scrollable
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -77,40 +77,20 @@ fun InfoScreen(context: Context) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Divider for permissions section
+        // Divider
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-        // Permissions Status Section
-        Text(
-            text = "Permissions Status:",
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(vertical = 8.dp)
-        )
-        Column {
-            permissionsStatus.forEach { status ->
-                Text(
-                    text = status,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(vertical = 2.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
+//        Spacer(modifier = Modifier.height(32.dp))
 
         Button(
             onClick = {
                 val allInfo = buildString {
                     append(deviceInfo)
-                    append("\n\nPermissions Status:\n")
-                    permissionsStatus.forEach { status ->
-                        append("$status\n")
-                    }
                 }
 
                 copyToClipboard(context, allInfo)
-                Toast.makeText(context, "Information copied to clipboard", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Information copied to clipboard", Toast.LENGTH_SHORT)
+                    .show()
             },
             modifier = Modifier.align(Alignment.CenterHorizontally)
         ) {
@@ -118,8 +98,6 @@ fun InfoScreen(context: Context) {
         }
     }
 }
-
-
 
 // Function to get the app version
 fun getAppVersion(context: Context): String {
@@ -167,25 +145,4 @@ fun copyToClipboard(context: Context, text: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     val clip = ClipData.newPlainText("Device Info", text)
     clipboard.setPrimaryClip(clip)
-}
-
-// Function to check permissions
-fun checkPermissions(context: Context): List<String> {
-    val requiredPermissions = mutableListOf(
-        android.Manifest.permission.READ_EXTERNAL_STORAGE,
-        android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
-        android.Manifest.permission.SYSTEM_ALERT_WINDOW,
-    )
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        requiredPermissions.add(android.Manifest.permission.POST_NOTIFICATIONS)
-    }
-
-    return requiredPermissions.map { permission ->
-        val permissionName = permission.substringAfterLast(".")
-        if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED) {
-            "$permissionName: Granted"
-        } else {
-            "$permissionName: Denied"
-        }
-    }
 }
