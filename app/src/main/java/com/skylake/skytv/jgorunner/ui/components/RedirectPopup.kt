@@ -92,7 +92,10 @@ fun RedirectPopup(
                     }
 
                     Text(
-                        text = "Redirecting to $appIPTV",
+                        text = if (appIPTV == "No IPTV")
+                            "No IPTV selected."
+                        else
+                            "Redirecting to $appIPTV",
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,

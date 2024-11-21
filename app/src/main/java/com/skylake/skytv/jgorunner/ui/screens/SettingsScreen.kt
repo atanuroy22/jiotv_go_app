@@ -235,22 +235,32 @@ fun SettingsScreen(
                 )
             }
             item {
-                SettingSwitchItem(icon = Icons.Filled.LiveTv,
+                SettingSwitchItem(
+                    icon = Icons.Filled.LiveTv,
                     title = "Auto IPTV",
                     subtitle = "Automatically start IPTV on app start",
                     isChecked = isSwitchOnForAutoIPTV,
-                    onCheckedChange = { isChecked -> isSwitchOnForAutoIPTV = isChecked })
+                    onCheckedChange = { isChecked -> isSwitchOnForAutoIPTV = isChecked }
+                )
             }
+            val iptvNameSaved = preferenceManager.myPrefs.iptvAppName
             item {
                 Spacer(modifier = Modifier.height(12.dp))
-                SettingItem(icon = Icons.Filled.ResetTv,
+                SettingItem(
+                    icon = Icons.Filled.ResetTv,
                     title = "Select Start IPTV",
-                    subtitle = "Choose your preferred IPTV to start",
+                    subtitle = if (iptvNameSaved.isNullOrEmpty() || iptvNameSaved == "No IPTV") {
+                        "Choose your preferred IPTV to start"
+                    } else {
+                        "Selected IPTV: $iptvNameSaved"
+                    },
                     onClick = {
                         val intent = Intent(activity, AppListActivity::class.java)
                         activity.startActivity(intent)
-                    })
+                    }
+                )
             }
+
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(
