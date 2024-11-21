@@ -347,7 +347,7 @@ class WebPlayerActivity : ComponentActivity() {
         fun playVideoInFullScreen(view: WebView) {
             val width = "100vw"
             val height = "auto"
-            val objectFit = "cover"
+            val objectFit = "contain"
 
             val script = """
         javascript:(function() {
@@ -518,8 +518,8 @@ class WebPlayerActivity : ComponentActivity() {
         }
 
         for (channel in recentChannels) {
-            val formattedPlayId = if (!channel.playId!!.endsWith("&&")) {
-                channel.playId + "&&"
+            val formattedPlayId = if (!channel.playId!!.endsWith("//")) {
+                channel.playId + "//"
             } else {
                 channel.playId
             }
