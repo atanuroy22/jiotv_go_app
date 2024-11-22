@@ -4,7 +4,6 @@ import android.os.Build
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.cthing.versionparser.semver.SemanticVersion
 import org.json.JSONObject
 import java.net.URL
 
@@ -49,7 +48,7 @@ object BinaryUpdater {
                 val assetName = releaseTargetDetails.getString("name")
                 val downloadUrl = releaseTargetDetails.getString("browser_download_url")
                 val downloadSize = releaseTargetDetails.getLong("size")
-                val version = SemanticVersion.parse(tagName)
+                val version = SemanticVersionNew.parse(tagName)
                 Log.d(TAG, "Latest release info: $version, $assetName, $downloadUrl, $downloadSize")
                 return@withContext DownloadAsset(assetName, version, downloadUrl, downloadSize)
             } catch (e: Exception) {

@@ -47,6 +47,7 @@ import com.skylake.skytv.jgorunner.core.execution.stopBinary
 import com.skylake.skytv.jgorunner.core.update.ApplicationUpdater
 import com.skylake.skytv.jgorunner.core.update.BinaryUpdater
 import com.skylake.skytv.jgorunner.core.update.DownloadProgress
+import com.skylake.skytv.jgorunner.core.update.SemanticVersionNew
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.BinaryService
 import com.skylake.skytv.jgorunner.ui.components.BottomNavigationBar
@@ -67,7 +68,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
-import org.cthing.versionparser.semver.SemanticVersion
 import java.net.Inet4Address
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -425,8 +425,10 @@ class MainActivity : ComponentActivity() {
             Log.d("DIX", "Current binary version: $currentBinaryVersion")
             Log.d("DIX", "Latest binary version: ${latestBinaryReleaseInfo?.version}")
 
+            Log.d(TAG,"$latestBinaryReleaseInfo,--,$currentBinaryVersion")
+
             if (latestBinaryReleaseInfo?.version?.compareTo(
-                    SemanticVersion.parse(
+                    SemanticVersionNew.parse(
                         currentBinaryVersion
                     )
                 ) == 1
@@ -454,7 +456,7 @@ class MainActivity : ComponentActivity() {
 
             val currentAppVersion = BuildConfig.VERSION_NAME
             val latestAppVersion = ApplicationUpdater.fetchLatestReleaseInfo()
-            if (latestAppVersion?.version?.compareTo(SemanticVersion.parse(currentAppVersion)) == 1) {
+            if (latestAppVersion?.version?.compareTo(SemanticVersionNew.parse(currentAppVersion)) == 1) {
                 showAppUpdatePopup = true
                 Log.d("DIX", "App update available")
             } else {
