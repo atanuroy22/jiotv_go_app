@@ -30,16 +30,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
-import com.ketch.DownloadConfig
-import com.ketch.DownloadModel
-import com.ketch.Ketch
-import com.ketch.NotificationConfig
-import com.ketch.Status
+import com.skylake.skytv.jgorunner.core.update.DownloadModelNew
 import com.skylake.skytv.jgorunner.BuildConfig
-import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.core.checkServerStatus
 import com.skylake.skytv.jgorunner.core.data.JTVConfigurationManager
 import com.skylake.skytv.jgorunner.core.execution.runBinary
@@ -47,6 +39,8 @@ import com.skylake.skytv.jgorunner.core.execution.stopBinary
 import com.skylake.skytv.jgorunner.core.update.ApplicationUpdater
 import com.skylake.skytv.jgorunner.core.update.BinaryUpdater
 import com.skylake.skytv.jgorunner.core.update.DownloadProgress
+import com.skylake.skytv.jgorunner.core.update.SemanticVersionNew
+import com.skylake.skytv.jgorunner.core.update.Status
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.BinaryService
 import com.skylake.skytv.jgorunner.ui.components.BottomNavigationBar
@@ -66,8 +60,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
+import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
-import org.cthing.versionparser.semver.SemanticVersion
+import okhttp3.Request
+import java.io.File
 import java.net.Inet4Address
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -274,7 +270,7 @@ class MainActivity : ComponentActivity() {
                         CustPopup(
                             isVisible = showLoginPopup,
                             title = "Login Required",
-                            text = "Please log in using WebTV, to access the server.",
+                            text = "Please log in using WebTV to access the server",
                             confirmButtonText = "Login",
                             dismissButtonText = "Cancel",
                             onConfirm = {
@@ -425,8 +421,10 @@ class MainActivity : ComponentActivity() {
             Log.d("DIX", "Current binary version: $currentBinaryVersion")
             Log.d("DIX", "Latest binary version: ${latestBinaryReleaseInfo?.version}")
 
+            Log.d(TAG,"$latestBinaryReleaseInfo,--,$currentBinaryVersion")
+
             if (latestBinaryReleaseInfo?.version?.compareTo(
-                    SemanticVersion.parse(
+                    SemanticVersionNew.parse(
                         currentBinaryVersion
                     )
                 ) == 1
@@ -454,7 +452,7 @@ class MainActivity : ComponentActivity() {
 
             val currentAppVersion = BuildConfig.VERSION_NAME
             val latestAppVersion = ApplicationUpdater.fetchLatestReleaseInfo()
-            if (latestAppVersion?.version?.compareTo(SemanticVersion.parse(currentAppVersion)) == 1) {
+            if (latestAppVersion?.version?.compareTo(SemanticVersionNew.parse(currentAppVersion)) == 1) {
                 showAppUpdatePopup = true
                 Log.d("DIX", "App update available")
             } else {
@@ -491,19 +489,18 @@ class MainActivity : ComponentActivity() {
             preferenceManager.savePreferences()
 
             downloadFile(
-                activity = this@MainActivity,
                 url = latestBinaryReleaseInfo.downloadUrl,
                 fileName = latestBinaryReleaseInfo.name,
                 path = filesDir.absolutePath,
-                onDownloadStatusUpdate = { downloadModel ->
-                    when (downloadModel.status) {
+                onDownloadStatusUpdate = { DownloadModelNew ->
+                    when (DownloadModelNew.status) {
                         Status.CANCELLED -> {
                             this@MainActivity.downloadProgress = null
                         }
 
                         Status.FAILED -> {
                             Log.e("DIX", "Download failed")
-                            Log.e("DIX", downloadModel.failureReason)
+                            Log.e("DIX", DownloadModelNew.failureReason)
                             this@MainActivity.downloadProgress = null
                         }
 
@@ -512,14 +509,13 @@ class MainActivity : ComponentActivity() {
                                 latestBinaryReleaseInfo.version.toString()
                             preferenceManager.myPrefs.jtvGoBinaryName = latestBinaryReleaseInfo.name
                             preferenceManager.savePreferences()
-                            Ketch.builder().build(this@MainActivity).clearAllDb(false)
                             this@MainActivity.downloadProgress = null
                         }
 
                         else -> {
                             this@MainActivity.downloadProgress = DownloadProgress(
-                                fileName = downloadModel.fileName,
-                                progress = downloadModel.progress
+                                fileName = DownloadModelNew.fileName,
+                                progress = DownloadModelNew.progress
                             )
                         }
                     }
@@ -529,43 +525,71 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun downloadFile(
-        activity: ComponentActivity,
         url: String,
         fileName: String,
-        path: String = activity.filesDir.absolutePath,
-        onDownloadStatusUpdate: (DownloadModel) -> Unit
+        path: String = filesDir.absolutePath,
+        onDownloadStatusUpdate: (DownloadModelNew) -> Unit
     ) {
-        val ketch = Ketch.builder()
-            .setOkHttpClient(
-                okHttpClient = OkHttpClient
-                    .Builder()
-                    .followRedirects(true)
-                    .followSslRedirects(true)
-                    .connectTimeout(10, TimeUnit.SECONDS)
-                    .readTimeout(10, TimeUnit.SECONDS)
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // Initialize OkHttpClient
+                val okHttpClient = OkHttpClient.Builder()
+                    .connectTimeout(30, TimeUnit.SECONDS)
+                    .readTimeout(60, TimeUnit.SECONDS)
+                    .retryOnConnectionFailure(true)
                     .build()
-            ).setDownloadConfig(
-                config = DownloadConfig(
-                    connectTimeOutInMs = 20000L,
-                    readTimeOutInMs = 15000L
-                )
-            ).setNotificationConfig(
-                config = NotificationConfig(
-                    enabled = true, // Default: false
-                    smallIcon = R.drawable.notifications_24px,
-                )
-            ).build(activity)
-        val id = ketch.download(url, path, fileName)
-        activity.lifecycleScope.launch {
-            activity.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                ketch.observeDownloadById(id)
-                    .flowOn(Dispatchers.IO)
-                    .collect { downloadModel ->
-                        onDownloadStatusUpdate(downloadModel)
+
+                // Build the request
+                val request = Request.Builder()
+                    .url(url)
+                    .build()
+
+                // Execute the request
+                okHttpClient.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        onDownloadStatusUpdate(
+                            DownloadModelNew(Status.FAILED, fileName, 0, "HTTP ${response.code}")
+                        )
+                        return@use
                     }
+
+                    // Create the file output stream
+                    val file = File(path, fileName)
+                    response.body?.byteStream()?.use { inputStream ->
+                        file.outputStream().use { outputStream ->
+                            val buffer = ByteArray(8192)
+                            var bytesRead: Int
+                            var totalBytesRead = 0L
+                            val contentLength = response.body?.contentLength() ?: -1L
+
+                            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                                outputStream.write(buffer, 0, bytesRead)
+                                totalBytesRead += bytesRead
+                                val progress = if (contentLength > 0) {
+                                    (totalBytesRead * 100 / contentLength).toInt()
+                                } else {
+                                    -1
+                                }
+                                onDownloadStatusUpdate(
+                                    DownloadModelNew(Status.IN_PROGRESS, fileName, progress, "")
+                                )
+                            }
+                        }
+                    }
+
+                    // File download completed successfully
+                    onDownloadStatusUpdate(
+                        DownloadModelNew(Status.SUCCESS, fileName, 100, "")
+                    )
+                }
+            } catch (e: Exception) {
+                onDownloadStatusUpdate(
+                    DownloadModelNew(Status.FAILED, fileName, 0, e.message ?: "Unknown error")
+                )
             }
         }
     }
+
 
     private fun performAppUpdate() {
         CoroutineScope(Dispatchers.IO).launch {
@@ -709,11 +733,12 @@ class MainActivity : ComponentActivity() {
 
     private fun getPublicJTVServerURL(context: Context): String {
         val connectivityManager =
-            context.getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+            context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
         val savedPortNumber = preferenceManager.myPrefs.jtvGoServerPort
-
         val isPublic = !preferenceManager.myPrefs.serveLocal
+
+        // If not public, always return localhost URL
         if (!isPublic)
             return "http://localhost:$savedPortNumber/playlist.m3u"
 
@@ -727,7 +752,12 @@ class MainActivity : ComponentActivity() {
 
         if (activeNetwork != null) {
             val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
-            if (networkCapabilities != null && networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+
+            // Check if the network is Wi-Fi or Ethernet
+            if (networkCapabilities != null &&
+                (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                        networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))) {
+
                 val linkProperties: LinkProperties? =
                     connectivityManager.getLinkProperties(activeNetwork)
                 val ipAddresses = linkProperties?.linkAddresses
@@ -738,10 +768,17 @@ class MainActivity : ComponentActivity() {
                 if (ipAddress != null)
                     return "http://$ipAddress:$savedPortNumber/playlist.m3u"
             }
+
+            // Check if the network is mobile data
+            if (networkCapabilities != null) {
+                if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
+                    return "http://localhost:$savedPortNumber/playlist.m3u"
+                }
+            }
         }
 
-        // WiFi is not connected or no public IP address found
-        return "Not connected to Wi-Fi"
+        // No active network
+        return "Connect to internet"
     }
 
     // Receiver to handle binary stop action
@@ -820,20 +857,76 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkOverlayPermission(): Boolean {
+        if (preferenceManager.myPrefs.overlayPermissionAttempts == 3) {
+            return true
+        }
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             Settings.canDrawOverlays(this)
-        } else true
+        } else {
+            true
+        }
     }
 
     private fun requestOverlayPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (!Settings.canDrawOverlays(this)) {
-                showOverlayPermissionPopup = true
-            } else {
-                preferenceManager.myPrefs.autoStartOnBootForeground = true
-                preferenceManager.savePreferences()
-                isSwitchOnForAutoStartForeground = true
+        try {
+            val overlayPermissionAttempts = preferenceManager.myPrefs.overlayPermissionAttempts
+
+            when {
+                overlayPermissionAttempts < 1 -> {
+                    showOverlayPermissionPopup = true
+                    incrementAndSaveAttempts(overlayPermissionAttempts)
+                    return
+                }
+                overlayPermissionAttempts == 2 -> {
+                    grantPermissionAndSave()
+                    incrementAndSaveAttempts(overlayPermissionAttempts)
+                    showToast("Turning ON foreground run forcefully. It may not work. Warning!")
+                    return
+                }
+                overlayPermissionAttempts > 3 -> {
+                    showOverlayPermissionPopup = true
+                    resetAttempts()
+                    showToast("Too many attempts, resetting.")
+                    return
+                }
             }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (Settings.canDrawOverlays(this)) {
+                    grantPermissionAndSave()
+                } else {
+                    incrementAndSaveAttempts(overlayPermissionAttempts)
+                    Log.d("OverlayPermission", "Overlay permission not granted, incrementing attempt count. $overlayPermissionAttempts")
+                }
+            }
+
+        } catch (e: Exception) {
+            Log.e("OverlayPermission", "Error requesting overlay permission: ${e.message}")
+            showToast("Error requesting overlay permission: ${e.message}")
         }
     }
+
+    private fun incrementAndSaveAttempts(attempts: Int) {
+        preferenceManager.myPrefs.overlayPermissionAttempts = attempts + 1
+        preferenceManager.savePreferences()
+    }
+
+    private fun resetAttempts() {
+        preferenceManager.myPrefs.overlayPermissionAttempts = 0
+        preferenceManager.savePreferences()
+    }
+
+    private fun grantPermissionAndSave() {
+        preferenceManager.myPrefs.autoStartOnBootForeground = true
+        preferenceManager.savePreferences()
+        isSwitchOnForAutoStartForeground = true
+        Log.i("OverlayPermission", "Overlay permission granted.")
+    }
+
+    private fun showToast(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        Log.e("OverlayPermission", message)
+    }
+
+
 }

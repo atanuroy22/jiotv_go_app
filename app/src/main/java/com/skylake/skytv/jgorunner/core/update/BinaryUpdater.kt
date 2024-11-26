@@ -4,7 +4,6 @@ import android.os.Build
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.cthing.versionparser.semver.SemanticVersion
 import org.json.JSONObject
 import java.net.URL
 
@@ -33,7 +32,7 @@ object BinaryUpdater {
                         supportedABIs.contains("armeabi-v7a") -> "5-armv7"
                         supportedABIs.contains("armeabi") -> "-arm"
                         supportedABIs.contains("x86_64") -> "-amd64"
-                        else -> "-arm"
+                        else -> "5-armv7"
                     }
 
                     if (asset.getString("name").contains(RELEASE_NAME_PREFIX + releaseNameSuffix)) {
@@ -49,7 +48,7 @@ object BinaryUpdater {
                 val assetName = releaseTargetDetails.getString("name")
                 val downloadUrl = releaseTargetDetails.getString("browser_download_url")
                 val downloadSize = releaseTargetDetails.getLong("size")
-                val version = SemanticVersion.parse(tagName)
+                val version = SemanticVersionNew.parse(tagName)
                 Log.d(TAG, "Latest release info: $version, $assetName, $downloadUrl, $downloadSize")
                 return@withContext DownloadAsset(assetName, version, downloadUrl, downloadSize)
             } catch (e: Exception) {

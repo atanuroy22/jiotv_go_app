@@ -1,7 +1,9 @@
 package com.skylake.skytv.jgorunner.core
 
 import android.util.Log
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -11,48 +13,53 @@ suspend fun checkServerStatus(
     onLoginFailure: () -> Unit,
     onServerDown: () -> Unit,
 ) {
-    val url = URL("http://localhost:$port/live/144.m3u8")
+    val url = URL("http://localhost:$port/live/143.m3u8")
+    val delayDurations = listOf(150L, 200L, 200L, 350L, 550L, 750L, 750L, 1000L, 1250L, 1500L, 1750L, 2000L, 2000L)
+    var lastResponseCode: Int? = null
 
-    repeat(5) { attempt ->
+    for ((attempt, delayDuration) in delayDurations.withIndex()) {
         try {
-            Log.d("ServerLoginCheck", "Attempt #${attempt + 1}: Checking server status...")
-            val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "HEAD"
-            connection.connectTimeout = 5000 // 5 seconds timeout
-            connection.readTimeout = 5000 // 5 seconds timeout
-            val responseCode = connection.responseCode
+            Log.d("ServerLoginCheck", "Attempt #${attempt + 1}: Checking server status at $url")
+            val connection = (withContext(Dispatchers.IO) {
+                url.openConnection()
+            } as HttpURLConnection).apply {
+                requestMethod = "HEAD"
+                connectTimeout = 5000 // 5 seconds timeout
+                readTimeout = 5000 // 5 seconds timeout
+            }
+
+            lastResponseCode = connection.responseCode
             connection.disconnect()
 
-            when (responseCode) {
+            when (lastResponseCode) {
                 HttpURLConnection.HTTP_OK -> {
-                    Log.d("ServerLoginCheck", "Response Code: $responseCode - Server is up!")
+                    Log.d("ServerLoginCheck", "Server is up (Response Code: $lastResponseCode).")
                     onLoginSuccess()
                     return
                 }
-
                 HttpURLConnection.HTTP_INTERNAL_ERROR -> {
-                    Log.d("ServerLoginCheck", "Response Code: $responseCode - Server error!")
+                    Log.w("ServerLoginCheck", "Server returned an error (Response Code: $lastResponseCode).")
                     onLoginFailure()
                     return
                 }
                 else -> {
-                    Log.d("ServerLoginCheck", "Unexpected Response Code: $responseCode")
+                    Log.w("ServerLoginCheck", "Unexpected Response Code: $lastResponseCode")
                 }
             }
-        } catch (ex: Exception) {
-            Log.d("ServerLoginCheck", "Attempt #${attempt + 1}: Error occurred")
+        } catch (er: Exception) {
             Log.e(
                 "ServerLoginCheck",
-                "Error checking server status (attempt ${attempt + 1})",
-                ex
+                "Attempt #${attempt + 1}: Error occurred while checking server status.",
+                er
             )
         }
 
-        if (attempt < 2) {
-            Log.d("ServerLoginCheck", "Delaying before next attempt...")
-            delay(1000)
+        if (attempt < delayDurations.size - 1) {
+            Log.d("ServerLoginCheck", "Delaying for $delayDuration ms before the next attempt.")
+            delay(delayDuration)
         }
     }
-    Log.d("ServerLoginCheck", "Reached maximum consecutive failures.")
+
+    Log.e("ServerLoginCheck", "Max attempts reached. Last Response Code: $lastResponseCode")
     onServerDown()
 }

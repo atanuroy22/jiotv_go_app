@@ -47,7 +47,7 @@ object ApplicationUpdater {
                 val assetName = releaseTargetDetails.getString("name")
                 val downloadUrl = releaseTargetDetails.getString("browser_download_url")
                 val downloadSize = releaseTargetDetails.getLong("size")
-                val version = SemanticVersion.parse(tagName)
+                val version = SemanticVersionNew.parse(tagName)
                 return@withContext DownloadAsset(assetName, version, downloadUrl, downloadSize)
             } catch (e: Exception) {
                 Log.e(TAG, "Error fetching latest release info: ${e.message}")
@@ -62,6 +62,7 @@ object ApplicationUpdater {
         fileName: String,
         onProgress: (DownloadProgress) -> Unit
     ) {
+        Log.d("$TAG-DL","URL: $downloadUrl, PATH: $fileName")
         val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 
         // Configure the request

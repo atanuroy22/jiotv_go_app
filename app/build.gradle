@@ -15,8 +15,8 @@ android {
         //noinspection ExpiredTargetSdkVersion
         targetSdk 28
         
-        versionCode 2
-        versionName "1.1.0"
+        versionCode 3
+        versionName "1.1.1"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -65,7 +65,7 @@ dependencies {
     implementation libs.androidx.material.icons.extended
     implementation libs.version.parser
     implementation libs.okhttp
-    implementation libs.ketch
+
     implementation libs.gson
 
     testImplementation libs.junit

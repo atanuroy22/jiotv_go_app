@@ -157,7 +157,7 @@ class BinaryService : Service() {
             val notificationBuilder = Notification.Builder(this, CHANNEL_ID)
                 .setContentTitle("JTV-GO Service Running")
                 .setContentText("The server is running in the background.")
-                .setSmallIcon(R.drawable.notifications_24px)
+                .setSmallIcon(R.drawable.logo)
                 .setOngoing(true)
                 .addAction(
                     Notification.Action.Builder(
@@ -166,13 +166,15 @@ class BinaryService : Service() {
                         stopPendingIntent
                     ).build()
                 )
+
             notification = notificationBuilder.build()
         } else {
             val notificationBuilder = NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("JTV-GO Service Running")
                 .setContentText("The server is running in the background.")
-                .setSmallIcon(R.drawable.notifications_24px)
+                .setSmallIcon(R.drawable.logo)
                 .setOngoing(true)
+
                 .addAction(R.drawable.cancel_24px, "Stop Server", stopPendingIntent)
             notification = notificationBuilder.build()
         }
@@ -201,6 +203,11 @@ class BinaryService : Service() {
                     "Binary Service Channel",
                     NotificationManager.IMPORTANCE_DEFAULT
                 )
+
+                // Disable sound and vibration
+                serviceChannel.setSound(null, null)
+                serviceChannel.enableVibration(false)
+
                 manager.createNotificationChannel(serviceChannel)
             }
         }
