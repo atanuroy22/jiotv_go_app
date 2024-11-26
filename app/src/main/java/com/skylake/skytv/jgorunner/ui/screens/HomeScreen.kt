@@ -21,6 +21,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.twotone.ExitToApp
+import androidx.compose.material.icons.filled.Stream
+import androidx.compose.material.icons.filled.Timelapse
 import androidx.compose.material.icons.twotone.Deblur
 import androidx.compose.material.icons.twotone.LiveTv
 import androidx.compose.material.icons.twotone.PlayArrow
@@ -28,6 +30,7 @@ import androidx.compose.material.icons.twotone.ResetTv
 import androidx.compose.material.icons.twotone.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -73,16 +76,20 @@ fun HomeScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(10.dp)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+
         Image(
-            painter = painterResource(id = R.mipmap.ic_launcher_neo_foreground),
+            painter = painterResource(id = R.drawable.logo),
             contentDescription = "App Icon",
-            modifier = Modifier.size(200.dp)
+            modifier = Modifier.size(75.dp)
         )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
         Text(
             text = title,
             fontSize = 24.sp,
@@ -99,11 +106,10 @@ fun HomeScreen(
 
             } else {
                 TextStyle.Default
-            },
-            modifier = Modifier.padding(bottom = 16.dp)
+            }
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         Box(
             modifier = Modifier
@@ -131,7 +137,7 @@ fun HomeScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -167,7 +173,7 @@ fun HomeScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         Column(
             modifier = Modifier.alpha(if (isServerRunning) 1f else 0f)

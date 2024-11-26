@@ -30,13 +30,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
-import com.ketch.Ketch
 import com.skylake.skytv.jgorunner.core.update.DownloadModelNew
 import com.skylake.skytv.jgorunner.BuildConfig
-import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.core.checkServerStatus
 import com.skylake.skytv.jgorunner.core.data.JTVConfigurationManager
 import com.skylake.skytv.jgorunner.core.execution.runBinary
@@ -275,7 +270,7 @@ class MainActivity : ComponentActivity() {
                         CustPopup(
                             isVisible = showLoginPopup,
                             title = "Login Required",
-                            text = "Please log in using WebTV, to access the server.",
+                            text = "Please log in using WebTV to access the server",
                             confirmButtonText = "Login",
                             dismissButtonText = "Cancel",
                             onConfirm = {
@@ -514,7 +509,6 @@ class MainActivity : ComponentActivity() {
                                 latestBinaryReleaseInfo.version.toString()
                             preferenceManager.myPrefs.jtvGoBinaryName = latestBinaryReleaseInfo.name
                             preferenceManager.savePreferences()
-//                            Ketch.builder().build(this@MainActivity).clearAllDb(false)
                             this@MainActivity.downloadProgress = null
                         }
 
@@ -739,11 +733,12 @@ class MainActivity : ComponentActivity() {
 
     private fun getPublicJTVServerURL(context: Context): String {
         val connectivityManager =
-            context.getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+            context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
         val savedPortNumber = preferenceManager.myPrefs.jtvGoServerPort
-
         val isPublic = !preferenceManager.myPrefs.serveLocal
+
+        // If not public, always return localhost URL
         if (!isPublic)
             return "http://localhost:$savedPortNumber/playlist.m3u"
 
@@ -757,7 +752,12 @@ class MainActivity : ComponentActivity() {
 
         if (activeNetwork != null) {
             val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
-            if (networkCapabilities != null && networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+
+            // Check if the network is Wi-Fi or Ethernet
+            if (networkCapabilities != null &&
+                (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                        networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))) {
+
                 val linkProperties: LinkProperties? =
                     connectivityManager.getLinkProperties(activeNetwork)
                 val ipAddresses = linkProperties?.linkAddresses
@@ -768,10 +768,17 @@ class MainActivity : ComponentActivity() {
                 if (ipAddress != null)
                     return "http://$ipAddress:$savedPortNumber/playlist.m3u"
             }
+
+            // Check if the network is mobile data
+            if (networkCapabilities != null) {
+                if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
+                    return "http://localhost:$savedPortNumber/playlist.m3u"
+                }
+            }
         }
 
-        // WiFi is not connected or no public IP address found
-        return "Not connected to Wi-Fi"
+        // No active network
+        return "Connect to internet"
     }
 
     // Receiver to handle binary stop action
@@ -859,8 +866,6 @@ class MainActivity : ComponentActivity() {
             true
         }
     }
-
-
 
     private fun requestOverlayPermission() {
         try {
