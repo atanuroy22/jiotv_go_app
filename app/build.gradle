@@ -65,6 +65,7 @@ dependencies {
     implementation libs.androidx.material.icons.extended
     implementation libs.version.parser
     implementation libs.okhttp
+
     implementation libs.gson
 
     testImplementation libs.junit
