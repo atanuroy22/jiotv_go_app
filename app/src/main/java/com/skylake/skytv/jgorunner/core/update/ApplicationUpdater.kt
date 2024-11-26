@@ -62,6 +62,7 @@ object ApplicationUpdater {
         fileName: String,
         onProgress: (DownloadProgress) -> Unit
     ) {
+        Log.d("$TAG-DL","URL: $downloadUrl, PATH: $fileName")
         val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 
         // Configure the request

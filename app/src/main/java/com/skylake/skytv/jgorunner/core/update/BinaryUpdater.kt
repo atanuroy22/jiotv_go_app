@@ -32,7 +32,7 @@ object BinaryUpdater {
                         supportedABIs.contains("armeabi-v7a") -> "5-armv7"
                         supportedABIs.contains("armeabi") -> "-arm"
                         supportedABIs.contains("x86_64") -> "-amd64"
-                        else -> "-arm"
+                        else -> "5-armv7"
                     }
 
                     if (asset.getString("name").contains(RELEASE_NAME_PREFIX + releaseNameSuffix)) {

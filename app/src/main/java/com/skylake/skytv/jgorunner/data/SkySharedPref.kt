@@ -147,7 +147,10 @@ class SkySharedPref private constructor(context: Context) {
         var iptvLaunchCountdown: Int = 4,
 
         @SharedPrefKey("recent_channels_json")
-        var recentChannelsJson: String? = null
+        var recentChannelsJson: String? = null,
+
+        @SharedPrefKey("overlayPermissionAttempts")
+        var overlayPermissionAttempts: Int = 0
     )
 
     // Annotation class to define the key for SharedPreferences
