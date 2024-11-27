@@ -19,3 +19,15 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Keep SkySharedPref and SharedPrefStructure classes from being obfuscated
+-keep class com.skylake.skytv.jgorunner.data.SkySharedPref { *; }
+-keep class com.skylake.skytv.jgorunner.data.SkySharedPref$SharedPrefStructure { *; }
+
+# Keep properties in SharedPrefStructure that are annotated with SharedPrefKey
+-keepclassmembers class com.skylake.skytv.jgorunner.data.SkySharedPref$SharedPrefStructure {
+    @com.skylake.skytv.jgorunner.data.SkySharedPref$SharedPrefKey <fields>;
+}
+
+# Keep the SharedPrefKey annotation
+-keep @interface com.skylake.skytv.jgorunner.data.SkySharedPref$SharedPrefKey

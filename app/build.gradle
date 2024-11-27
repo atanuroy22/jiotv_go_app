@@ -3,6 +3,8 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.android)
 }
 
+apply from: "version.gradle"
+
 android {
     namespace 'com.skylake.skytv.jgorunner'
     compileSdk 34
@@ -14,9 +16,11 @@ android {
         // Required for binary execution
         //noinspection ExpiredTargetSdkVersion
         targetSdk 28
-        
-        versionCode 3
-        versionName "1.1.1"
+
+        // Load versionCode and versionName
+        versionCode appVersionCode
+        versionName appVersionName
+
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

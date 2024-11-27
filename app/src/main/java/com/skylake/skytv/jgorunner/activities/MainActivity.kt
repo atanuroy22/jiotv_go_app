@@ -102,6 +102,14 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         preferenceManager = SkySharedPref.getInstance(this)
 
+        if (preferenceManager.myPrefs.iptvLaunchCountdown == 0) {
+            preferenceManager.myPrefs.iptvLaunchCountdown = 4
+            preferenceManager.myPrefs.enableAutoUpdate = true
+            preferenceManager.myPrefs.jtvGoServerPort = 5350
+            preferenceManager.myPrefs.jtvGoBinaryVersion = "v0.0.0"
+            preferenceManager.savePreferences()
+        }
+
         JTVConfigurationManager.getInstance(this).saveJTVConfiguration()
         isServerRunning = BinaryService.isRunning
         if (isServerRunning) {
@@ -310,12 +318,12 @@ class MainActivity : ComponentActivity() {
                         CustPopup(
                             isVisible = showAppUpdatePopup,
                             title = "App Update Available",
-                            text = "A new version of the app is available. Update now?",
+                            text = "A new version of the app is available. Update now!",
                             confirmButtonText = "Update",
                             dismissButtonText = "Later",
                             onConfirm = {
                                 performAppUpdate()
-                                showAppUpdatePopup = false
+                                showAppUpdatePopup = true
                             },
                             onDismiss = null
                         )
