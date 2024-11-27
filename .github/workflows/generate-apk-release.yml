@@ -9,7 +9,7 @@ on:
     branches:
       - main
     paths:
-      - "version.gradle"  
+      - "app/version.gradle"  
   workflow_dispatch:
 
 jobs:
