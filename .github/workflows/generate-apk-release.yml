@@ -29,9 +29,9 @@ jobs:
 
       # Extract versionName from version.gradle
       - name: 🔍 Extract version name from version.gradle
-        run: |
-          version_name=$(grep "versionName" ${{ env.main_project_module }}/version.gradle | awk '{print $2}' | tr -d '"')
-          echo "version_name=$version_name" >> $GITHUB_ENV
+      run: |
+        version_name=$(grep "appVersionName" ${{ env.main_project_module }}/version.gradle | awk -F'=' '{print $2}' | tr -d ' "')
+        echo "version_name=$version_name" >> $GITHUB_ENV    
 
       - name: ☕ Set Up JDK
         uses: actions/setup-java@v3
