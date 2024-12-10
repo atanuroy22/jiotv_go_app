@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Attribution
 import androidx.compose.material.icons.filled.BrowserUpdated
 import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.Mediation
 import androidx.compose.material.icons.filled.Pix
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.ResetTv
@@ -74,6 +75,7 @@ import com.skylake.skytv.jgorunner.activities.AppListActivity
 import com.skylake.skytv.jgorunner.activities.MainActivity
 import com.skylake.skytv.jgorunner.core.data.JTVConfigurationManager
 import com.skylake.skytv.jgorunner.data.SkySharedPref
+import com.skylake.skytv.jgorunner.ui.components.ModeSelectionDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -120,6 +122,7 @@ fun SettingsScreen(
     }
 
     var showPortDialog by remember { mutableStateOf(false) }
+    var showModeDialog by remember { mutableStateOf(false) }
     var showRestartDialog by remember { mutableStateOf(false) }
     var showRestartAppDialog by remember { mutableStateOf(false) }
 
@@ -304,6 +307,12 @@ fun SettingsScreen(
 
             }
             item {
+                SettingItem(icon = Icons.Filled.Mediation,
+                    title = "Configure WEBTV filters",
+                    subtitle = "Select default language, category, and quality.",
+                    onClick = { showModeDialog = true })
+            }
+            item {
                 SettingSwitchItem(icon = Icons.Filled.SoupKitchen,
                     title = "Check for updates automatically",
                     subtitle = "Check for updates when the app starts",
@@ -389,7 +398,6 @@ fun SettingsScreen(
         }
     }
 
-
     // Restart Required Dialog
     if (showRestartDialog) {
         Dialog(
@@ -424,6 +432,22 @@ fun SettingsScreen(
             }
         }
     }
+
+    ModeSelectionDialog(
+        showDialog = showModeDialog,
+        onDismiss = { showModeDialog = false },
+        onSelectionsMade = { selectedQuality, selectedCategory, selectedLanguage ->
+
+            preferenceManager.myPrefs.filterQ = selectedQuality
+            preferenceManager.myPrefs.filterC = selectedCategory
+            preferenceManager.myPrefs.filterL = selectedLanguage
+            preferenceManager.savePreferences()
+
+            println("Quality: $selectedQuality, Category: $selectedCategory, Language: $selectedLanguage")
+            Toast.makeText(activity, "[#] Updated Filters", Toast.LENGTH_LONG).show()
+
+        }
+    )
 
     // Restart App Dialog
     if (showRestartAppDialog) {
@@ -479,6 +503,7 @@ fun resetFunc(context: Context) {
     SkySharedPref.getInstance(context).clearPreferences()
     context.filesDir.deleteRecursively()
 }
+
 
 
 @Composable
