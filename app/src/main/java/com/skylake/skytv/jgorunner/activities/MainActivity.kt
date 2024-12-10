@@ -107,6 +107,9 @@ class MainActivity : ComponentActivity() {
             preferenceManager.myPrefs.enableAutoUpdate = true
             preferenceManager.myPrefs.jtvGoServerPort = 5350
             preferenceManager.myPrefs.jtvGoBinaryVersion = "v0.0.0"
+            preferenceManager.myPrefs.filterQ = ""
+            preferenceManager.myPrefs.filterL = ""
+            preferenceManager.myPrefs.filterC = ""
             preferenceManager.savePreferences()
         }
 

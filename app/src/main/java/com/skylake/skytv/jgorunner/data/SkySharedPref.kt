@@ -121,7 +121,10 @@ class SkySharedPref private constructor(context: Context) {
         @SharedPrefKey("iptv_app_launch_activity") var iptvAppLaunchActivity: String? = null,
         @SharedPrefKey("iptv_launch_countdown") var iptvLaunchCountdown: Int = 4,
         @SharedPrefKey("recent_channels_json") var recentChannelsJson: String? = null,
-        @SharedPrefKey("overlayPermissionAttempts") var overlayPermissionAttempts: Int = 0
+        @SharedPrefKey("overlayPermissionAttempts") var overlayPermissionAttempts: Int = 0,
+        @SharedPrefKey("filterQ") var filterQ: String? = null,
+        @SharedPrefKey("filterL") var filterL: String? = null,
+        @SharedPrefKey("filterC") var filterC: String? = null,
     )
 
     // Annotation class to define the key for SharedPreferences

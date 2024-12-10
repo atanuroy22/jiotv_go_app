@@ -53,7 +53,13 @@ class WebPlayerActivity : ComponentActivity() {
         setContentView(R.layout.activity_web_player)
 
         val savedPortNumber = prefManager.myPrefs.jtvGoServerPort
-        url = String.format(Locale.getDefault(), DEFAULT_URL_TEMPLATE, savedPortNumber)
+        val filterQ = prefManager.myPrefs.filterQ
+        val filterL = prefManager.myPrefs.filterL
+        val filterC = prefManager.myPrefs.filterC
+        val extraFilterUrl = "/?q=$filterQ&language=$filterL&category=$filterC" // "/?q=low&language=6&category=7"
+        url = String.format(Locale.getDefault(), DEFAULT_URL_TEMPLATE, savedPortNumber) + extraFilterUrl
+
+        Log.d("DIX", url!!)
 
         Log.d(TAG, "URL: $url")
 
