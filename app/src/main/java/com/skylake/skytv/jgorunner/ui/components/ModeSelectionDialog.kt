@@ -38,7 +38,7 @@ fun ModeSelectionDialog(
                     // Quality Selection
                     var qualityExpanded by remember { mutableStateOf(false) }
                     var selectedQuality by remember { mutableStateOf("Auto") }
-                    val qualityMap = mapOf( "Auto" to "", "High" to "high", "Medium" to "medium", "Low" to "low")
+                    val qualityMap = mapOf( "Auto" to "auto", "High" to "high", "Medium" to "medium", "Low" to "low")
 
                     DropdownSelection(
                         title = "Quality",
@@ -55,7 +55,7 @@ fun ModeSelectionDialog(
                     var categoryExpanded by remember { mutableStateOf(false) }
                     var selectedCategory by remember { mutableStateOf("All Categories") }
                     val categoryMap = mapOf(
-                        "All Categories" to "", // Default case
+                        "All Categories" to 0, // Default case
                         "Entertainment" to 5,
                         "Movies" to 6,
                         "Kids" to 7,
@@ -86,7 +86,7 @@ fun ModeSelectionDialog(
                     var languageExpanded by remember { mutableStateOf(false) }
                     var selectedLanguage by remember { mutableStateOf("All Languages") }
                     val languageMap = mapOf(
-                        "All Languages" to "", // Default case
+                        "All Languages" to 0, // Default case
                         "Hindi" to 1,
                         "Marathi" to 2,
                         "Punjabi" to 3,
