@@ -125,6 +125,7 @@ class SkySharedPref private constructor(context: Context) {
         @SharedPrefKey("filterQ") var filterQ: String? = null,
         @SharedPrefKey("filterL") var filterL: String? = null,
         @SharedPrefKey("filterC") var filterC: String? = null,
+        @SharedPrefKey("login_chk") var loginChk: Boolean = true
     )
 
     // Annotation class to define the key for SharedPreferences
