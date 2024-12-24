@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +35,7 @@ import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.SoupKitchen
 import androidx.compose.material.icons.filled.Stream
 import androidx.compose.material.icons.filled.Timelapse
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -91,12 +93,17 @@ fun SettingsScreen(
     val focusRequester = remember { FocusRequester() }
     val customFontFamily = FontFamily(Font(R.font.chakrapetch_bold))
 
+    var showNewBadge by remember { mutableStateOf(true) }
+
     fun applySettings() {
         preferenceManager.savePreferences()
     }
     // Retrieve saved switch states
     var isSwitchOnForLOCAL by remember {
         mutableStateOf(preferenceManager.myPrefs.serveLocal)
+    }
+    var isLoginCheckEnabled by remember {
+        mutableStateOf(preferenceManager.myPrefs.loginChk)
     }
     var isSwitchOnForEPG by remember {
         mutableStateOf(jtvConfigurationManager.jtvConfiguration.epg)
@@ -166,6 +173,11 @@ fun SettingsScreen(
         applySettings()
     }
 
+    LaunchedEffect(isLoginCheckEnabled) {
+        preferenceManager.myPrefs.loginChk = isLoginCheckEnabled
+        applySettings()
+    }
+
     LaunchedEffect(isSwitchOnForEPG) {
         jtvConfigurationManager.jtvConfiguration.epg = isSwitchOnForEPG
         jtvConfigurationManager.saveJTVConfiguration()
@@ -227,6 +239,15 @@ fun SettingsScreen(
                     title = "Server Port",
                     subtitle = "Current Port: $portNumber",
                     onClick = { showPortDialog = true })
+            }
+            item {
+                SettingSwitchItem(
+                    icon = Icons.Filled.VerifiedUser,
+                    title = "Login Checker",
+                    subtitle = "Toggle to enable or disable login checks",
+                    isChecked = isLoginCheckEnabled,
+                    onCheckedChange = { isChecked -> isLoginCheckEnabled = isChecked }
+                )
             }
             item {
                 SettingSwitchItem(
@@ -307,10 +328,16 @@ fun SettingsScreen(
 
             }
             item {
-                SettingItem(icon = Icons.Filled.Mediation,
+                SettingItem(
+                    icon = Icons.Filled.Mediation,
                     title = "Configure WEBTV filters",
                     subtitle = "Select default language, category, and quality.",
-                    onClick = { showModeDialog = true })
+                    showBadge = showNewBadge,
+                    onClick = {
+                        showModeDialog = true
+                        showNewBadge = false
+                    }
+                )
             }
             item {
                 SettingSwitchItem(icon = Icons.Filled.SoupKitchen,
@@ -537,7 +564,11 @@ fun SettingSwitchItem(
 
 @Composable
 fun SettingItem(
-    icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    showBadge: Boolean = false,
+    onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -548,8 +579,25 @@ fun SettingItem(
     ) {
         Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(24.dp))
         Spacer(modifier = Modifier.width(16.dp))
-        Column {
-            Text(text = title, fontWeight = FontWeight.Bold)
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = title, fontWeight = FontWeight.Bold)
+                if (showBadge) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "New",
+                        color = Color.Red,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .background(
+                                color = Color.Red.copy(alpha = 0.1f),
+                                shape = MaterialTheme.shapes.small
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
             Text(text = subtitle, fontSize = 12.sp, color = Color.Gray)
         }
     }
