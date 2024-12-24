@@ -37,7 +37,7 @@ fun LoginPopup(
     dismissButtonText: String,
     onConfirm: () -> Unit,
     onDismiss: (() -> Unit)?,
-    onSettingsClick: () -> Unit // New parameter for handling the settings icon click
+    onSettingsClick: (Any?) -> Unit // New parameter for handling the settings icon click
 ) {
     LaunchedEffect(isVisible) {
         if (isVisible) {
@@ -84,7 +84,7 @@ fun LoginPopup(
                             .size(24.dp)
                             .padding(start = 8.dp)
                             .align(Alignment.CenterVertically)
-                            .clickable { onSettingsClick() }
+                            .clickable { onSettingsClick("Login") }
                     )
                 }
             },
