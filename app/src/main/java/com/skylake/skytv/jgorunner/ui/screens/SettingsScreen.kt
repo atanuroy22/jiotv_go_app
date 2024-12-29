@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Timelapse
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -204,6 +205,7 @@ fun SettingsScreen(
                     isChecked = isSwitchOnForAutoStartServer,
                     onCheckedChange = { isChecked -> isSwitchOnForAutoStartServer = isChecked })
             }
+
             item {
                 SettingSwitchItem(icon = Icons.Filled.Stream,
                     title = "Auto Start on Boot",
@@ -249,6 +251,11 @@ fun SettingsScreen(
                     onCheckedChange = { isChecked -> isLoginCheckEnabled = isChecked }
                 )
             }
+
+            item {
+                HorizontalDividerLine()
+            }
+
             item {
                 SettingSwitchItem(
                     icon = Icons.Filled.BrowserUpdated,
@@ -339,9 +346,14 @@ fun SettingsScreen(
                     }
                 )
             }
+
+            item {
+                HorizontalDividerLine()
+            }
+
             item {
                 SettingSwitchItem(icon = Icons.Filled.SoupKitchen,
-                    title = "Check for updates automatically",
+                    title = "Check for auto updates",
                     subtitle = "Check for updates when the app starts",
                     isChecked = isSwitchOnCheckForUpdate,
                     onCheckedChange = { isChecked -> isSwitchOnCheckForUpdate = isChecked })
@@ -602,3 +614,14 @@ fun SettingItem(
         }
     }
 }
+
+@Composable
+fun HorizontalDividerLine() {
+    HorizontalDivider(
+        thickness = 2.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    )
+}
+
