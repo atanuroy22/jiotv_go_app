@@ -56,6 +56,13 @@
             android:supportsPictureInPicture="true" >
         </activity>
 
+        <activity
+            android:name=".activities.WebPlayerAltActivity"
+            android:configChanges="orientation|screenSize"
+            android:resizeableActivity="true"
+            android:supportsPictureInPicture="true" >
+        </activity>
+
         <service
             android:name=".services.BinaryService"
             android:foregroundServiceType="mediaPlayback"
