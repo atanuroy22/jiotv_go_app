@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Pix
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.ResetTv
 import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SoupKitchen
 import androidx.compose.material.icons.filled.Stream
 import androidx.compose.material.icons.filled.Timelapse
@@ -109,6 +110,9 @@ fun SettingsScreen(
     var isSwitchOnForEPG by remember {
         mutableStateOf(jtvConfigurationManager.jtvConfiguration.epg)
     }
+    var isSwitchOnForDRM by remember {
+        mutableStateOf(jtvConfigurationManager.jtvConfiguration.drm)
+    }
     var isSwitchOnForAutoStartServer by remember {
         mutableStateOf(preferenceManager.myPrefs.autoStartServer)
     }
@@ -184,6 +188,11 @@ fun SettingsScreen(
         jtvConfigurationManager.saveJTVConfiguration()
     }
 
+    LaunchedEffect(isSwitchOnForDRM) {
+        jtvConfigurationManager.jtvConfiguration.drm = isSwitchOnForDRM
+        jtvConfigurationManager.saveJTVConfiguration()
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -228,6 +237,11 @@ fun SettingsScreen(
                         })
                 }
             }
+
+            item {
+                HorizontalDividerLine()
+            }
+
             item {
                 SettingSwitchItem(icon = Icons.Filled.Public,
                     title = "Use Server Publicly",
@@ -235,6 +249,17 @@ fun SettingsScreen(
                     isChecked = !isSwitchOnForLOCAL,
                     onCheckedChange = { isChecked -> isSwitchOnForLOCAL = !isChecked })
             }
+
+            item {
+                SettingSwitchItem(
+                    icon = Icons.Filled.Security,
+                    title = "DRM",
+                    subtitle =  "DRM toggle [chrome/firefox only]",
+                    isChecked = isSwitchOnForDRM,
+                    onCheckedChange = { isChecked -> isSwitchOnForDRM = isChecked },
+                )
+            }
+
             // Port Number Setting
             item {
                 SettingItem(icon = Icons.Filled.Attribution,

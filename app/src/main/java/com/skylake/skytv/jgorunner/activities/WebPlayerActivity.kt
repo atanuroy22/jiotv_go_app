@@ -144,6 +144,7 @@ class WebPlayerActivity : ComponentActivity() {
         webSettings.loadWithOverviewMode = true
         webSettings.useWideViewPort = true
         webSettings.defaultTextEncodingName = "utf-8"
+        webSettings.mixedContentMode = 0
         webSettings.mediaPlaybackRequiresUserGesture = false // Allow autoplay
     }
 
