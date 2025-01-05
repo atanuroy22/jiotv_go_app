@@ -44,7 +44,8 @@ class JTVConfigurationManager private constructor(context: Context) {
         if (jtvConfigLocation == null) {
             val parentDir = File(filesDir, "jiotv_go")
             jtvConfigLocation = File(parentDir, "jtv_config.json").absolutePath
-            jtvConfiguration.pathPrefix = parentDir.absolutePath
+//            jtvConfiguration.pathPrefix = parentDir.absolutePath // fix for v3.12.1
+            jtvConfiguration.pathPrefix = filesDir.absolutePath
 
             preferenceManager.myPrefs.jtvConfigLocation = jtvConfigLocation
             preferenceManager.savePreferences()

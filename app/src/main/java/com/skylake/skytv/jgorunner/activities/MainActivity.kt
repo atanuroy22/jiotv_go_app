@@ -45,6 +45,7 @@ import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.BinaryService
 import com.skylake.skytv.jgorunner.ui.components.BottomNavigationBar
 import com.skylake.skytv.jgorunner.ui.components.CustPopup
+import com.skylake.skytv.jgorunner.ui.components.LoginPopup
 import com.skylake.skytv.jgorunner.ui.components.ProgressPopup
 import com.skylake.skytv.jgorunner.ui.components.RedirectPopup
 import com.skylake.skytv.jgorunner.ui.screens.DebugScreen
@@ -105,6 +106,7 @@ class MainActivity : ComponentActivity() {
         if (preferenceManager.myPrefs.iptvLaunchCountdown == 0) {
             preferenceManager.myPrefs.iptvLaunchCountdown = 4
             preferenceManager.myPrefs.enableAutoUpdate = true
+            preferenceManager.myPrefs.loginChk = true
             preferenceManager.myPrefs.jtvGoServerPort = 5350
             preferenceManager.myPrefs.jtvGoBinaryVersion = "v0.0.0"
             preferenceManager.myPrefs.filterQ = ""
@@ -222,6 +224,7 @@ class MainActivity : ComponentActivity() {
                                 onWebTVButtonClick = {
                                     val intent =
                                         Intent(this@MainActivity, WebPlayerActivity::class.java)
+//                                          Intent(this@MainActivity, WebPlayerAltActivity::class.java)
                                     startActivity(intent)
                                 },
                                 onDebugButtonClick = {
@@ -278,7 +281,7 @@ class MainActivity : ComponentActivity() {
                             }
                         )
 
-                        CustPopup(
+                        LoginPopup(
                             isVisible = showLoginPopup,
                             title = "Login Required",
                             text = "Please log in using WebTV to access the server",
@@ -295,11 +298,18 @@ class MainActivity : ComponentActivity() {
                                     Toast.LENGTH_SHORT
                                 ).show()
                                 Log.d("DIX", "Opening WEBTV")
-                                return@CustPopup
+                                return@LoginPopup
                             },
                             onDismiss = {
                                 showLoginPopup = false
-                                return@CustPopup
+                                return@LoginPopup
+                            },
+                            onSettingsClick = {
+                                currentScreen = "Login"
+                                showLoginPopup = false
+
+//                                onNavigate("Runner")
+                                return@LoginPopup
                             }
                         )
 
@@ -654,7 +664,30 @@ class MainActivity : ComponentActivity() {
                 onLoginFailure = {
                     isGlowBox = false
                     isServerRunning = true
-                    showLoginPopup = true
+                    if (preferenceManager.myPrefs.loginChk) {
+                        showLoginPopup = true
+                    } else {
+                        if (preferenceManager.myPrefs.autoStartIPTV) {
+                            countdownJob?.cancel() // Cancel any existing countdown job
+
+                            var countdownTime = preferenceManager.myPrefs.iptvLaunchCountdown
+                            countdownJob = CoroutineScope(Dispatchers.Main).launch {
+                                showRedirectPopup = true
+                                shouldLaunchIPTV = true
+
+                                while (countdownTime > 0) {
+                                    delay(1000)
+                                    countdownTime--
+                                }
+
+                                showRedirectPopup = false
+
+                                if (shouldLaunchIPTV) {
+                                    startIPTV()
+                                }
+                            }
+                        }
+                    }
                 },
                 onServerDown = {
                     CoroutineScope(Dispatchers.Main).launch {
@@ -744,7 +777,7 @@ class MainActivity : ComponentActivity() {
 
     private fun getPublicJTVServerURL(context: Context): String {
         val connectivityManager =
-            context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            context.getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
 
         val savedPortNumber = preferenceManager.myPrefs.jtvGoServerPort
         val isPublic = !preferenceManager.myPrefs.serveLocal

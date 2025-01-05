@@ -1,8 +1,9 @@
 package com.skylake.skytv.jgorunner.ui.screens
 
 import android.content.Context
-import android.util.Log
 import android.widget.Toast
+import androidx.compose.animation.Animatable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,81 +22,65 @@ import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.data.SkySharedPref
-import kotlinx.coroutines.delay
+import androidx.compose.ui.input.key.*
+import androidx.compose.ui.text.input.*
 
 @Composable
 fun LoginScreen(context: Context) {
-    val customFontFamily = FontFamily(Font(R.font.chakrapetch_bold))
-    val glowColor = Color.Green
     val preferenceManager = SkySharedPref.getInstance(context)
 
+    val glowColors = listOf(
+        Color.Red,
+        Color.Green,
+        Color.Blue,
+        Color.Yellow,
+        Color.Cyan,
+        Color.Magenta
+    )
+    val glowColor = remember { Animatable(glowColors.first()) }
+    val customFontFamily = FontFamily(Font(R.font.chakrapetch_bold))
     var isUsingOtp by remember { mutableStateOf(true) }
 
-    var phoneNumber by remember { mutableStateOf("") }
-    var otpCode by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    var phoneNumber by remember { mutableStateOf(TextFieldValue()) }
+    var otpCode by remember { mutableStateOf(TextFieldValue()) }
+    var password by remember { mutableStateOf(TextFieldValue()) }
 
-    val isGlowing by rememberUpdatedState(newValue = run {
-        preferenceManager.myPrefs.serveLocal
-    })
+    val focusRequesterList = remember { List(3) { FocusRequester() } }
+    val (phoneNumberFocusRequester, otpCodeFocusRequester, passwordFocusRequester) = focusRequesterList
 
-    // Focus requesters for managing focus on fields
-    val phoneNumberFocusRequester = remember { FocusRequester() }
-    val otpCodeFocusRequester = remember { FocusRequester() }
-    val passwordFocusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
 
     LaunchedEffect(Unit) {
-        while (true) {
-            phoneNumberFocusRequester.requestFocus()
-            Log.d("PreferenceCheck", "isFlagSetForLOCAL: $isGlowing")
-            delay(3000) // Delay for 3 seconds
-        }
+        phoneNumberFocusRequester.requestFocus()
     }
 
-    // Function to draw the watermark
-    @Composable
-    fun Watermark() {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer(rotationZ = -30f)
-                .alpha(0.1f)
-        ) {
-            Text(
-                text = "NOT WORKING - EXPERIMENTAL",
-                fontSize = 50.sp,
-                color = Color.Red,
-                modifier = Modifier.align(Alignment.Center)
-            )
-        }
-    }
-
-    // Main UI layout
     Box(modifier = Modifier.fillMaxSize()) {
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -108,10 +93,10 @@ fun LoginScreen(context: Context) {
                 fontSize = 24.sp,
                 fontFamily = customFontFamily,
                 color = MaterialTheme.colorScheme.onBackground,
-                style = if (isGlowing) {
+                style = if (true) {
                     TextStyle(
                         shadow = Shadow(
-                            color = glowColor,
+                            color = glowColor.value,
                             blurRadius = 30f,
                             offset = Offset(0f, 0f)
                         )
@@ -122,44 +107,29 @@ fun LoginScreen(context: Context) {
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
+
             // Tab layout to switch between OTP and Password
-            var selectedTabIndex by remember { mutableIntStateOf(0) }
+            var selectedTabIndex by remember { mutableStateOf(0) }
             TabRow(selectedTabIndex = selectedTabIndex) {
                 Tab(
                     selected = selectedTabIndex == 0,
                     onClick = {
                         selectedTabIndex = 0
                         isUsingOtp = true
-                        // Request focus for phone number when switching to OTP
                         phoneNumberFocusRequester.requestFocus()
                     }
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .height(56.dp)
-                            .padding(vertical = 16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("Use OTP")
-                    }
+                    Text("Use OTP", modifier = Modifier.padding(16.dp))
                 }
                 Tab(
                     selected = selectedTabIndex == 1,
                     onClick = {
                         selectedTabIndex = 1
                         isUsingOtp = false
-                        // Request focus for phone number when switching to Password
                         phoneNumberFocusRequester.requestFocus()
                     }
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .height(56.dp)
-                            .padding(vertical = 16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("Use Password")
-                    }
+                    Text("Use Password", modifier = Modifier.padding(16.dp))
                 }
             }
 
@@ -171,24 +141,26 @@ fun LoginScreen(context: Context) {
                     value = phoneNumber,
                     onValueChange = { phoneNumber = it },
                     label = { Text("Phone Number") },
-                    keyboardOptions = KeyboardOptions.Default.copy(
-                        keyboardType = KeyboardType.Phone,
-                        imeAction = ImeAction.Next
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onNext = {
-                            otpCodeFocusRequester.requestFocus() // Move focus to OTP code
+                    keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(onNext = { otpCodeFocusRequester.requestFocus() }),
+                    modifier = Modifier
+                        .focusRequester(phoneNumberFocusRequester)
+                        .focusable()
+                        .onKeyEvent { event ->
+                            handleKeyEvent(
+                                event = event,
+                                focusManager = focusManager,
+                                focusRequesterList = focusRequesterList,
+                                currentFieldValue = phoneNumber.text,
+                                cursorPosition = phoneNumber.selection.end
+                            )
                         }
-                    ),
-                    modifier = Modifier.focusRequester(phoneNumberFocusRequester) // Attach focus requester
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Button(onClick = {
-                    sendOtp(context, phoneNumber)
-                }) {
-                    Text(text = "Send OTP")
+                Button(onClick = { sendOtp(context, phoneNumber.text) }) {
+                    Text("Send OTP")
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -197,24 +169,26 @@ fun LoginScreen(context: Context) {
                     value = otpCode,
                     onValueChange = { otpCode = it },
                     label = { Text("OTP Code") },
-                    keyboardOptions = KeyboardOptions.Default.copy(
-                        keyboardType = KeyboardType.Phone,
-                        imeAction = ImeAction.Done
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = {
-                            verifyOtp(context, phoneNumber, otpCode)
+                    keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { verifyOtp(context, phoneNumber.text, otpCode.text) }),
+                    modifier = Modifier
+                        .focusRequester(otpCodeFocusRequester)
+                        .focusable()
+                        .onKeyEvent { event ->
+                            handleKeyEvent(
+                                event = event,
+                                focusManager = focusManager,
+                                focusRequesterList = focusRequesterList,
+                                currentFieldValue = otpCode.text,
+                                cursorPosition = otpCode.selection.end
+                            )
                         }
-                    ),
-                    modifier = Modifier.focusRequester(otpCodeFocusRequester) // Attach focus requester
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Button(onClick = {
-                    verifyOtp(context, phoneNumber, otpCode)
-                }) {
-                    Text(text = "Verify OTP")
+                Button(onClick = { verifyOtp(context, phoneNumber.text, otpCode.text) }) {
+                    Text("Verify OTP")
                 }
 
             } else {
@@ -223,16 +197,20 @@ fun LoginScreen(context: Context) {
                     value = phoneNumber,
                     onValueChange = { phoneNumber = it },
                     label = { Text("Phone Number") },
-                    keyboardOptions = KeyboardOptions.Default.copy(
-                        keyboardType = KeyboardType.Phone,
-                        imeAction = ImeAction.Next
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onNext = {
-                            passwordFocusRequester.requestFocus() // Move focus to password field
+                    keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(onNext = { passwordFocusRequester.requestFocus() }),
+                    modifier = Modifier
+                        .focusRequester(phoneNumberFocusRequester)
+                        .focusable()
+                        .onKeyEvent { event ->
+                            handleKeyEvent(
+                                event = event,
+                                focusManager = focusManager,
+                                focusRequesterList = focusRequesterList,
+                                currentFieldValue = phoneNumber.text,
+                                cursorPosition = phoneNumber.selection.end
+                            )
                         }
-                    ),
-                    modifier = Modifier.focusRequester(phoneNumberFocusRequester) // Attach focus requester
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -242,29 +220,58 @@ fun LoginScreen(context: Context) {
                     onValueChange = { password = it },
                     label = { Text("Password") },
                     visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions.Default.copy(
-                        imeAction = ImeAction.Done
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = {
-                            login(context, phoneNumber, password)
+                    keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { login(context, phoneNumber.text, password.text) }),
+                    modifier = Modifier
+                        .focusRequester(passwordFocusRequester)
+                        .focusable()
+                        .onKeyEvent { event ->
+                            handleKeyEvent(
+                                event = event,
+                                focusManager = focusManager,
+                                focusRequesterList = focusRequesterList,
+                                currentFieldValue = password.text,
+                                cursorPosition = password.selection.end
+                            )
                         }
-                    ),
-                    modifier = Modifier.focusRequester(passwordFocusRequester) // Attach focus requester
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Button(onClick = {
-                    login(context, phoneNumber, password)
-                }) {
-                    Text(text = "Login")
+                Button(onClick = { login(context, phoneNumber.text, password.text) }) {
+                    Text("Login")
                 }
             }
         }
-
-        Watermark()
     }
+}
+
+private fun handleKeyEvent(
+    event: KeyEvent,
+    focusManager: FocusManager,
+    focusRequesterList: List<FocusRequester>,
+    currentFieldValue: String,
+    cursorPosition: Int
+): Boolean {
+    if (event.type == KeyEventType.KeyDown) {
+        when (event.key) {
+            Key.DirectionDown -> {
+                if (cursorPosition == currentFieldValue.length) {
+                    // Cursor is at the end of the field, move focus to the next field
+                    focusManager.moveFocus(FocusDirection.Down)
+                    return true
+                }
+            }
+            Key.DirectionUp -> {
+                if (cursorPosition == 0) {
+                    // Cursor is at the start of the field, move focus to the previous field
+                    focusManager.moveFocus(FocusDirection.Up)
+                    return true
+                }
+            }
+        }
+    }
+    return false
 }
 
 private fun sendOtp(context: Context, phoneNumber: String) {
@@ -290,3 +297,6 @@ private fun login(context: Context, phoneNumber: String, password: String) {
         Toast.makeText(context, "Please enter your phone number and password", Toast.LENGTH_SHORT).show()
     }
 }
+
+
+

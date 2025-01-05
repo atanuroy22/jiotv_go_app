@@ -1,5 +1,10 @@
 package com.skylake.skytv.jgorunner.ui.screens
 
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -41,6 +46,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
@@ -70,6 +76,17 @@ fun HomeScreen(
     onDebugButtonClick: () -> Unit,
     onExitButtonClick: () -> Unit
 ) {
+
+    val context = LocalContext.current
+    val regex = Regex("http://(?:\\d+\\.\\d+\\.\\d+\\.\\d+|localhost)(:\\d+)?")
+    fun updateURL(url: String): String {
+        return url.replace(regex) { matchResult ->
+            val port = matchResult.groups[1]?.value ?: ""
+            "http://localhost$port"
+        }.replace("/playlist.m3u", "")
+    }
+    val baseUrl = updateURL(publicJTVServerURL)
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -82,7 +99,21 @@ fun HomeScreen(
         Image(
             painter = painterResource(id = R.drawable.logo),
             contentDescription = "App Icon",
-            modifier = Modifier.size(75.dp)
+            modifier = Modifier
+                .size(75.dp)
+                .clickable {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(baseUrl))
+                    Log.d("DND",baseUrl)
+                    val packageName = "com.android.chrome"
+                    val pm = context.packageManager
+                    try {
+                        pm.getPackageInfo(packageName, PackageManager.GET_ACTIVITIES)
+                        intent.setPackage(packageName)
+                    } catch (e: PackageManager.NameNotFoundException) {
+                        Toast.makeText(context, "Chrome not found. Opening in default browser.", Toast.LENGTH_SHORT).show()
+                    }
+                    context.startActivity(intent)
+                }
         )
 
         Spacer(modifier = Modifier.height(10.dp))

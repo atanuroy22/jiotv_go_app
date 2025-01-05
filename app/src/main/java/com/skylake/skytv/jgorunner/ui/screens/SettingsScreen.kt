@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,11 +32,14 @@ import androidx.compose.material.icons.filled.Pix
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.ResetTv
 import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SoupKitchen
 import androidx.compose.material.icons.filled.Stream
 import androidx.compose.material.icons.filled.Timelapse
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -91,6 +95,8 @@ fun SettingsScreen(
     val focusRequester = remember { FocusRequester() }
     val customFontFamily = FontFamily(Font(R.font.chakrapetch_bold))
 
+    var showNewBadge by remember { mutableStateOf(true) }
+
     fun applySettings() {
         preferenceManager.savePreferences()
     }
@@ -98,8 +104,14 @@ fun SettingsScreen(
     var isSwitchOnForLOCAL by remember {
         mutableStateOf(preferenceManager.myPrefs.serveLocal)
     }
+    var isLoginCheckEnabled by remember {
+        mutableStateOf(preferenceManager.myPrefs.loginChk)
+    }
     var isSwitchOnForEPG by remember {
         mutableStateOf(jtvConfigurationManager.jtvConfiguration.epg)
+    }
+    var isSwitchOnForDRM by remember {
+        mutableStateOf(jtvConfigurationManager.jtvConfiguration.drm)
     }
     var isSwitchOnForAutoStartServer by remember {
         mutableStateOf(preferenceManager.myPrefs.autoStartServer)
@@ -166,8 +178,18 @@ fun SettingsScreen(
         applySettings()
     }
 
+    LaunchedEffect(isLoginCheckEnabled) {
+        preferenceManager.myPrefs.loginChk = isLoginCheckEnabled
+        applySettings()
+    }
+
     LaunchedEffect(isSwitchOnForEPG) {
         jtvConfigurationManager.jtvConfiguration.epg = isSwitchOnForEPG
+        jtvConfigurationManager.saveJTVConfiguration()
+    }
+
+    LaunchedEffect(isSwitchOnForDRM) {
+        jtvConfigurationManager.jtvConfiguration.drm = isSwitchOnForDRM
         jtvConfigurationManager.saveJTVConfiguration()
     }
 
@@ -192,6 +214,7 @@ fun SettingsScreen(
                     isChecked = isSwitchOnForAutoStartServer,
                     onCheckedChange = { isChecked -> isSwitchOnForAutoStartServer = isChecked })
             }
+
             item {
                 SettingSwitchItem(icon = Icons.Filled.Stream,
                     title = "Auto Start on Boot",
@@ -214,6 +237,11 @@ fun SettingsScreen(
                         })
                 }
             }
+
+            item {
+                HorizontalDividerLine()
+            }
+
             item {
                 SettingSwitchItem(icon = Icons.Filled.Public,
                     title = "Use Server Publicly",
@@ -221,6 +249,17 @@ fun SettingsScreen(
                     isChecked = !isSwitchOnForLOCAL,
                     onCheckedChange = { isChecked -> isSwitchOnForLOCAL = !isChecked })
             }
+
+            item {
+                SettingSwitchItem(
+                    icon = Icons.Filled.Security,
+                    title = "DRM",
+                    subtitle =  "DRM toggle [chrome/firefox only]",
+                    isChecked = isSwitchOnForDRM,
+                    onCheckedChange = { isChecked -> isSwitchOnForDRM = isChecked },
+                )
+            }
+
             // Port Number Setting
             item {
                 SettingItem(icon = Icons.Filled.Attribution,
@@ -228,6 +267,20 @@ fun SettingsScreen(
                     subtitle = "Current Port: $portNumber",
                     onClick = { showPortDialog = true })
             }
+            item {
+                SettingSwitchItem(
+                    icon = Icons.Filled.VerifiedUser,
+                    title = "Login Checker",
+                    subtitle = "Toggle to enable or disable login checks",
+                    isChecked = isLoginCheckEnabled,
+                    onCheckedChange = { isChecked -> isLoginCheckEnabled = isChecked }
+                )
+            }
+
+            item {
+                HorizontalDividerLine()
+            }
+
             item {
                 SettingSwitchItem(
                     icon = Icons.Filled.BrowserUpdated,
@@ -307,14 +360,25 @@ fun SettingsScreen(
 
             }
             item {
-                SettingItem(icon = Icons.Filled.Mediation,
+                SettingItem(
+                    icon = Icons.Filled.Mediation,
                     title = "Configure WEBTV filters",
                     subtitle = "Select default language, category, and quality.",
-                    onClick = { showModeDialog = true })
+                    showBadge = showNewBadge,
+                    onClick = {
+                        showModeDialog = true
+                        showNewBadge = false
+                    }
+                )
             }
+
+            item {
+                HorizontalDividerLine()
+            }
+
             item {
                 SettingSwitchItem(icon = Icons.Filled.SoupKitchen,
-                    title = "Check for updates automatically",
+                    title = "Check for auto updates",
                     subtitle = "Check for updates when the app starts",
                     isChecked = isSwitchOnCheckForUpdate,
                     onCheckedChange = { isChecked -> isSwitchOnCheckForUpdate = isChecked })
@@ -537,7 +601,11 @@ fun SettingSwitchItem(
 
 @Composable
 fun SettingItem(
-    icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    showBadge: Boolean = false,
+    onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -548,9 +616,37 @@ fun SettingItem(
     ) {
         Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(24.dp))
         Spacer(modifier = Modifier.width(16.dp))
-        Column {
-            Text(text = title, fontWeight = FontWeight.Bold)
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = title, fontWeight = FontWeight.Bold)
+                if (showBadge) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "New",
+                        color = Color.Red,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .background(
+                                color = Color.Red.copy(alpha = 0.1f),
+                                shape = MaterialTheme.shapes.small
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
             Text(text = subtitle, fontSize = 12.sp, color = Color.Gray)
         }
     }
 }
+
+@Composable
+fun HorizontalDividerLine() {
+    HorizontalDivider(
+        thickness = 2.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    )
+}
+

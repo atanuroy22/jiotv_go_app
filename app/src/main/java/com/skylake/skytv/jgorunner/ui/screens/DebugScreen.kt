@@ -129,6 +129,17 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
             Button3(context)
             Button4(context)
         }
+
+//        Spacer(modifier = Modifier.height(8.dp))
+//
+//        Row(
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .focusGroup(),
+//            horizontalArrangement = Arrangement.SpaceEvenly
+//        ) {
+//            Button5(context)
+//        }
     }
 }
 
@@ -244,6 +255,32 @@ fun RowScope.Button4(context: Context) {
     }
 }
 
+@Composable
+fun RowScope.Button5(context: Context) {
+    val colorPRIME = MaterialTheme.colorScheme.primary
+    val colorSECOND = colorPRIME.copy(alpha = 0.5f)
+    val buttonColor = remember { mutableStateOf(colorPRIME) }
+
+    Button(
+        onClick = { handleButton5Click(context) },
+        modifier = Modifier
+            .weight(1f)
+            .padding(8.dp)
+            .onFocusChanged { focusState ->
+                buttonColor.value = if (focusState.isFocused) {
+                    colorSECOND
+                } else {
+                    colorPRIME
+                }
+            },
+        shape = RoundedCornerShape(8.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
+        contentPadding = PaddingValues(2.dp)
+    ) {
+        ButtonContent("Login", Icons.Default.Verified)
+    }
+}
+
 fun handleButton1Click(context: Context) {
     Toast.makeText(context, "Caution: Experimental!\n May be unstable.", Toast.LENGTH_SHORT).show()
 }
@@ -260,4 +297,8 @@ fun handleButton3Click(context: Context) {
 fun handleButton4Click(context: Context) {
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://bit.ly/JTV-GO-Server"))
     context.startActivity(intent)
+}
+
+fun handleButton5Click(context: Context) {
+    Toast.makeText(context, "Pending Implementation", Toast.LENGTH_SHORT).show()
 }
