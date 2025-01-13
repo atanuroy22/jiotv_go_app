@@ -24,6 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowCircleUp
 import androidx.compose.material.icons.filled.Attribution
+import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.BrowserUpdated
 import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material.icons.filled.LiveTv
@@ -65,6 +66,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.nativeKeyCode
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -79,7 +81,9 @@ import com.skylake.skytv.jgorunner.activities.AppListActivity
 import com.skylake.skytv.jgorunner.activities.MainActivity
 import com.skylake.skytv.jgorunner.core.data.JTVConfigurationManager
 import com.skylake.skytv.jgorunner.data.SkySharedPref
+import com.skylake.skytv.jgorunner.ui.components.BackupDialog
 import com.skylake.skytv.jgorunner.ui.components.ModeSelectionDialog
+import com.skylake.skytv.jgorunner.ui.components.restoreBackup
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -135,6 +139,8 @@ fun SettingsScreen(
 
     var showPortDialog by remember { mutableStateOf(false) }
     var showModeDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    var showBackupDialog by remember { mutableStateOf(false) }
     var showRestartDialog by remember { mutableStateOf(false) }
     var showRestartAppDialog by remember { mutableStateOf(false) }
 
@@ -391,6 +397,20 @@ fun SettingsScreen(
                         checkForUpdates()
                     })
             }
+
+            item {
+                SettingItem(
+                    icon = Icons.Filled.Backup,
+                    title = "Backup & Restore",
+                    subtitle = "Securely back up and restore your data.",
+                    showBadge = showNewBadge,
+                    onClick = {
+                        showBackupDialog = true
+                        showNewBadge = false
+                    }
+                )
+            }
+
             item {
                 SettingItem(icon = Icons.Filled.RestartAlt,
                     title = "Reset All Settings",
@@ -510,6 +530,19 @@ fun SettingsScreen(
             println("Quality: $selectedQuality, Category: $selectedCategory, Language: $selectedLanguage")
             Toast.makeText(activity, "[#] Updated Filters", Toast.LENGTH_LONG).show()
 
+        }
+    )
+
+    BackupDialog(
+        showDialog = showBackupDialog,
+        context = context,
+        onDismiss = { showBackupDialog = false },
+        onBackup = { backupFile ->
+            println("Backup created at: ${backupFile.absolutePath}")
+        },
+        onRestore = { backupFile ->
+            restoreBackup(context, backupFile)
+            println("Restore completed from: ${backupFile.absolutePath}")
         }
     )
 
