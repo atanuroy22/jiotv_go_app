@@ -152,14 +152,14 @@ public class ExoplayerActivity extends ComponentActivity {
 //        }
 //    }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (player != null) {
-            player.release();
-            player = null;
-        }
-    }
+//    @Override
+//    protected void onDestroy() {
+//        super.onDestroy();
+//        if (player != null) {
+//            player.release();
+//            player = null;
+//        }
+//    }
 
 
     @Override
