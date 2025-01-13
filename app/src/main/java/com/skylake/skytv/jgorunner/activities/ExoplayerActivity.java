@@ -153,6 +153,16 @@ public class ExoplayerActivity extends ComponentActivity {
 //    }
 
     @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (player != null) {
+            player.release();
+            player = null;
+        }
+    }
+
+
+    @Override
     protected void onNewIntent(@NonNull Intent intent) {
         super.onNewIntent(intent);
         finish();
@@ -173,13 +183,14 @@ public class ExoplayerActivity extends ComponentActivity {
         }
     }
 
+
     @Override
     public void onPictureInPictureModeChanged(boolean isInPiPMode, @NonNull Configuration newConfig) {
         super.onPictureInPictureModeChanged(isInPiPMode, newConfig);
         isInPipMode = isInPiPMode;
-        if (isInPiPMode) {
-            // You can handle additional PiP mode behavior here
-        }
+//        if (isInPiPMode) {
+//
+//        }
     }
 
 }
