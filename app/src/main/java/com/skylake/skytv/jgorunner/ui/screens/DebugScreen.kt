@@ -45,6 +45,9 @@ import com.skylake.skytv.jgorunner.activities.ExoplayerActivity
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.ui.components.ButtonContent
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+
 @Composable
 fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
     val customFontFamily = FontFamily(Font(R.font.chakrapetch_bold))
@@ -59,6 +62,7 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
     )
     val glowColor = remember { Animatable(glowColors.first()) }
     val preferenceManager = SkySharedPref.getInstance(context)
+    val scrollState = rememberScrollState()
 
     LaunchedEffect(Unit) {
         launch(Dispatchers.IO) {
@@ -86,6 +90,7 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(scrollState)
             .padding(16.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
@@ -144,6 +149,7 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
         }
     }
 }
+
 
 @Composable
 fun RowScope.Button1(context: Context, onNavigate: (String) -> Unit) {
