@@ -1,11 +1,8 @@
 package com.skylake.skytv.jgorunner.activities
 
 import android.annotation.SuppressLint
-import android.app.AlertDialog
-import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Bitmap
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -24,11 +21,9 @@ import com.skylake.skytv.jgorunner.data.SkySharedPref
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.Locale
 
-class WebPlayerAltActivity : ComponentActivity() {
+class WebPlayerActivityOld : ComponentActivity() {
     companion object {
         private const val TAG = "WebPlayerActivity"
         private const val DEFAULT_URL_TEMPLATE = "http://localhost:%d"
@@ -347,109 +342,12 @@ class WebPlayerAltActivity : ComponentActivity() {
                 Log.d(TAG, "Playing: $url")
                 setupFullScreenMode()
                 playVideoInFullScreen(view)
-
-                // Check the status of the /live/ URL and .m3u8
-                checkLiveAndM3U8Status(url)
             } else {
                 moveSearchInput(view)
                 extractChannelNumbers()
                 loadRecentChannels()
             }
         }
-
-        private fun checkLiveAndM3U8Status(playerUrl: String) {
-            val liveUrl = playerUrl.replace("/player/", "/live/")
-            val m3u8Url = "$liveUrl.m3u8"
-            val m3u8UrlDRM = liveUrl.replace("/live/", "/mpd/")
-            val savedPortNumber = prefManager.myPrefs.jtvGoServerPort
-            val initialCheckUrl = String.format(Locale.getDefault(), DEFAULT_URL_TEMPLATE, savedPortNumber)+ "/live/143.m3u8"
-            Log.d("500xc",initialCheckUrl)
-            val thread = Thread {
-                try {
-                    // First check the initial URL (localhost:port/live/143.m3u)
-                    val initialConnection = URL(initialCheckUrl).openConnection() as HttpURLConnection
-                    initialConnection.requestMethod = "HEAD"
-                    initialConnection.connect()
-
-                    if (initialConnection.responseCode == HttpURLConnection.HTTP_OK) {
-                        // If the initial URL is OK, proceed to check the live URL and m3u8 URL
-                        val liveConnection = URL(liveUrl).openConnection() as HttpURLConnection
-                        liveConnection.requestMethod = "HEAD"
-                        liveConnection.connect()
-
-                        if (liveConnection.responseCode == HttpURLConnection.HTTP_OK) {
-                            val m3u8Connection = URL(m3u8Url).openConnection() as HttpURLConnection
-                            m3u8Connection.requestMethod = "HEAD"
-                            m3u8Connection.connect()
-
-                            if (m3u8Connection.responseCode == HttpURLConnection.HTTP_INTERNAL_ERROR) {
-                                Log.d("500log", "500 error on .m3u8 URL: $m3u8Url")
-                                runOnUiThread {
-                                    AlertDialog.Builder(this@WebPlayerAltActivity)
-                                        .setTitle("DRM channel")
-                                        .setMessage("Would you like to open it in Chrome?")
-                                        .setPositiveButton("Open in Chrome") { _, _ ->
-                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(m3u8UrlDRM))
-                                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-
-                                            intent.setPackage("com.android.chrome")
-
-                                            if (intent.resolveActivity(packageManager) != null) {
-                                                startActivity(intent)
-                                            } else {
-                                                val fallbackIntent = Intent(Intent.ACTION_VIEW, Uri.parse(m3u8UrlDRM))
-                                                fallbackIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                startActivity(fallbackIntent)
-                                            }
-
-                                        }
-                                        .setNegativeButton("Cancel", null)
-                                        .show()
-                                }
-                            }
-                        } else {
-                            Log.d("500log", "500 error on /live/ URL: $liveUrl")
-                            runOnUiThread {
-                                AlertDialog.Builder(this@WebPlayerAltActivity)
-                                    .setTitle("DRM channel")
-                                    .setMessage("Would you like to open it in Chrome?")
-                                    .setPositiveButton("Open in Chrome") { _, _ ->
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(m3u8UrlDRM))
-                                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-
-                                        intent.setPackage("com.android.chrome")
-
-                                        if (intent.resolveActivity(packageManager) != null) {
-                                            startActivity(intent)
-                                        } else {
-                                            val fallbackIntent = Intent(Intent.ACTION_VIEW, Uri.parse(m3u8UrlDRM))
-                                            fallbackIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                            startActivity(fallbackIntent)
-                                        }
-
-                                    }
-                                    .setNegativeButton("Cancel", null)
-                                    .show()
-                            }
-                        }
-                    } else {
-                        Log.d("500log", "500 error on the initial URL: $initialCheckUrl")
-                        runOnUiThread {
-                            AlertDialog.Builder(this@WebPlayerAltActivity)
-                                .setTitle("Login Error")
-                                .setMessage("Login to access channels")
-                                .setPositiveButton("OK", null)
-                                .show()
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.d("500log", "Error checking the URLs: ${e.message}")
-                }
-            }
-            thread.start()
-        }
-
-
 
         fun extractChannelNumbers() {
             webView!!.evaluateJavascript(

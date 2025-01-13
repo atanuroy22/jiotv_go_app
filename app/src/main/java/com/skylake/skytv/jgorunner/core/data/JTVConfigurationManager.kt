@@ -1,6 +1,7 @@
 package com.skylake.skytv.jgorunner.core.data
 
 import android.content.Context
+import android.util.Log
 import com.google.gson.Gson
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import java.io.File
@@ -41,10 +42,14 @@ class JTVConfigurationManager private constructor(context: Context) {
     fun saveJTVConfiguration() {
         var jtvConfigLocation = preferenceManager.myPrefs.jtvConfigLocation
 
+        if (jtvConfiguration.pathPrefix != filesDir.absolutePath) {
+            handlePathPrefixMismatch()
+        }
+
         if (jtvConfigLocation == null) {
             val parentDir = File(filesDir, "jiotv_go")
             jtvConfigLocation = File(parentDir, "jtv_config.json").absolutePath
-//            jtvConfiguration.pathPrefix = parentDir.absolutePath // fix for v3.12.1
+//            jtvConfiguration.pathPrefix = parentDir.absolutePath // fix v3.12.1+
             jtvConfiguration.pathPrefix = filesDir.absolutePath
 
             preferenceManager.myPrefs.jtvConfigLocation = jtvConfigLocation
@@ -58,6 +63,11 @@ class JTVConfigurationManager private constructor(context: Context) {
         }
 
         jtvConfigFile.writeText(Gson().toJson(jtvConfiguration))
+    }
+
+    private fun handlePathPrefixMismatch() {
+        jtvConfiguration.pathPrefix = filesDir.absolutePath
+//            jtvConfiguration.pathPrefix = parentDir.absolutePath // fix v3.12.1+
     }
 
     fun deleteJTVConfiguration() {

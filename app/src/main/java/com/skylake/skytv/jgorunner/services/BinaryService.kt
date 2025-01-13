@@ -47,6 +47,12 @@ class BinaryService : Service() {
     }
 
     override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
+        // Check if intent is null
+        if (intent == null) {
+            Log.e("BinaryService", "Received null intent in onStartCommand!")
+            return START_NOT_STICKY
+        }
+
         // Create the notification for the service
         val notification = createNotification()
         startForeground(NOTIFICATION_ID, notification)
