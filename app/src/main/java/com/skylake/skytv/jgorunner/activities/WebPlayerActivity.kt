@@ -261,8 +261,8 @@ class WebPlayerActivity : ComponentActivity() {
                 Log.d(TAG, "Saving initURL: $initURL")
 
                 // Extract the play ID from the URL
-                val playId = if (url.matches(".*\\/play\\/([^\\/]+).*".toRegex())) url.replace(
-                    ".*\\/play\\/([^\\/]+).*".toRegex(),
+                val playId = if (url.matches(".*/play/([^/]+).*".toRegex())) url.replace(
+                    ".*/play/([^/]+).*".toRegex(),
                     "$1"
                 ) else null
 
@@ -320,9 +320,11 @@ class WebPlayerActivity : ComponentActivity() {
                 val modifiedUrl = url.replace("/play/", "/live/") + ".m3u8"
                 Log.d("DIX", "Modified URL for intent: $modifiedUrl")
 
-                // Send the intent to MainActivityx
+                // Send the intent to ExoplayerActivity
                 val intent = Intent(this@WebPlayerActivity, ExoplayerActivity::class.java).apply {
                     putExtra("video_url", modifiedUrl)
+                    putExtra("current_play_id", playId?.substringBefore("?") ?: playId)
+                    putExtra("channels_list", channelNumbers?.toTypedArray())
                 }
                 startActivity(intent)
                 return true
