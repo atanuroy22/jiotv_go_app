@@ -1,6 +1,7 @@
 package com.skylake.skytv.jgorunner.activities
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.os.Build
@@ -45,7 +46,6 @@ class WebPlayerActivity : ComponentActivity() {
     private val prefManager = SkySharedPref.getInstance(this)
 
     private class Channel(var playId: String?, var logoUrl: String?, var channelName: String?)
-
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -136,18 +136,20 @@ class WebPlayerActivity : ComponentActivity() {
 
     private fun updateSystemUiVisibility() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.setDecorFitsSystemWindows(false)
             window.insetsController?.let { controller ->
                 controller.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
                 controller.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             }
         } else {
             @Suppress("deprecation")
-            window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_FULLSCREEN
-                    or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                    or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
+            window.decorView.systemUiVisibility = (
+                    View.SYSTEM_UI_FLAG_FULLSCREEN
+                            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    )
         }
     }
+
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
@@ -187,7 +189,9 @@ class WebPlayerActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         webView!!.onResume()
+//        webView!!.loadUrl(url!!)
     }
+
 
     @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -260,14 +264,12 @@ class WebPlayerActivity : ComponentActivity() {
                 Log.d(TAG, "Saving initURL: $initURL")
 
                 // Extract the play ID from the URL
-                //String playId = url.substring(url.lastIndexOf("/play/") + 6); // Extracting play ID
-                val playId = if (url.matches(".*\\/play\\/([^\\/]+).*".toRegex())) url.replace(
-                    ".*\\/play\\/([^\\/]+).*".toRegex(),
+                val playId = if (url.matches(".*/play/([^/]+).*".toRegex())) url.replace(
+                    ".*/play/([^/]+).*".toRegex(),
                     "$1"
                 ) else null
 
-
-                Log.d("WB", playId!!)
+                Log.d("WB", playId ?: "Play ID not found")
 
                 // Use JavaScript to extract the channel logo and name
                 view.evaluateJavascript(
@@ -299,31 +301,35 @@ class WebPlayerActivity : ComponentActivity() {
                             currentChannelName = jsonResult.getString("channelName")
 
                             Log.d(
-                                TAG,
+                               TAG,
                                 "Channel Clicked: $currentChannelName (Play ID: $currentPlayId)"
                             )
                             saveRecentChannel(currentPlayId, currentLogoUrl, currentChannelName)
                         } catch (e: JSONException) {
                             Log.d(
-                                TAG,
+                               TAG,
                                 "JSON parsing error: " + e.message
                             )
                         }
                     } else {
                         Log.d(
-                            TAG,
+                           TAG,
                             "No channel data extracted."
                         )
                     }
                 }
 
+                // Construct the new URL
+                val modifiedUrl = url.replace("/play/", "/live/") + ".m3u8"
+                Log.d("DIX", "Modified URL for intent: $modifiedUrl")
 
-                val newUrl = url.replace("/play/", "/player/")
-                Log.d(
-                    TAG,
-                    "Loading new player URL: $newUrl"
-                )
-                webView!!.loadUrl(newUrl)
+                // Send the intent to ExoplayerActivity
+                val intent = Intent(this@WebPlayerActivity, ExoplayerActivity::class.java).apply {
+                    putExtra("video_url", modifiedUrl)
+                    putExtra("current_play_id", playId?.substringBefore("?") ?: playId)
+                    putExtra("channels_list", channelNumbers?.toTypedArray())
+                }
+                startActivity(intent)
                 return true
             } else if (!url.contains("/play/") && !url.contains("/player/")) {
                 initURL = url
@@ -332,7 +338,9 @@ class WebPlayerActivity : ComponentActivity() {
             return false
         }
 
-        override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
+
+
+    override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
             loadingSpinner!!.visibility = View.VISIBLE
         }
 

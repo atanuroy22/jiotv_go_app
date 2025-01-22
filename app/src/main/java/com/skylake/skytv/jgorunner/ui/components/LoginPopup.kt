@@ -77,17 +77,15 @@ fun LoginPopup(
                     ) {
                         Text(confirmButtonText)
                     }
-                    if (false) {
-                        Icon(
-                            imageVector = Icons.Filled.Settings,
-                            contentDescription = "Settings",
-                            modifier = Modifier
-                                .size(24.dp)
-                                .padding(start = 8.dp)
-                                .align(Alignment.CenterVertically)
-                                .clickable { onSettingsClick("Login") }
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Filled.Settings,
+                        contentDescription = "Settings",
+                        modifier = Modifier
+                            .size(24.dp)
+                            .padding(start = 8.dp)
+                            .align(Alignment.CenterVertically)
+                            .clickable { onSettingsClick("Login") }
+                    )
                 }
             },
             dismissButton = {

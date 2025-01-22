@@ -1,6 +1,11 @@
 package com.skylake.skytv.jgorunner.ui.screens
 
+import android.app.Activity
+import android.app.Dialog
 import android.content.Context
+import android.content.Intent
+import android.util.Log
+import android.widget.EditText
 import android.widget.Toast
 import androidx.compose.animation.Animatable
 import androidx.compose.foundation.focusable
@@ -11,8 +16,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Tab
@@ -22,6 +29,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -49,10 +57,24 @@ import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.text.input.*
+import com.skylake.skytv.jgorunner.activities.MainActivity
+import org.json.JSONObject
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.concurrent.Executors
+import kotlin.random.Random
 
 @Composable
 fun LoginScreen(context: Context) {
     val preferenceManager = SkySharedPref.getInstance(context)
+    val scrollState = rememberScrollState()
+
+    val localPORT by remember {
+        mutableIntStateOf(preferenceManager.myPrefs.jtvGoServerPort)
+    }
+    var basefinURL = "http://localhost:$localPORT"
 
     val glowColors = listOf(
         Color.Red,
@@ -62,7 +84,7 @@ fun LoginScreen(context: Context) {
         Color.Cyan,
         Color.Magenta
     )
-    val glowColor = remember { Animatable(glowColors.first()) }
+    val glowColor = remember { Animatable(glowColors[Random.nextInt(glowColors.size)]) }
     val customFontFamily = FontFamily(Font(R.font.chakrapetch_bold))
     var isUsingOtp by remember { mutableStateOf(true) }
 
@@ -75,6 +97,13 @@ fun LoginScreen(context: Context) {
 
     val focusManager = LocalFocusManager.current
 
+    var isUrlAvailable by remember { mutableStateOf(false) }
+    LaunchedEffect(basefinURL) {
+        isUrlAvailable(basefinURL) { isAvailable ->
+            isUrlAvailable = isAvailable
+        }
+    }
+
     LaunchedEffect(Unit) {
         phoneNumberFocusRequester.requestFocus()
     }
@@ -84,7 +113,8 @@ fun LoginScreen(context: Context) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(16.dp)
+                .verticalScroll(scrollState),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -107,6 +137,10 @@ fun LoginScreen(context: Context) {
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
+
+            if (!isUrlAvailable) {
+                Text(text = "Server is not started, Login function will not work", color = Color.Red)
+            }
 
             // Tab layout to switch between OTP and Password
             var selectedTabIndex by remember { mutableStateOf(0) }
@@ -159,7 +193,7 @@ fun LoginScreen(context: Context) {
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Button(onClick = { sendOtp(context, phoneNumber.text) }) {
+                Button(onClick = { sendOtp(context, phoneNumber.text, basefinURL) }) {
                     Text("Send OTP")
                 }
 
@@ -170,7 +204,7 @@ fun LoginScreen(context: Context) {
                     onValueChange = { otpCode = it },
                     label = { Text("OTP Code") },
                     keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { verifyOtp(context, phoneNumber.text, otpCode.text) }),
+                    keyboardActions = KeyboardActions(onDone = { verifyOtp(context, phoneNumber.text, otpCode.text, basefinURL) }),
                     modifier = Modifier
                         .focusRequester(otpCodeFocusRequester)
                         .focusable()
@@ -187,7 +221,7 @@ fun LoginScreen(context: Context) {
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Button(onClick = { verifyOtp(context, phoneNumber.text, otpCode.text) }) {
+                Button(onClick = { verifyOtp(context, phoneNumber.text, otpCode.text, basefinURL) }) {
                     Text("Verify OTP")
                 }
 
@@ -221,7 +255,7 @@ fun LoginScreen(context: Context) {
                     label = { Text("Password") },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { login(context, phoneNumber.text, password.text) }),
+                    keyboardActions = KeyboardActions(onDone = { login(context, phoneNumber.text, password.text, basefinURL) }),
                     modifier = Modifier
                         .focusRequester(passwordFocusRequester)
                         .focusable()
@@ -238,7 +272,7 @@ fun LoginScreen(context: Context) {
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Button(onClick = { login(context, phoneNumber.text, password.text) }) {
+                Button(onClick = { login(context, phoneNumber.text, password.text, basefinURL) }) {
                     Text("Login")
                 }
             }
@@ -274,29 +308,190 @@ private fun handleKeyEvent(
     return false
 }
 
-private fun sendOtp(context: Context, phoneNumber: String) {
+private fun sendOtp(context: Context, phoneNumber: String, baseURL: String) {
     if (phoneNumber.isNotBlank()) {
+        val executorService = Executors.newSingleThreadExecutor()
+        executorService.execute {
+            try {
+                val url = URL("$baseURL/login/sendOTP")
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.doOutput = true
+
+                val jsonInputString = "{\"number\": \"+91$phoneNumber\"}"
+                connection.outputStream.use { os ->
+                    val input = jsonInputString.toByteArray(Charsets.UTF_8)
+                    os.write(input, 0, input.size)
+                }
+
+                val response = StringBuilder()
+                BufferedReader(InputStreamReader(connection.inputStream, "utf-8")).use { br ->
+                    var responseLine: String?
+                    while (br.readLine().also { responseLine = it } != null) {
+                        response.append(responseLine!!.trim())
+                    }
+                }
+
+                (context as Activity).runOnUiThread {
+                    handleSendOtpResponse(context, response.toString())
+                }
+
+            } catch (e: Exception) {
+                Log.e("OTP", "Error sending OTP", e)
+                (context as Activity).runOnUiThread {
+                    Toast.makeText(context, "Failed to send OTP", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
         Toast.makeText(context, "Sending OTP to $phoneNumber", Toast.LENGTH_SHORT).show()
     } else {
         Toast.makeText(context, "Please enter your phone number", Toast.LENGTH_SHORT).show()
     }
 }
 
-private fun verifyOtp(context: Context, phoneNumber: String, otpCode: String) {
+    // Handle the OTP sending response
+    private fun handleSendOtpResponse(context: Context, result: String?) {
+        if (result != null) {
+            Toast.makeText(context, "OTP Sent: $result", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, "Failed to send OTP", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+
+
+private fun verifyOtp(context: Context, phoneNumber: String, otpCode: String, baseURL: String) {
     if (otpCode.isNotBlank()) {
+        val executorService = Executors.newSingleThreadExecutor()
+        executorService.execute {
+            try {
+                val url = URL("$baseURL/login/verifyOTP")
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.doOutput = true
+
+                val jsonInputString = "{\"number\": \"+91$phoneNumber\", \"otp\": \"$otpCode\"}"
+                connection.outputStream.use { os ->
+                    val input = jsonInputString.toByteArray(Charsets.UTF_8)
+                    os.write(input, 0, input.size)
+                }
+
+                val response = StringBuilder()
+                BufferedReader(InputStreamReader(connection.inputStream, "utf-8")).use { br ->
+                    var responseLine: String?
+                    while (br.readLine().also { responseLine = it } != null) {
+                        response.append(responseLine!!.trim())
+                    }
+                }
+
+                (context as Activity).runOnUiThread {
+                    handleVerifyOtpResponse(context, response.toString())
+                }
+
+            } catch (e: Exception) {
+                Log.e("OTP", "Error verifying OTP", e)
+                (context as Activity).runOnUiThread {
+                    Toast.makeText(context, "Failed to verify OTP", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
         Toast.makeText(context, "Verifying OTP: $otpCode for $phoneNumber", Toast.LENGTH_SHORT).show()
     } else {
         Toast.makeText(context, "Please enter the OTP", Toast.LENGTH_SHORT).show()
     }
 }
 
-private fun login(context: Context, phoneNumber: String, password: String) {
+private fun handleVerifyOtpResponse(context: Context, result: String?) {
+    if (result != null) {
+        try {
+            val jsonObject = JSONObject(result)
+            val status = jsonObject.optString("status")
+            if (status == "success") {
+                Toast.makeText(context, "OTP Verified Successfully", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(context, "Failed to verify OTP", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Toast.makeText(context, "Error parsing response", Toast.LENGTH_SHORT).show()
+        }
+    } else {
+        Toast.makeText(context, "Failed to verify OTP", Toast.LENGTH_SHORT).show()
+    }
+}
+
+
+private fun login(context: Context, phoneNumber: String, password: String, baseURL: String) {
     if (phoneNumber.isNotBlank() && password.isNotBlank()) {
+            Thread {
+                try {
+                    val url = URL("$baseURL/login")
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.requestMethod = "POST"
+                    conn.setRequestProperty("Content-Type", "application/json; utf-8")
+                    conn.setRequestProperty("Accept", "application/json")
+                    conn.doOutput = true
+
+                    val jsonInputString = "{\"username\": \"$phoneNumber\", \"password\": \"$password\"}"
+
+                    conn.outputStream.use { os ->
+                        val input = jsonInputString.toByteArray(Charsets.UTF_8)
+                        os.write(input, 0, input.size)
+                    }
+
+                    val responseCode = conn.responseCode
+                    if (responseCode == HttpURLConnection.HTTP_OK) {
+                        (context as Activity).runOnUiThread {
+                            handleVerifyPasswordResponse(context, "success")
+                        }
+                    } else {
+                        (context as Activity).runOnUiThread {
+                            handleVerifyPasswordResponse(context, "failure")
+                        }
+                    }
+
+                    conn.disconnect()
+
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    (context as Activity).runOnUiThread {
+                        handleVerifyPasswordResponse(context, "failure")
+                    }
+                }
+            }.start()
+
         Toast.makeText(context, "Logging in with $phoneNumber", Toast.LENGTH_SHORT).show()
     } else {
         Toast.makeText(context, "Please enter your phone number and password", Toast.LENGTH_SHORT).show()
     }
 }
 
+private fun handleVerifyPasswordResponse(context: Context, result: String) {
+    if (result == "success") {
+        Toast.makeText(context, "Login success. Enjoy!", Toast.LENGTH_SHORT).show()
+        val intent = Intent(context, MainActivity::class.java)
+        context.startActivity(intent)
+    } else {
+        Toast.makeText(context, "Login failed! Please check your credentials.", Toast.LENGTH_SHORT).show()
+    }
+}
+
+private fun isUrlAvailable(url: String, onResult: (Boolean) -> Unit) {
+    val executorService = Executors.newSingleThreadExecutor()
+    executorService.execute {
+        try {
+            val connection = URL(url).openConnection() as HttpURLConnection
+            connection.requestMethod = "HEAD" // We just want to check if the URL is available, no need for full content
+            connection.connectTimeout = 5000 // Set a timeout in case the server is slow
+            connection.readTimeout = 5000
+
+            val responseCode = connection.responseCode
+            onResult(responseCode == HttpURLConnection.HTTP_OK)
+        } catch (e: Exception) {
+            onResult(false)
+        }
+    }
+}
 
 

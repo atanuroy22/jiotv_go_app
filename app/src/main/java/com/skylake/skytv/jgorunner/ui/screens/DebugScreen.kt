@@ -41,8 +41,12 @@ import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.sharp.Info
 import androidx.compose.material.icons.sharp.Support
 import androidx.compose.runtime.*
+import com.skylake.skytv.jgorunner.activities.ExoplayerActivity
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.ui.components.ButtonContent
+
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 @Composable
 fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
@@ -58,6 +62,7 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
     )
     val glowColor = remember { Animatable(glowColors.first()) }
     val preferenceManager = SkySharedPref.getInstance(context)
+    val scrollState = rememberScrollState()
 
     LaunchedEffect(Unit) {
         launch(Dispatchers.IO) {
@@ -85,6 +90,7 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(scrollState)
             .padding(16.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
@@ -130,18 +136,20 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
             Button4(context)
         }
 
-//        Spacer(modifier = Modifier.height(8.dp))
-//
-//        Row(
-//            modifier = Modifier
-//                .fillMaxWidth()
-//                .focusGroup(),
-//            horizontalArrangement = Arrangement.SpaceEvenly
-//        ) {
-//            Button5(context)
-//        }
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusGroup(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Button5(context, onNavigate)
+            Button6(context)
+        }
     }
 }
+
 
 @Composable
 fun RowScope.Button1(context: Context, onNavigate: (String) -> Unit) {
@@ -256,13 +264,16 @@ fun RowScope.Button4(context: Context) {
 }
 
 @Composable
-fun RowScope.Button5(context: Context) {
+fun RowScope.Button5(context: Context, onNavigate: (String) -> Unit) {
     val colorPRIME = MaterialTheme.colorScheme.primary
     val colorSECOND = colorPRIME.copy(alpha = 0.5f)
     val buttonColor = remember { mutableStateOf(colorPRIME) }
 
     Button(
-        onClick = { handleButton5Click(context) },
+        onClick = {
+            onNavigate("Login")
+            handleButton5Click(context)
+                  },
         modifier = Modifier
             .weight(1f)
             .padding(8.dp)
@@ -277,9 +288,41 @@ fun RowScope.Button5(context: Context) {
         colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
         contentPadding = PaddingValues(2.dp)
     ) {
-        ButtonContent("Login", Icons.Default.Verified)
+        ButtonContent("Login Exp.", Icons.Default.Verified)
     }
 }
+
+@Composable
+fun RowScope.Button6(context: Context) {
+    val colorPRIME = MaterialTheme.colorScheme.primary
+    val colorSECOND = colorPRIME.copy(alpha = 0.5f)
+    val buttonColor = remember { mutableStateOf(colorPRIME) }
+
+    Button(
+        onClick = {
+            handleButton6Click(context)
+            val intent = Intent(context, ExoplayerActivity::class.java)
+            context.startActivity(intent)
+        },
+        modifier = Modifier
+            .weight(1f)
+            .padding(8.dp)
+            .onFocusChanged { focusState ->
+                buttonColor.value = if (focusState.isFocused) {
+                    colorSECOND
+                } else {
+                    colorPRIME
+                }
+            },
+        shape = RoundedCornerShape(8.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
+        contentPadding = PaddingValues(2.dp)
+    ) {
+        ButtonContent("Exoplayer Debug", Icons.Default.PlayCircleOutline)
+    }
+}
+
+
 
 fun handleButton1Click(context: Context) {
     Toast.makeText(context, "Caution: Experimental!\n May be unstable.", Toast.LENGTH_SHORT).show()
@@ -300,5 +343,9 @@ fun handleButton4Click(context: Context) {
 }
 
 fun handleButton5Click(context: Context) {
+    Toast.makeText(context, "Pending Implementation", Toast.LENGTH_SHORT).show()
+}
+
+fun handleButton6Click(context: Context) {
     Toast.makeText(context, "Pending Implementation", Toast.LENGTH_SHORT).show()
 }
