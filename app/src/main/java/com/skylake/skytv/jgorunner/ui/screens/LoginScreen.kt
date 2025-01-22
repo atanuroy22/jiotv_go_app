@@ -99,8 +99,8 @@ fun LoginScreen(context: Context) {
 
     val url = "$basefinURL/live/143.m3u8"
     var isUrlAvailable by remember { mutableStateOf(false) }
-    LaunchedEffect(url) {
-        isUrlAvailable(url) { isAvailable ->
+    LaunchedEffect(basefinURL) {
+        isUrlAvailable(basefinURL) { isAvailable ->
             isUrlAvailable = isAvailable
         }
     }
