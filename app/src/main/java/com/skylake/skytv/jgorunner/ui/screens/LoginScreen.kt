@@ -97,7 +97,6 @@ fun LoginScreen(context: Context) {
 
     val focusManager = LocalFocusManager.current
 
-    val url = "$basefinURL/live/143.m3u8"
     var isUrlAvailable by remember { mutableStateOf(false) }
     LaunchedEffect(basefinURL) {
         isUrlAvailable(basefinURL) { isAvailable ->
