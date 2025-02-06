@@ -2,6 +2,11 @@ package com.skylake.skytv.jgorunner.ui.screens
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Context.CONNECTIVITY_SERVICE
+import android.net.ConnectivityManager
+import android.net.LinkProperties
+import android.net.NetworkCapabilities
+import android.os.Build
 import android.util.Log
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -42,6 +47,7 @@ import com.skylake.skytv.jgorunner.core.execution.castMediaPlayer
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import org.json.JSONException
 import org.json.JSONObject
+import java.net.Inet4Address
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -277,9 +283,15 @@ private class CustomWebViewClient(
 //                    )
 
                     // Direct Streaming - only few channels are working
-                    castMediaPlayer(context, newPlayerURL)
 
-                } else {
+                     val ipAddress = getPublicJTVServerURL(context)
+                     fun ensureM3U8Suffix(url: String) = url.takeIf { it.endsWith(".m3u8") } ?: "$url.m3u8"
+                     val updatedUrl = ensureM3U8Suffix(newPlayerURL).replace("localhost", ipAddress)
+                     Log.d(TAG2, updatedUrl)
+                     castMediaPlayer(context, updatedUrl)
+
+
+                 } else {
                     Log.d(TAG,"Not connected to any device")
                     Toast.makeText(
                         context,
@@ -346,5 +358,41 @@ private class CustomWebViewClient(
                     "} " +
                     "})()"
         )
+    }
+
+    private fun getPublicJTVServerURL(context: Context): String {
+        val connectivityManager =
+            context.getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+        val activeNetwork = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            connectivityManager.activeNetwork
+        } else {
+            @Suppress("deprecation")
+            val networks = connectivityManager.allNetworks
+            if (networks.isNotEmpty()) networks[0] else null
+        }
+
+        if (activeNetwork != null) {
+            val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
+
+            // Check if the network is Wi-Fi or Ethernet
+            if (networkCapabilities != null &&
+                (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                        networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))) {
+
+                val linkProperties: LinkProperties? =
+                    connectivityManager.getLinkProperties(activeNetwork)
+                val ipAddresses = linkProperties?.linkAddresses
+                    ?.filter { it.address is Inet4Address } // Filter for IPv4 addresses
+                    ?.map { it.address.hostAddress }
+                val ipAddress = ipAddresses?.firstOrNull() // Get the first IPv4 address
+
+                if (ipAddress != null)
+                    return ipAddress
+            }
+
+        }
+
+        // No active network
+        return "0.0.0.0"
     }
 }
