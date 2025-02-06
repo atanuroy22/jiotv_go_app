@@ -43,7 +43,7 @@ import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.SessionManagerListener
 import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.core.execution.castMediaPlayer
-//import com.skylake.skytv.jgorunner.core.execution.crosscode
+import com.skylake.skytv.jgorunner.core.execution.crosscode
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import org.json.JSONException
 import org.json.JSONObject
@@ -275,20 +275,20 @@ private class CustomWebViewClient(
 //                 if (true) {
                 if (isSessionConnected.value) {
                     // Skipping CrossCode [FFMPEGKIT]
-//                    crosscode(
-//                        context = context,
-//                        videoUrl = newPlayerURL,
-//                        onProcessingStart = { isProcessing.value = true },
-//                        onProcessingEnd = { isProcessing.value = false }
-//                    )
+                    crosscode(
+                        context = context,
+                        videoUrl = newPlayerURL,
+                        onProcessingStart = { isProcessing.value = true },
+                        onProcessingEnd = { isProcessing.value = false }
+                    )
 
                     // Direct Streaming - only few channels are working
 
-                     val ipAddress = getPublicJTVServerURL(context)
-                     fun ensureM3U8Suffix(url: String) = url.takeIf { it.endsWith(".m3u8") } ?: "$url.m3u8"
-                     val updatedUrl = ensureM3U8Suffix(newPlayerURL).replace("localhost", ipAddress)
-                     Log.d(TAG2, updatedUrl)
-                     castMediaPlayer(context, updatedUrl)
+//                     val ipAddress = getPublicJTVServerURL(context)
+//                     fun ensureM3U8Suffix(url: String) = url.takeIf { it.endsWith(".m3u8") } ?: "$url.m3u8"
+//                     val updatedUrl = ensureM3U8Suffix(newPlayerURL).replace("localhost", ipAddress)
+//                     Log.d(TAG2, updatedUrl)
+//                     castMediaPlayer(context, updatedUrl)
 
 
                  } else {
