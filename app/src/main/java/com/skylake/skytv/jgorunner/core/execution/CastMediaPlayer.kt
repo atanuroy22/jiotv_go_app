@@ -1,6 +1,8 @@
 package com.skylake.skytv.jgorunner.core.execution
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.google.android.gms.cast.MediaInfo
 import com.google.android.gms.cast.MediaLoadRequestData
@@ -9,6 +11,10 @@ import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.media.RemoteMediaClient
 import com.skylake.skytv.jgorunner.data.SkySharedPref
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 fun castMediaPlayer(context: Context, videoUrl: String) {
     val TAG = "MediaPlayer-DIX"
@@ -16,7 +22,7 @@ fun castMediaPlayer(context: Context, videoUrl: String) {
     val remoteMediaClient: RemoteMediaClient? = castSession?.remoteMediaClient
     val prefManager = SkySharedPref.getInstance(context)
 
-    val currentChannelName1 = prefManager.myPrefs.castChannelName+""
+    val currentChannelName1 = prefManager.myPrefs.castChannelName?.takeIf { it.isNotEmpty() } ?: "Streaming"
 
     Log.d(TAG, currentChannelName1)
 
