@@ -1,5 +1,6 @@
 package com.skylake.skytv.jgorunner.ui.screens
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
@@ -107,6 +108,7 @@ data class AppInfo(
     val launchActivity: String
 )
 
+@SuppressLint("UseCompatLoadingForDrawables")
 fun getInstalledApps(context: Context): Flow<AppInfo> = flow {
     val packageManager: PackageManager = context.packageManager
 
@@ -130,9 +132,18 @@ fun getInstalledApps(context: Context): Flow<AppInfo> = flow {
     )
     emit(noneOption)
 
+    // Add TV-zone action
+    val tvOption = AppInfo(
+        appName = "New TV UI",
+        icon = context.getDrawable(R.mipmap.ic_launcher_neo)!!,
+        packageName = "tvzone",
+        launchActivity = ""
+    )
+    emit(tvOption)
+
     // Add WebTV action
     val webOption = AppInfo(
-        appName = "WEB TV",
+        appName = "WEB TV - {browser based}",
         icon = context.getDrawable(R.mipmap.ic_launcher_neo)!!,
         packageName = "webtv",
         launchActivity = ""
