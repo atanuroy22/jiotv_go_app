@@ -29,14 +29,23 @@ import androidx.media3.ui.PlayerView;
 
 import com.skylake.skytv.jgorunner.R;
 
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+
+
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class ExoplayerActivity extends ComponentActivity {
 
     private ExoPlayer player;
     private PlayerView playerView;
     private boolean isInPipMode = false;
+    private String current_play_id;
 
     @OptIn(markerClass = UnstableApi.class)
     @Override
@@ -65,7 +74,7 @@ public class ExoplayerActivity extends ComponentActivity {
 
         Intent intent = getIntent();
         String videoUrl = intent.getStringExtra("video_url");
-        String current_play_id = intent.getStringExtra("current_play_id");
+        current_play_id = intent.getStringExtra("current_play_id");
         String[] channelNumbersArray = getIntent().getStringArrayExtra("channels_list");
         List<String> channelNumbers = channelNumbersArray != null ? Arrays.asList(channelNumbersArray) : null;
         // For future usage
@@ -95,6 +104,12 @@ public class ExoplayerActivity extends ComponentActivity {
         player.setPlayWhenReady(true);
 
         hideControlsAfterDelay();
+
+        videoUrl = videoUrl.replace(".m3u8", "");
+        videoUrl = videoUrl.replace("live", "mpd");
+
+//        scrapeAndLogUrls(videoUrl);
+
     }
 
     private String formatVideoUrl(String videoUrl) {
@@ -199,6 +214,59 @@ public class ExoplayerActivity extends ComponentActivity {
         }
     }
 
+
+    private void scrapeAndLogUrls(String mpdUrl) {
+        new Thread(() -> {
+            try {
+                OkHttpClient client = new OkHttpClient();
+                Request request = new Request.Builder()
+                        .url(mpdUrl)
+                        .build();
+
+                Response response = client.newCall(request).execute();
+                assert response.body() != null;
+                String mpdContent = response.body().string();
+                Log.d("MPD_Scraper", "MPD URL: " + mpdUrl);
+
+                Log.d("MPD_Scraper", ": " + mpdContent);
+
+                String playUrl = extractPlayUrl(mpdContent);
+
+                String licenseUrl = extractLicenseUrl(mpdContent);
+
+                playUrl = playUrl.replace("\\/", "http://localhost:5350/");
+                playUrl = playUrl.replace("\\u0026", "&");
+
+                licenseUrl = licenseUrl.replace("\\/", "http://localhost:5350/");
+                licenseUrl = licenseUrl.replace("\\u0026", "&");
+
+
+                Log.d("MPD_Scraper", "Play URL: " + playUrl);
+                Log.d("MPD_Scraper", "License URL: " + licenseUrl);
+
+            } catch (IOException e) {
+                Log.e("MPD_Scraper", "Error scraping MPD: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    private String extractPlayUrl(String mpdContent) {
+        Pattern pattern = Pattern.compile("player\\.load\\(\"([^\"]*)\"\\)");
+        Matcher matcher = pattern.matcher(mpdContent);
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        return "Not Found";
+    }
+
+    private String extractLicenseUrl(String mpdContent) {
+        Pattern pattern = Pattern.compile("com\\.widevine\\.alpha\":\\s*\"([^\"]*)");
+        Matcher matcher = pattern.matcher(mpdContent);
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        return "Not Found";
+    }
+
+
 }
-
-

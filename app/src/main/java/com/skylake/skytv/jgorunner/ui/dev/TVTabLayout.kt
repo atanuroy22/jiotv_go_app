@@ -88,55 +88,53 @@ fun TVTabLayout(context: Context) {
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
-        if (!fetched) {
-            var attempts = 0
-            var success = false
+        var attempts = 0
+        var success = false
 
-            while (attempts < 2 && !success) {
-                attempts++
-                try {
-                    val response = ChannelUtils.fetchChannels("$basefinURL/channels")
-                    channelsResponse.value = response
+        while (attempts < 2 && !success) {
+            attempts++
+            try {
+                val response = ChannelUtils.fetchChannels("$basefinURL/channels")
+                channelsResponse.value = response
 
-                    if (response != null) {
-                        val categories = preferenceManager.myPrefs.filterCI
-                            ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
-                        val languages = preferenceManager.myPrefs.filterLI
-                            ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+                if (response != null) {
+                    val categories = preferenceManager.myPrefs.filterCI
+                        ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+                    val languages = preferenceManager.myPrefs.filterLI
+                        ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
 
-                        Log.d("DIX#2", "CAT:$categories, Lang:$languages")
+                    Log.d("DIX#2", "CAT:$categories, Lang:$languages")
 
-                        val filtered = when {
-                            categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(response)
-                            categories.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                                response,
-                                languageIds = languages?.mapNotNull { it.toIntOrNull() }.takeIf { it!!.isNotEmpty() }
-                            )
-                            languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                                response,
-                                categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
-                            )
-                            else -> ChannelUtils.filterChannels(
-                                response,
-                                categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() },
-                                languageIds = languages.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
-                            )
-                        }
-
-                        filteredChannels.value = filtered
-                        success = true
+                    val filtered = when {
+                        categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(response)
+                        categories.isNullOrEmpty() -> ChannelUtils.filterChannels(
+                            response,
+                            languageIds = languages?.mapNotNull { it.toIntOrNull() }.takeIf { it!!.isNotEmpty() }
+                        )
+                        languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
+                            response,
+                            categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
+                        )
+                        else -> ChannelUtils.filterChannels(
+                            response,
+                            categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() },
+                            languageIds = languages.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
+                        )
                     }
-                } catch (e: Exception) {
-                    Log.e("TVTabLayout", "Error fetching channels: ${e.message}")
-                }
 
-                if (!success) {
-                    kotlinx.coroutines.delay(300)
+                    filteredChannels.value = filtered
+                    success = true
                 }
+            } catch (e: Exception) {
+                Log.e("TVTabLayout", "Error fetching channels: ${e.message}")
             }
 
-            fetched = true
+            if (!success) {
+                kotlinx.coroutines.delay(300)
+            }
         }
+
+        fetched = true
     }
 
     LaunchedEffect(selectedChannel) {

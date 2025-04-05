@@ -111,9 +111,6 @@ class MainActivity : ComponentActivity() {
 
         val appPackageName = preferenceManager.myPrefs.iptvAppPackageName
 
-        preferenceManager.myPrefs.fetchedTV = false
-        preferenceManager.savePreferences()
-
         if (!appPackageName.isNullOrEmpty()) {
             if (appPackageName == "tvzone") {
                 preferenceManager.myPrefs.autoStartIPTV = false
@@ -122,7 +119,6 @@ class MainActivity : ComponentActivity() {
         }
 
         // DEL
-
 
 
         if (preferenceManager.myPrefs.iptvLaunchCountdown == 0) {
@@ -139,7 +135,6 @@ class MainActivity : ComponentActivity() {
             preferenceManager.myPrefs.filterLI = ""
             preferenceManager.myPrefs.filterCI = ""
             preferenceManager.myPrefs.operationMODE = -1
-            preferenceManager.myPrefs.fetchedTV = false
             preferenceManager.savePreferences()
         }
 
@@ -806,7 +801,7 @@ class MainActivity : ComponentActivity() {
             try {
                 runOnUiThread {
                     val appPackageName = preferenceManager.myPrefs.iptvAppPackageName
-                    if (!appPackageName.isNullOrEmpty()) {
+                    if (!appPackageName.isNullOrEmpty() && currentScreen != "Zone") {
                         Log.d("DIX", appPackageName)
                         val appName = preferenceManager.myPrefs.iptvAppName
 
@@ -914,9 +909,9 @@ class MainActivity : ComponentActivity() {
         // Retrieve the app package name from shared preferences
         val appPackageName = preferenceManager.myPrefs.iptvAppPackageName
 
-        if (!appPackageName.isNullOrEmpty()) {
+        if (!appPackageName.isNullOrEmpty() && currentScreen != "Zone") {
             Log.d("DIX", appPackageName)
-            // Retrieve other details
+
             val appLaunchActivity = preferenceManager.myPrefs.iptvAppLaunchActivity
             val appName = preferenceManager.myPrefs.iptvAppName
 
@@ -928,7 +923,7 @@ class MainActivity : ComponentActivity() {
             else if (appPackageName == "tvzone") {
                 Toast.makeText(this@MainActivity, "Starting TV", Toast.LENGTH_SHORT).show()
                 Log.d("DIX", "Opening TV")
-//                            currentScreen = "Zone"
+//                currentScreen = "Zone"
             }
             else {
                 if (!appLaunchActivity.isNullOrEmpty()) {
