@@ -1,5 +1,6 @@
 package com.skylake.skytv.jgorunner.ui.components
 
+import android.content.Intent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -9,6 +10,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import androidx.compose.ui.platform.LocalContext
+import com.skylake.skytv.jgorunner.activities.MainActivity
 import com.skylake.skytv.jgorunner.ui.dev.Helper
 
 
@@ -16,12 +18,14 @@ import com.skylake.skytv.jgorunner.ui.dev.Helper
 fun ModeSelectorPopup(
     isVisible: Boolean,
     onDismiss: () -> Unit,
-    onModeSelected: (Int) -> Unit
+    onModeSelected: (Int) -> Unit,
+    preferenceManager: SkySharedPref
 ) {
+
+
     if (isVisible) {
-        var selectedIndex by remember { mutableIntStateOf(0) }
+        var selectedIndex by remember { mutableIntStateOf(3) }
         val context = LocalContext.current
-        val preferenceManager = remember { SkySharedPref(context) }
 
         AlertDialog(
             onDismissRequest = { onDismiss() },
@@ -49,18 +53,28 @@ fun ModeSelectorPopup(
                     SingleChoiceSegmentedButtonRow(
                         modifier = Modifier.align(Alignment.CenterHorizontally)
                     ) {
-                        options.forEachIndexed { index, label ->
-                            SegmentedButton(
-                                shape = SegmentedButtonDefaults.itemShape(
-                                    index = index,
-                                    count = options.size
-                                ),
-                                onClick = { selectedIndex = index },
-                                selected = index == selectedIndex,
-                                label = { Text(label) },
-                                modifier = Modifier.width(IntrinsicSize.Min)
-                            )
-                        }
+                        SegmentedButton(
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                            onClick = { selectedIndex = 0
+                                preferenceManager.myPrefs.operationMODE = selectedIndex
+                                applySettings(preferenceManager)
+                                Helper.setEasyMode(context)
+                            },
+                            selected = 0 == selectedIndex,
+                            label = { Text("Easy") },
+                            modifier = Modifier.width(IntrinsicSize.Min)
+                        )
+
+                        SegmentedButton(
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                            onClick = { selectedIndex = 1
+                                preferenceManager.myPrefs.operationMODE = selectedIndex
+                                applySettings(preferenceManager)
+                                Helper.setExpertMode(context)},
+                            selected = 1 == selectedIndex,
+                            label = { Text("Expert") },
+                            modifier = Modifier.width(IntrinsicSize.Min)
+                        )
                     }
 
                     // Display info based on selected option
@@ -71,16 +85,12 @@ fun ModeSelectorPopup(
                                 Text("• Best for beginners")
                                 Text("• Default parameters")
                             }
-
-                            Helper.setEasyMode(context)
                         }
                         1 -> {
                             Column(horizontalAlignment = Alignment.Start) {
                                 Text("• Full control over all settings")
                                 Text("• Suited for advanced users")
                             }
-
-                            Helper.setExpertMode(context)
                         }
                     }
                 }
@@ -90,6 +100,10 @@ fun ModeSelectorPopup(
                     onClick = {
                         onModeSelected(selectedIndex)
                         onDismiss()
+                        val intent = Intent(context, MainActivity::class.java)
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(intent)
+                        android.os.Process.killProcess(android.os.Process.myPid())
                     }
                 ) {
                     Text("Confirm")
@@ -108,4 +122,7 @@ fun ModeSelectorPopup(
     }
 }
 
+fun applySettings(preferenceManager: SkySharedPref) {
+    preferenceManager.savePreferences()
+}
 

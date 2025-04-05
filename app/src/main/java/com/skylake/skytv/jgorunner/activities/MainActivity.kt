@@ -69,6 +69,7 @@ import java.io.File
 import java.net.Inet4Address
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import kotlin.system.exitProcess
 
 
 class MainActivity : ComponentActivity() {
@@ -110,6 +111,9 @@ class MainActivity : ComponentActivity() {
 
         val appPackageName = preferenceManager.myPrefs.iptvAppPackageName
 
+        preferenceManager.myPrefs.fetchedTV = false
+        preferenceManager.savePreferences()
+
         if (!appPackageName.isNullOrEmpty()) {
             if (appPackageName == "tvzone") {
                 preferenceManager.myPrefs.autoStartIPTV = false
@@ -118,6 +122,7 @@ class MainActivity : ComponentActivity() {
         }
 
         // DEL
+
 
 
         if (preferenceManager.myPrefs.iptvLaunchCountdown == 0) {
@@ -134,6 +139,7 @@ class MainActivity : ComponentActivity() {
             preferenceManager.myPrefs.filterLI = ""
             preferenceManager.myPrefs.filterCI = ""
             preferenceManager.myPrefs.operationMODE = -1
+            preferenceManager.myPrefs.fetchedTV = false
             preferenceManager.savePreferences()
         }
 
@@ -270,6 +276,8 @@ class MainActivity : ComponentActivity() {
                                             isServerRunning = false
                                             outputText = "Server stopped"
                                             finish()
+                                            android.os.Process.killProcess(android.os.Process.myPid())
+                                            exitProcess(0)
                                         }
                                     )
                                 },
@@ -425,6 +433,7 @@ class MainActivity : ComponentActivity() {
 
                         ModeSelectorPopup(
                             isVisible = showOperationDialog,
+                            preferenceManager = preferenceManager,
                             onModeSelected = {
                                 showOperationDialog = false
                             },

@@ -69,7 +69,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 
-
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
 fun TVTabLayout(context: Context) {
@@ -88,42 +87,55 @@ fun TVTabLayout(context: Context) {
 
     val focusRequester = remember { FocusRequester() }
 
-
     LaunchedEffect(Unit) {
-        if (true) {
-            scope.launch {
-                val response = ChannelUtils.fetchChannels("$basefinURL/channels")
-                channelsResponse.value = response
+        if (!fetched) {
+            var attempts = 0
+            var success = false
 
-                if (response != null) {
-                    val categories = preferenceManager.myPrefs.filterCI
-                        ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
-                    val languages = preferenceManager.myPrefs.filterLI
-                        ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+            while (attempts < 2 && !success) {
+                attempts++
+                try {
+                    val response = ChannelUtils.fetchChannels("$basefinURL/channels")
+                    channelsResponse.value = response
 
-                    Log.d("DIX#2", "CAT:$categories, Lang:$languages")
+                    if (response != null) {
+                        val categories = preferenceManager.myPrefs.filterCI
+                            ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+                        val languages = preferenceManager.myPrefs.filterLI
+                            ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
 
-                    val filtered = when {
-                        categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(response)
-                        categories.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                            response,
-                            languageIds = languages?.mapNotNull { it.toIntOrNull() }.takeIf { it!!.isNotEmpty() }
-                        )
-                        languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                            response,
-                            categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
-                        )
-                        else -> ChannelUtils.filterChannels(
-                            response,
-                            categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() },
-                            languageIds = languages.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
-                        )
+                        Log.d("DIX#2", "CAT:$categories, Lang:$languages")
+
+                        val filtered = when {
+                            categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(response)
+                            categories.isNullOrEmpty() -> ChannelUtils.filterChannels(
+                                response,
+                                languageIds = languages?.mapNotNull { it.toIntOrNull() }.takeIf { it!!.isNotEmpty() }
+                            )
+                            languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
+                                response,
+                                categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
+                            )
+                            else -> ChannelUtils.filterChannels(
+                                response,
+                                categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() },
+                                languageIds = languages.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
+                            )
+                        }
+
+                        filteredChannels.value = filtered
+                        success = true
                     }
-
-                    filteredChannels.value = filtered
+                } catch (e: Exception) {
+                    Log.e("TVTabLayout", "Error fetching channels: ${e.message}")
                 }
-                fetched = true
+
+                if (!success) {
+                    kotlinx.coroutines.delay(300)
+                }
             }
+
+            fetched = true
         }
     }
 
@@ -133,7 +145,6 @@ fun TVTabLayout(context: Context) {
             epgData = ChannelUtils.fetchEpg(epgURLc)
         }
     }
-
 
     if (!fetched) {
         Box(
@@ -145,7 +156,6 @@ fun TVTabLayout(context: Context) {
             )
         }
     } else {
-
         // Content Above the Grid (EPG Details)
         if (epgData != null) {
             Column(
@@ -187,7 +197,6 @@ fun TVTabLayout(context: Context) {
                                 style = TextStyle(fontSize = 12.sp),
                                 maxLines = 3
                             )
-
                         } else {
                             Text(
                                 text = selectedChannel?.channel_name ?: "No channel selected",
@@ -203,17 +212,15 @@ fun TVTabLayout(context: Context) {
                     GlideImage(
                         model = "$basefinURL/jtvposter/${epgData?.episodePoster}",
                         contentDescription = null,
-                        modifier = Modifier
-                            .height(75.dp),
+                        modifier = Modifier.height(75.dp),
                         contentScale = ContentScale.Fit,
                     )
                 }
             }
-
-
         } else {
             Log.d("HANA4k", "EPG ERROR")
         }
+
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 100.dp),
             contentPadding = PaddingValues(16.dp),
@@ -244,22 +251,25 @@ fun TVTabLayout(context: Context) {
                         }
                         .clickable {
                             Log.d("HT", channel.channel_name)
-                            val intent = Intent(context, ExoplayerActivity::class.java).apply {
-                                putExtra("video_url", channel.channel_url)
-                            }
+                            val intent =
+                                Intent(context, ExoplayerActivity::class.java).apply {
+                                    putExtra("video_url", channel.channel_url)
+                                }
                             startActivity(context, intent, null)
 
-                            val recentChannelsJson = preferenceManager.myPrefs.recentChannels
-                            val type = object : TypeToken<List<Channel>>() {}.type
+                            val recentChannelsJson =
+                                preferenceManager.myPrefs.recentChannels
+                            val type =
+                                object : TypeToken<List<Channel>>() {}.type
                             val recentChannels: MutableList<Channel> =
-                                Gson().fromJson(recentChannelsJson, type)
-                                    ?: mutableListOf()
+                                Gson().fromJson(recentChannelsJson, type) ?: mutableListOf()
 
                             val existingIndex =
                                 recentChannels.indexOfFirst { it.channel_id == channel.channel_id }
 
                             if (existingIndex != -1) {
-                                val existingChannel = recentChannels[existingIndex]
+                                val existingChannel =
+                                    recentChannels[existingIndex]
                                 recentChannels.removeAt(existingIndex)
                                 recentChannels.add(0, existingChannel)
                             } else {
@@ -269,13 +279,18 @@ fun TVTabLayout(context: Context) {
                                 }
                             }
 
-                            val gson = Gson()
-                            val recentChannelsJsonx = gson.toJson(recentChannels)
-                            preferenceManager.myPrefs.recentChannels = recentChannelsJsonx
+                            val gson =
+                                Gson()
+                            val recentChannelsJsonx =
+                                gson.toJson(recentChannels)
+                            preferenceManager.myPrefs.recentChannels =
+                                recentChannelsJsonx
                             preferenceManager.savePreferences()
                         },
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    colors =
+                    CardDefaults.cardColors(
+                        containerColor =
+                        MaterialTheme.colorScheme.primaryContainer,
                     )
                 ) {
                     Column {
@@ -284,19 +299,24 @@ fun TVTabLayout(context: Context) {
                             "http://localhost:${SkySharedPref.getInstance(context).myPrefs.jtvGoServerPort}/jtvimage/${channel.logoUrl}"
 
                         GlideImage(
-                            model = imageUrl,
-                            contentDescription = channel.channel_name,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(80.dp),
-                            contentScale = ContentScale.Fit
+                            model =
+                            imageUrl,
+                            contentDescription =
+                            channel.channel_name,
+                            modifier =
+                            Modifier.fillMaxWidth().height(80.dp),
+                            contentScale =
+                            ContentScale.Fit
                         )
 
                         // Title
                         Text(
-                            text = channel.channel_name,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(8.dp)
+                            text =
+                            channel.channel_name,
+                            fontSize =
+                            12.sp,
+                            modifier =
+                            Modifier.padding(8.dp)
                         )
                     }
                 }

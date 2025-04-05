@@ -136,7 +136,8 @@ class SkySharedPref(context: Context) {
         @SharedPrefKey("lastFetchTime") var lastFetchTime: Int? = 0,
         @SharedPrefKey("currentPort") var currentPort: Int = 0,
         @SharedPrefKey("recentChannels") var recentChannels: String? = null,
-        @SharedPrefKey("operationMODE") var operationMODE: Int = 999
+        @SharedPrefKey("operationMODE") var operationMODE: Int = 999,
+        @SharedPrefKey("fetchedTV") var fetchedTV: Boolean = false,
     )
 
     // Annotation class to define the key for SharedPreferences

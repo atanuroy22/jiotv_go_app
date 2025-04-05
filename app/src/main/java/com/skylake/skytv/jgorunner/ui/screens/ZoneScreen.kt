@@ -69,15 +69,15 @@ import kotlin.random.Random
 @Composable
 fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
 
-    val activity = context as? androidx.activity.ComponentActivity
-    LaunchedEffect(Unit) {
-        activity?.window?.let { window ->
-            WindowCompat.setDecorFitsSystemWindows(window, false)
-            val controller = window.insetsController
-            controller?.hide(WindowInsets.Type.systemBars())
-            controller?.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
-    }
+//    val activity = context as? androidx.activity.ComponentActivity
+//    LaunchedEffect(Unit) {
+//        activity?.window?.let { window ->
+//            WindowCompat.setDecorFitsSystemWindows(window, false)
+//            val controller = window.insetsController
+//            controller?.hide(WindowInsets.Type.systemBars())
+//            controller?.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+//        }
+//    }
 
     data class TabItem(val text: String, val icon: ImageVector)
     var showModeDialog by remember { mutableStateOf(false) }

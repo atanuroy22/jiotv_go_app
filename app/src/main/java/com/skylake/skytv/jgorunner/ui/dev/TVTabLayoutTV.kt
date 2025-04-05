@@ -75,40 +75,54 @@ fun TVTabLayoutTV(context: Context) {
 
 
     LaunchedEffect(Unit) {
-        if (true) {
-            scope.launch {
-                val response = ChannelUtils.fetchChannels("$basefinURL/channels")
-                channelsResponse.value = response
+        if (!fetched) {
+            var attempts = 0
+            var success = false
 
-                if (response != null) {
-                    val categories = preferenceManager.myPrefs.filterCI
-                        ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
-                    val languages = preferenceManager.myPrefs.filterLI
-                        ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+            while (attempts < 2 && !success) {
+                attempts++
+                try {
+                    val response = ChannelUtils.fetchChannels("$basefinURL/channels")
+                    channelsResponse.value = response
 
-                    Log.d("DIX#2", "CAT:$categories, Lang:$languages")
+                    if (response != null) {
+                        val categories = preferenceManager.myPrefs.filterCI
+                            ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+                        val languages = preferenceManager.myPrefs.filterLI
+                            ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
 
-                    val filtered = when {
-                        categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(response)
-                        categories.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                            response,
-                            languageIds = languages?.mapNotNull { it.toIntOrNull() }.takeIf { it!!.isNotEmpty() }
-                        )
-                        languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                            response,
-                            categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
-                        )
-                        else -> ChannelUtils.filterChannels(
-                            response,
-                            categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() },
-                            languageIds = languages.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
-                        )
+                        Log.d("DIX#2", "CAT:$categories, Lang:$languages")
+
+                        val filtered = when {
+                            categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(response)
+                            categories.isNullOrEmpty() -> ChannelUtils.filterChannels(
+                                response,
+                                languageIds = languages?.mapNotNull { it.toIntOrNull() }.takeIf { it!!.isNotEmpty() }
+                            )
+                            languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
+                                response,
+                                categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
+                            )
+                            else -> ChannelUtils.filterChannels(
+                                response,
+                                categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() },
+                                languageIds = languages.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
+                            )
+                        }
+
+                        filteredChannels.value = filtered
+                        success = true
                     }
-
-                    filteredChannels.value = filtered
+                } catch (e: Exception) {
+                    Log.e("TVTabLayout", "Error fetching channels: ${e.message}")
                 }
-                fetched = true
+
+                if (!success) {
+                    kotlinx.coroutines.delay(300)
+                }
             }
+
+            fetched = true
         }
     }
 
