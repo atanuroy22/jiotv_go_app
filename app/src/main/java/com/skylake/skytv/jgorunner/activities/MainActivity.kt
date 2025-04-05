@@ -45,6 +45,7 @@ import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.BinaryService
 import com.skylake.skytv.jgorunner.ui.components.BottomNavigationBar
 import com.skylake.skytv.jgorunner.ui.components.CustPopup
+import com.skylake.skytv.jgorunner.ui.components.ModeSelectorPopup
 import com.skylake.skytv.jgorunner.ui.components.LoginPopup
 import com.skylake.skytv.jgorunner.ui.components.ProgressPopup
 import com.skylake.skytv.jgorunner.ui.components.RedirectPopup
@@ -55,6 +56,7 @@ import com.skylake.skytv.jgorunner.ui.screens.InfoScreen
 import com.skylake.skytv.jgorunner.ui.screens.LoginScreen
 import com.skylake.skytv.jgorunner.ui.screens.RunnerScreen
 import com.skylake.skytv.jgorunner.ui.screens.SettingsScreen
+import com.skylake.skytv.jgorunner.ui.screens.ZoneScreen
 import com.skylake.skytv.jgorunner.ui.theme.JGOTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -98,9 +100,25 @@ class MainActivity : ComponentActivity() {
     private var downloadProgress by mutableStateOf<DownloadProgress?>(null)
     private var isSwitchOnForAutoStartForeground by mutableStateOf(false)
 
+    private var showOperationDialog by mutableStateOf(false)
+
     override fun onStart() {
         super.onStart()
         preferenceManager = SkySharedPref.getInstance(this)
+
+        // DEL
+
+        val appPackageName = preferenceManager.myPrefs.iptvAppPackageName
+
+        if (!appPackageName.isNullOrEmpty()) {
+            if (appPackageName == "tvzone") {
+                preferenceManager.myPrefs.autoStartIPTV = false
+                currentScreen = "Zone"
+            }
+        }
+
+        // DEL
+
 
         if (preferenceManager.myPrefs.iptvLaunchCountdown == 0) {
             preferenceManager.myPrefs.iptvLaunchCountdown = 4
@@ -111,7 +129,16 @@ class MainActivity : ComponentActivity() {
             preferenceManager.myPrefs.filterQ = ""
             preferenceManager.myPrefs.filterL = ""
             preferenceManager.myPrefs.filterC = ""
+            preferenceManager.myPrefs.filterLX = ""
+            preferenceManager.myPrefs.filterCX = ""
+            preferenceManager.myPrefs.filterLI = ""
+            preferenceManager.myPrefs.filterCI = ""
+            preferenceManager.myPrefs.operationMODE = -1
             preferenceManager.savePreferences()
+        }
+
+        if (preferenceManager.myPrefs.operationMODE == -1) {
+            showOperationDialog = true
         }
 
         JTVConfigurationManager.getInstance(this).saveJTVConfiguration()
@@ -181,7 +208,11 @@ class MainActivity : ComponentActivity() {
             JGOTheme {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                    bottomBar = { BottomNavigationBar(setCurrentScreen = { currentScreen = it }) },
+                    bottomBar = {
+                        if (currentScreen != "Zone") {
+                            BottomNavigationBar(setCurrentScreen = { currentScreen = it })
+                        }
+                    },
                 ) { innerPadding ->
                     Column(
                         modifier = Modifier
@@ -226,7 +257,7 @@ class MainActivity : ComponentActivity() {
                                     startActivity(intent)
                                 },
                                 onDebugButtonClick = {
-                                    currentScreen = "Debug"
+                                    currentScreen = "Zone"
 //                                    val intent =
 //                                        Intent(this@MainActivity, CastActivity::class.java)
 //                                    startActivity(intent)
@@ -258,6 +289,20 @@ class MainActivity : ComponentActivity() {
                                     }
                                 })
 
+                            "SettingsTV" -> SettingsScreen(
+                                activity = this@MainActivity,
+                                checkForUpdates = { checkForUpdates(true) },
+                                isSwitchOnForAutoStartForeground = isSwitchOnForAutoStartForeground,
+                                onAutoStartForegroundSwitch = {
+                                    if (it) {
+                                        requestOverlayPermission()
+                                    } else {
+                                        preferenceManager.myPrefs.autoStartOnBootForeground = false
+                                        preferenceManager.savePreferences()
+                                        isSwitchOnForAutoStartForeground = false
+                                    }
+                                })
+
                             "Info" -> InfoScreen(context = this@MainActivity)
                             "Debug" -> DebugScreen(
                                 context = this@MainActivity,
@@ -266,6 +311,7 @@ class MainActivity : ComponentActivity() {
                             "Runner" -> RunnerScreen(context = this@MainActivity)
                             "Login" -> LoginScreen(context = this@MainActivity)
                             "Cast" -> CastScreen(context = this@MainActivity)
+                            "Zone" -> ZoneScreen(context = this@MainActivity, onNavigate = { title -> currentScreen = title })
                         }
 
                         // Show the redirect popup
@@ -376,6 +422,18 @@ class MainActivity : ComponentActivity() {
                                 ).show()
                             }
                         )
+
+                        ModeSelectorPopup(
+                            isVisible = showOperationDialog,
+                            onModeSelected = {
+                                showOperationDialog = false
+                            },
+                            onDismiss = {
+                                showOperationDialog = false
+                            }
+                        )
+
+
                     }
                 }
             }
@@ -395,6 +453,10 @@ class MainActivity : ComponentActivity() {
                     currentScreen = "Home"
                 }
 
+                "SettingsTV" -> {
+                    currentScreen = "Zone"
+                }
+
                 "Debug" -> {
                     currentScreen = "Home"
                 }
@@ -408,6 +470,10 @@ class MainActivity : ComponentActivity() {
                 }
 
                 "Login" -> {
+                    currentScreen = "Debug"
+                }
+
+                "Zone" -> {
                     currentScreen = "Debug"
                 }
 
@@ -647,7 +713,8 @@ class MainActivity : ComponentActivity() {
 
                         var countdownTime = preferenceManager.myPrefs.iptvLaunchCountdown
                         countdownJob = CoroutineScope(Dispatchers.Main).launch {
-                            showRedirectPopup = true
+                            showRedirectPopup = (currentScreen != "Zone")
+
                             shouldLaunchIPTV = true
 
                             while (countdownTime > 0) {
@@ -674,7 +741,7 @@ class MainActivity : ComponentActivity() {
 
                             var countdownTime = preferenceManager.myPrefs.iptvLaunchCountdown
                             countdownJob = CoroutineScope(Dispatchers.Main).launch {
-                                showRedirectPopup = true
+                                showRedirectPopup = (currentScreen != "Zone")
                                 shouldLaunchIPTV = true
 
                                 while (countdownTime > 0) {
@@ -736,27 +803,24 @@ class MainActivity : ComponentActivity() {
 
                         if (appPackageName == "webtv") {
                             val intent = Intent(this@MainActivity, WebPlayerActivity::class.java)
-                            Toast.makeText(this@MainActivity, "Opening WEBTV", Toast.LENGTH_SHORT)
-                                .show()
+                            Toast.makeText(this@MainActivity, "Opening WEBTV", Toast.LENGTH_SHORT).show()
                             Log.d("DIX", "Opening WEBTV")
                             startActivity(intent)
-                        } else {
-                            val launchIntent =
-                                packageManager.getLaunchIntentForPackage(appPackageName)
+                        }
+                        else if (appPackageName == "tvzone") {
+                            Toast.makeText(this@MainActivity, "Starting TV", Toast.LENGTH_SHORT).show()
+                            Log.d("DIX", "Opening TV")
+//                            currentScreen = "Zone"
+
+                        }
+                        else {
+                            val launchIntent = packageManager.getLaunchIntentForPackage(appPackageName)
                             launchIntent?.let {
-                                Toast.makeText(
-                                    this@MainActivity,
-                                    "Opening $appName",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                Toast.makeText(this@MainActivity, "Opening $appName", Toast.LENGTH_SHORT).show()
                                 Log.d("DIX", "Opening $appName")
                                 startActivity(it)
                             } ?: run {
-                                Toast.makeText(
-                                    this@MainActivity,
-                                    "Cannot find the specified application",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                Toast.makeText(this@MainActivity, "Cannot find the specified application", Toast.LENGTH_SHORT).show()
                                 Log.d("DIX", "Cannot find the specified application")
                             }
                         }
@@ -851,7 +915,13 @@ class MainActivity : ComponentActivity() {
                 val intent = Intent(this@MainActivity, WebPlayerActivity::class.java)
                 startActivity(intent)
                 Toast.makeText(this@MainActivity, "Starting: $appName", Toast.LENGTH_SHORT).show()
-            } else {
+            }
+            else if (appPackageName == "tvzone") {
+                Toast.makeText(this@MainActivity, "Starting TV", Toast.LENGTH_SHORT).show()
+                Log.d("DIX", "Opening TV")
+//                            currentScreen = "Zone"
+            }
+            else {
                 if (!appLaunchActivity.isNullOrEmpty()) {
                     Log.d("DIX", appLaunchActivity)
                     // Create an intent to launch the app

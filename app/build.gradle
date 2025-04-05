@@ -86,6 +86,13 @@ dependencies {
 //    Skipping FFMPEG
 //    implementation 'com.arthenica:ffmpeg-kit-min:6.0-2'
 
+    implementation libs.androidx.tv.foundation
+    implementation libs.androidx.tv.material
+
+    implementation libs.okhttp
+    implementation(libs.compose)
+
+
     testImplementation libs.junit
 
     androidTestImplementation libs.androidx.junit

@@ -29,6 +29,7 @@ import androidx.compose.material.icons.automirrored.twotone.ExitToApp
 import androidx.compose.material.icons.twotone.Cast
 import androidx.compose.material.icons.twotone.CastConnected
 import androidx.compose.material.icons.twotone.Deblur
+import androidx.compose.material.icons.twotone.Landscape
 import androidx.compose.material.icons.twotone.LiveTv
 import androidx.compose.material.icons.twotone.PlayArrow
 import androidx.compose.material.icons.twotone.ResetTv
@@ -381,7 +382,7 @@ fun RowScope.DebugButton(
         contentPadding = PaddingValues(2.dp),
         enabled = enabled
     ) {
-        ButtonContent("Debug", Icons.TwoTone.Deblur)
+        ButtonContent("TV", Icons.TwoTone.Landscape)
     }
 }
 

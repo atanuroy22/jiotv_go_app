@@ -8,7 +8,7 @@ import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.memberProperties
 import kotlin.reflect.jvm.isAccessible
 
-class SkySharedPref private constructor(context: Context) {
+class SkySharedPref(context: Context) {
     companion object {
         private const val PREF_NAME = "SkySharedPref"
 
@@ -125,9 +125,18 @@ class SkySharedPref private constructor(context: Context) {
         @SharedPrefKey("filterQ") var filterQ: String? = null,
         @SharedPrefKey("filterL") var filterL: String? = null,
         @SharedPrefKey("filterC") var filterC: String? = null,
+        @SharedPrefKey("filterQX") var filterQX: String? = null,
+        @SharedPrefKey("filterLX") var filterLX: String? = null,
+        @SharedPrefKey("filterCX") var filterCX: String? = null,
+        @SharedPrefKey("filterLI") var filterLI: String? = null,
+        @SharedPrefKey("filterCI") var filterCI: String? = null,
         @SharedPrefKey("login_chk") var loginChk: Boolean = true,
         @SharedPrefKey("cast_channel_name") var castChannelName: String? = "",
         @SharedPrefKey("cast_channel_logo") var castChannelLogo: String? = "",
+        @SharedPrefKey("lastFetchTime") var lastFetchTime: Int? = 0,
+        @SharedPrefKey("currentPort") var currentPort: Int = 0,
+        @SharedPrefKey("recentChannels") var recentChannels: String? = null,
+        @SharedPrefKey("operationMODE") var operationMODE: Int = 999
     )
 
     // Annotation class to define the key for SharedPreferences

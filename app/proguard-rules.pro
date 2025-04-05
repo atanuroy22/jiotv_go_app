@@ -31,3 +31,33 @@
 
 # Keep the SharedPrefKey annotation
 -keep @interface com.skylake.skytv.jgorunner.data.SkySharedPref$SharedPrefKey
+
+
+# Keep the no-args constructor of the deserialized class
+-keepclassmembers class com.skylake.skytv.jgorunner.ui.dev.Channel {
+  <init>(...);
+}
+
+-keepclassmembers class com.skylake.skytv.jgorunner.ui.dev.ChannelResponse {
+  <init>(...);
+}
+
+-keepclassmembers class com.skylake.skytv.jgorunner.ui.dev.EpgProgram {
+  <init>(...);
+}
+
+-keepclassmembers class com.skylake.skytv.jgorunner.ui.dev.EpgResponse {
+  <init>(...);
+}
+
+-keep class com.skylake.skytv.jgorunner.ui.dev.Channel
+-keep class com.skylake.skytv.jgorunner.ui.dev.ChannelResponse
+-keep class com.skylake.skytv.jgorunner.ui.dev.EpgProgram
+-keep class com.skylake.skytv.jgorunner.ui.dev.EpgResponse
+
+
+
+
+
+
+

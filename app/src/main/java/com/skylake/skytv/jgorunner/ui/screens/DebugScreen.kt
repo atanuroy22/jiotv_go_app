@@ -135,7 +135,7 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
 
-            Button7(context)
+            Button7(context, onNavigate)
             Button8(context)
         }
 
@@ -324,14 +324,14 @@ fun RowScope.Button6(context: Context) {
 }
 
 @Composable
-fun RowScope.Button7(context: Context) {
+fun RowScope.Button7(context: Context, onNavigate: (String) -> Unit) {
     val colorPRIME = MaterialTheme.colorScheme.primary
     val colorSECOND = colorPRIME.copy(alpha = 0.5f)
     val buttonColor = remember { mutableStateOf(colorPRIME) }
 
     Button(
         onClick = {
-            handleButton7Click(context)
+            handleButton7Click(context, onNavigate)
         },
         modifier = Modifier
             .weight(1f)
@@ -413,7 +413,8 @@ fun handleButton6Click(context: Context) {
     context.startActivity(intent)
 }
 
-fun handleButton7Click(context: Context) {
+fun handleButton7Click(context: Context, onNavigate: (String) -> Unit) {
+    onNavigate("Zone")
     Toast.makeText(context, "Pending Implementation", Toast.LENGTH_SHORT).show()
 }
 

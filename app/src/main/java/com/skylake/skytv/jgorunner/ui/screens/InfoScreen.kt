@@ -109,7 +109,7 @@ fun getAppVersion(context: Context): String {
     }
 }
 
-// Helper function to get the IP address from WifiManager
+// com.skylake.skytv.jgorunner.ui.dev.Helper function to get the IP address from WifiManager
 fun getIpAddress(wifiManager: WifiManager): String {
     @Suppress("deprecation")
     val ip = wifiManager.connectionInfo.ipAddress
@@ -127,20 +127,20 @@ fun getIpAddress(wifiManager: WifiManager): String {
     }
 }
 
-// Helper function to get the total storage space
+// com.skylake.skytv.jgorunner.ui.dev.Helper function to get the total storage space
 fun getTotalStorageSpace(context: Context): Long {
     val stat = android.os.StatFs(context.filesDir.absolutePath)
     val bytesAvailable = stat.blockSizeLong * stat.blockCountLong
     return bytesAvailable / (1024 * 1024 * 1024) // Convert to GB
 }
 
-// Helper function to get the current date and time
+// com.skylake.skytv.jgorunner.ui.dev.Helper function to get the current date and time
 fun getCurrentDateTime(): String {
     val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
     return sdf.format(Date())
 }
 
-// Helper function to copy text to clipboard
+// com.skylake.skytv.jgorunner.ui.dev.Helper function to copy text to clipboard
 fun copyToClipboard(context: Context, text: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     val clip = ClipData.newPlainText("Device Info", text)
