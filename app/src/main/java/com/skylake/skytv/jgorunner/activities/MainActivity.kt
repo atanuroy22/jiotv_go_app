@@ -12,6 +12,8 @@ import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
@@ -45,7 +47,7 @@ import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.BinaryService
 import com.skylake.skytv.jgorunner.ui.components.BottomNavigationBar
 import com.skylake.skytv.jgorunner.ui.components.CustPopup
-import com.skylake.skytv.jgorunner.ui.components.ModeSelectorPopup
+import com.skylake.skytv.jgorunner.ui.components.JTVModeSelectorPopup
 import com.skylake.skytv.jgorunner.ui.components.LoginPopup
 import com.skylake.skytv.jgorunner.ui.components.ProgressPopup
 import com.skylake.skytv.jgorunner.ui.components.RedirectPopup
@@ -138,8 +140,14 @@ class MainActivity : ComponentActivity() {
             preferenceManager.savePreferences()
         }
 
+        if (preferenceManager.myPrefs.jtvGoBinaryVersion != "v0.0.0") {
+            preferenceManager.myPrefs.operationMODE = 1
+        }
+
         if (preferenceManager.myPrefs.operationMODE == -1) {
-            showOperationDialog = true
+            val intent = Intent(this, FirstModeSelectorActivity::class.java)
+            this.startActivity(intent)
+//            showOperationDialog = true
         }
 
         JTVConfigurationManager.getInstance(this).saveJTVConfiguration()
@@ -168,6 +176,8 @@ class MainActivity : ComponentActivity() {
             )
         }
     }
+
+
 
     override fun onResume() {
         super.onResume()
@@ -426,7 +436,7 @@ class MainActivity : ComponentActivity() {
                             }
                         )
 
-                        ModeSelectorPopup(
+                        JTVModeSelectorPopup(
                             isVisible = showOperationDialog,
                             preferenceManager = preferenceManager,
                             onModeSelected = {
@@ -603,6 +613,17 @@ class MainActivity : ComponentActivity() {
                             preferenceManager.myPrefs.jtvGoBinaryName = latestBinaryReleaseInfo.name
                             preferenceManager.savePreferences()
                             this@MainActivity.downloadProgress = null
+
+                            Handler(Looper.getMainLooper()).postDelayed({
+                                if (preferenceManager.myPrefs.operationMODE == 0) {
+                                    val intent = Intent(this@MainActivity, MainActivity::class.java)
+                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    this@MainActivity.startActivity(intent)
+                                    android.os.Process.killProcess(android.os.Process.myPid())
+                                }
+                            }, 500)
+
+
                         }
 
                         else -> {

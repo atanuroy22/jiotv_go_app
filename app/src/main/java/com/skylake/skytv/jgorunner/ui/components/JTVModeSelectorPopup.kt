@@ -15,7 +15,7 @@ import com.skylake.skytv.jgorunner.ui.dev.Helper
 
 
 @Composable
-fun ModeSelectorPopup(
+fun JTVModeSelectorPopup(
     isVisible: Boolean,
     onDismiss: () -> Unit,
     onModeSelected: (Int) -> Unit,
