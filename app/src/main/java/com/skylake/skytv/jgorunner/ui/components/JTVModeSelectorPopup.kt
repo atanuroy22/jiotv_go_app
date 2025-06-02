@@ -1,6 +1,9 @@
 package com.skylake.skytv.jgorunner.ui.components
 
+import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,13 +22,14 @@ fun JTVModeSelectorPopup(
     isVisible: Boolean,
     onDismiss: () -> Unit,
     onModeSelected: (Int) -> Unit,
-    preferenceManager: SkySharedPref
+    preferenceManager: SkySharedPref,
+    context: Context
 ) {
 
 
     if (isVisible) {
         var selectedIndex by remember { mutableIntStateOf(3) }
-        val context = LocalContext.current
+
 
         AlertDialog(
             onDismissRequest = { onDismiss() },
@@ -46,7 +50,7 @@ fun JTVModeSelectorPopup(
                         style = MaterialTheme.typography.bodyLarge
                     )
                     val options = listOf(
-                        "Easy",
+                        "Simple",
                         "Expert"
                     )
 
@@ -61,7 +65,7 @@ fun JTVModeSelectorPopup(
                                 Helper.setEasyMode(context)
                             },
                             selected = 0 == selectedIndex,
-                            label = { Text("Easy") },
+                            label = { Text("Simple") },
                             modifier = Modifier.width(IntrinsicSize.Min)
                         )
 
@@ -100,10 +104,16 @@ fun JTVModeSelectorPopup(
                     onClick = {
                         onModeSelected(selectedIndex)
                         onDismiss()
-                        val intent = Intent(context, MainActivity::class.java)
-                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        context.startActivity(intent)
-                        android.os.Process.killProcess(android.os.Process.myPid())
+
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            if (preferenceManager.myPrefs.operationMODE == 0) {
+                                val intent = Intent(context, context::class.java)
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                context.startActivity(intent)
+                                android.os.Process.killProcess(android.os.Process.myPid())
+                            }
+                        }, 500)
+
                     }
                 ) {
                     Text("Confirm")
