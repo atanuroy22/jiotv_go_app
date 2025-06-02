@@ -135,7 +135,7 @@ fun getInstalledApps(context: Context): Flow<AppInfo> = flow {
     // Add TV-zone action
     val tvOption = AppInfo(
         appName = "New TV UI",
-        icon = context.getDrawable(R.mipmap.ic_launcher_neo)!!,
+        icon = context.getDrawable(R.mipmap.ic_launcher_neodark)!!,
         packageName = "tvzone",
         launchActivity = ""
     )

@@ -50,7 +50,7 @@ fun FirstModeSelectorScreen(
                         Helper.setEasyMode(context)
                     },
                     shape = SegmentedButtonDefaults.itemShape(0, 2),
-                    label = { Text("Easy") }
+                    label = { Text("Simple") }
                 )
                 SegmentedButton(
                     selected = selectedIndex == 1,
