@@ -15,10 +15,10 @@ object Helper {
 
     fun setEasyMode(context: Context) {
         val preferenceManager = SkySharedPref(context)
-        Toast.makeText(context, "Setting operation mode to EASY", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "Setting operation mode to SIMPLE", Toast.LENGTH_SHORT).show()
 //        Toast.makeText(context, "Applying default settings", Toast.LENGTH_SHORT).show()
         Toast.makeText(context, "Restart JTV-Go App", Toast.LENGTH_LONG).show()
-        Log.d(TAG, "Setting operation mode to EASY")
+        Log.d(TAG, "Setting operation mode to SIMPLE")
 
         preferenceManager.myPrefs.autoStartServer = true
         preferenceManager.myPrefs.loginChk = true
