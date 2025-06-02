@@ -14,6 +14,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
@@ -32,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.skylake.skytv.jgorunner.core.update.DownloadModelNew
 import com.skylake.skytv.jgorunner.BuildConfig
 import com.skylake.skytv.jgorunner.core.checkServerStatus
@@ -74,6 +76,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
 
+
 class MainActivity : ComponentActivity() {
     companion object {
         private const val TAG = "JTVGo::MainActivity"
@@ -105,11 +108,15 @@ class MainActivity : ComponentActivity() {
 
     private var showOperationDialog by mutableStateOf(false)
 
+    private var isSwitchDarkMode by mutableStateOf(false)
+
     override fun onStart() {
         super.onStart()
         preferenceManager = SkySharedPref.getInstance(this)
 
         // DEL
+
+//        currentScreen = "Info"
 
         val appPackageName = preferenceManager.myPrefs.iptvAppPackageName
 
@@ -140,12 +147,12 @@ class MainActivity : ComponentActivity() {
             preferenceManager.savePreferences()
         }
 
-        if (preferenceManager.myPrefs.jtvGoBinaryVersion != "v0.0.0") {
-            preferenceManager.myPrefs.operationMODE = 1
+        if (preferenceManager.myPrefs.operationMODE == null || (preferenceManager.myPrefs.operationMODE == 999)) {
+            preferenceManager.myPrefs.operationMODE = 1;
         }
 
         if (preferenceManager.myPrefs.operationMODE == -1) {
-            val intent = Intent(this, FirstModeSelectorActivity::class.java)
+            val intent = Intent(this, InitModeSelectorActivity::class.java)
             this.startActivity(intent)
 //            showOperationDialog = true
         }
@@ -188,15 +195,35 @@ class MainActivity : ComponentActivity() {
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         requestNotificationPermissions()
         preferenceManager = SkySharedPref.getInstance(this)
+
+        isSwitchDarkMode = preferenceManager.myPrefs.darkMODE
+
         isSwitchOnForAutoStartForeground = preferenceManager.myPrefs.autoStartOnBootForeground
         if (!checkOverlayPermission() && isSwitchOnForAutoStartForeground) {
             isSwitchOnForAutoStartForeground = false
             preferenceManager.myPrefs.autoStartOnBootForeground = false
             preferenceManager.savePreferences()
+        }
+
+        // Request Ignore Battery Optimizations if not already granted
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            val packageName = packageName
+            if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
+                val intentSettings = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                    data = Uri.fromParts("package", packageName, null)
+                    addCategory(Intent.CATEGORY_DEFAULT)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
+                    addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS)
+                }
+                startActivity(intentSettings)
+            }
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -216,7 +243,7 @@ class MainActivity : ComponentActivity() {
         onBackPressedDispatcher.addCallback(this, backPressedCallback)
 
         setContent {
-            JGOTheme {
+            JGOTheme(themeOverride = isSwitchDarkMode) {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     bottomBar = {
@@ -291,6 +318,7 @@ class MainActivity : ComponentActivity() {
                             "Settings" -> SettingsScreen(
                                 activity = this@MainActivity,
                                 checkForUpdates = { checkForUpdates(true) },
+                                onNavigate = { title -> currentScreen = title },
                                 isSwitchOnForAutoStartForeground = isSwitchOnForAutoStartForeground,
                                 onAutoStartForegroundSwitch = {
                                     if (it) {
@@ -305,6 +333,7 @@ class MainActivity : ComponentActivity() {
                             "SettingsTV" -> SettingsScreen(
                                 activity = this@MainActivity,
                                 checkForUpdates = { checkForUpdates(true) },
+                                onNavigate = { title -> currentScreen = title },
                                 isSwitchOnForAutoStartForeground = isSwitchOnForAutoStartForeground,
                                 onAutoStartForegroundSwitch = {
                                     if (it) {
@@ -438,13 +467,14 @@ class MainActivity : ComponentActivity() {
 
                         JTVModeSelectorPopup(
                             isVisible = showOperationDialog,
-                            preferenceManager = preferenceManager,
+                            onDismiss = {
+                                showOperationDialog = false
+                            },
                             onModeSelected = {
                                 showOperationDialog = false
                             },
-                            onDismiss = {
-                                showOperationDialog = false
-                            }
+                            preferenceManager = preferenceManager,
+                            context = this@MainActivity
                         )
 
 
@@ -476,7 +506,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 "Info" -> {
-                    currentScreen = "Debug"
+                    currentScreen = "Home"
                 }
 
                 "Runner" -> {
@@ -850,9 +880,10 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     } else {
-                        Toast.makeText(this@MainActivity, "IPTV not set.", Toast.LENGTH_SHORT)
-                            .show()
+//                        val intent = Intent(this@MainActivity, AppListActivity::class.java)
+                        Toast.makeText(this@MainActivity, "IPTV not set", Toast.LENGTH_SHORT).show()
                         Log.d("DIX", "IPTV not set")
+//                        startActivity(intent)
                     }
                 }
             } catch (e: Exception) {
@@ -977,6 +1008,8 @@ class MainActivity : ComponentActivity() {
             }
         } else {
             // Handle the case where app_packagename is null
+            val intent = Intent(this@MainActivity, AppListActivity::class.java)
+            startActivity(intent)
             Toast.makeText(this@MainActivity, "IPTV app not selected", Toast.LENGTH_SHORT).show()
         }
     }
