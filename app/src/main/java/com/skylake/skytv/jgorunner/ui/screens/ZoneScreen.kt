@@ -141,7 +141,7 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
             ) {
                 Icon(
                     imageVector = Icons.Default.FilterAlt,
-                    contentDescription = "Settings Icon",
+                    contentDescription = "Filter Icon",
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.primary
                 )
