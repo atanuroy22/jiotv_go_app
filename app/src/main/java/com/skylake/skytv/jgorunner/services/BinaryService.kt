@@ -47,10 +47,11 @@ class BinaryService : Service() {
         createNotificationChannel()
     }
 
-    override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int { //
         // Check if intent is null
         if (intent == null) {
             Log.e("BinaryService", "Received null intent in onStartCommand!")
+            stopService() //
             return START_NOT_STICKY
         }
 
@@ -123,7 +124,8 @@ class BinaryService : Service() {
             "BinaryService started in the background. ? " + arguments.contentToString()
         )
 
-        return START_STICKY
+//        return START_STICKY
+        return START_REDELIVER_INTENT //
     }
 
     private fun stopService() {
