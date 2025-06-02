@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.content.res.Configuration
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -13,7 +12,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +29,10 @@ import androidx.compose.material.icons.filled.Attribution
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.BrowserUpdated
 import androidx.compose.material.icons.filled.CenterFocusStrong
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Hub
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Mediation
 import androidx.compose.material.icons.filled.Pix
@@ -43,13 +45,12 @@ import androidx.compose.material.icons.filled.Stream
 import androidx.compose.material.icons.filled.Timelapse
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.Button
+import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -89,16 +90,17 @@ import com.skylake.skytv.jgorunner.activities.MainActivity
 import com.skylake.skytv.jgorunner.core.data.JTVConfigurationManager
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.ui.components.BackupDialog
+import com.skylake.skytv.jgorunner.ui.components.JTVModeSelectorPopup
 import com.skylake.skytv.jgorunner.ui.components.ModeSelectionDialog
 import com.skylake.skytv.jgorunner.ui.components.restoreBackup
-import com.skylake.skytv.jgorunner.ui.dev.Helper
 
-@SuppressLint("UnrememberedMutableState")
+@SuppressLint("UnrememberedMutableState", "AutoboxingStateCreation")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     activity: ComponentActivity,
     checkForUpdates: () -> Unit,
+    onNavigate: (String) -> Unit,
     isSwitchOnForAutoStartForeground: Boolean,
     onAutoStartForegroundSwitch: (Boolean) -> Unit,
 ) {
@@ -114,9 +116,10 @@ fun SettingsScreen(
         preferenceManager.savePreferences()
     }
 
-    var selectedIndex by remember {
-        mutableStateOf(preferenceManager.myPrefs.operationMODE)
+    val selectedIndex by remember {
+        mutableIntStateOf(preferenceManager.myPrefs.operationMODE)
     }
+
 
     // Retrieve saved switch states
     var isSwitchOnForLOCAL by remember {
@@ -144,6 +147,9 @@ fun SettingsScreen(
     var isSwitchOnCheckForUpdate by remember {
         mutableStateOf(preferenceManager.myPrefs.enableAutoUpdate)
     }
+    var isSwitchDarkMode by remember {
+        mutableStateOf(preferenceManager.myPrefs.darkMODE)
+    }
     var selectedIPTVTime by remember {
         mutableIntStateOf(preferenceManager.myPrefs.iptvLaunchCountdown)
     }
@@ -153,6 +159,7 @@ fun SettingsScreen(
 
     var showPortDialog by remember { mutableStateOf(false) }
     var showModeDialog by remember { mutableStateOf(false) }
+    var showOperationDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
     var showBackupDialog by remember { mutableStateOf(false) }
     var showRestartDialog by remember { mutableStateOf(false) }
@@ -198,6 +205,11 @@ fun SettingsScreen(
         applySettings()
     }
 
+    LaunchedEffect(isSwitchDarkMode) {
+        preferenceManager.myPrefs.darkMODE = isSwitchDarkMode
+        applySettings()
+    }
+
     LaunchedEffect(isLoginCheckEnabled) {
         preferenceManager.myPrefs.loginChk = isLoginCheckEnabled
         applySettings()
@@ -213,12 +225,10 @@ fun SettingsScreen(
         jtvConfigurationManager.saveJTVConfiguration()
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(selectedIndex) {
         preferenceManager.myPrefs.operationMODE = selectedIndex
         applySettings()
     }
-
-    val orientation = context.resources.configuration.orientation
 
     Column(
         modifier = Modifier
@@ -239,140 +249,23 @@ fun SettingsScreen(
 
 
             item {
-                HorizontalDividerLine()
-            }
-
-            item {
-                if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceAround
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(
-                                text = "JTV-Go Operation Mode",
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-                            SingleChoiceSegmentedButtonRow(
-                                modifier = Modifier.align(Alignment.CenterHorizontally)
-                            ) {
-                                SegmentedButton(
-                                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                                    onClick = { selectedIndex = 0
-                                        preferenceManager.myPrefs.operationMODE = selectedIndex
-                                        applySettings()
-                                        Helper.setEasyMode(context)
-                                    },
-                                    selected = 0 == selectedIndex,
-                                    label = { Text("Easy") },
-                                    modifier = Modifier.width(IntrinsicSize.Min)
-                                )
-
-                                SegmentedButton(
-                                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                                    onClick = { selectedIndex = 1
-                                        preferenceManager.myPrefs.operationMODE = selectedIndex
-                                        applySettings()
-                                        Helper.setExpertMode(context)},
-                                    selected = 1 == selectedIndex,
-                                    label = { Text("Expert") },
-                                    modifier = Modifier.width(IntrinsicSize.Min)
-                                )
-                            }
-                        }
-
-                        Column(
-                            horizontalAlignment = Alignment.Start,
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(start = 16.dp)
-                        ) {
-                            Text("Mode Info:")
-                            when (selectedIndex) {
-                                0 -> {
-                                    Text("• Simple and direct TV operation")
-                                    Text("• Default TV player: [JGO]")
-                                    Text("• Best for beginners")
-                                }
-
-                                1 -> {
-                                    Text("• Full control over all settings")
-                                    Text("• IPTV setup required.")
-                                    Text("• Suited for advanced users")
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = "JTV-Go Operation Mode",
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                        SingleChoiceSegmentedButtonRow(
-                            modifier = Modifier.align(Alignment.CenterHorizontally)
-                        ) {
-                            SegmentedButton(
-                                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                                onClick = { selectedIndex = 0
-                                    preferenceManager.myPrefs.operationMODE = selectedIndex
-                                    applySettings()
-                                    Helper.setEasyMode(context)
-                                          },
-                                selected = 0 == selectedIndex,
-                                label = { Text("Easy") },
-                                modifier = Modifier.width(IntrinsicSize.Min)
-                            )
-
-                            SegmentedButton(
-                                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                                onClick = { selectedIndex = 1
-                                    preferenceManager.myPrefs.operationMODE = selectedIndex
-                                    applySettings()
-                                    Helper.setExpertMode(context)},
-                                selected = 1 == selectedIndex,
-                                label = { Text("Expert") },
-                                modifier = Modifier.width(IntrinsicSize.Min)
-                            )
-                        }
-
-
-                        when (selectedIndex) {
-                            0 -> {
-                                Column(horizontalAlignment = Alignment.Start) {
-                                    Text("• Simple and direct operation")
-                                    Text("• Best for beginners")
-                                }
-                            }
-
-                            1 -> {
-                                Column(horizontalAlignment = Alignment.Start) {
-                                    Text("• Full control over all settings")
-                                    Text("• Suited for advanced users")
-                                }
-                            }
-                        }
-                    }
-                }
+                HorizontalDividerLineTr()
             }
 
 
             item {
-                HorizontalDividerLine()
+
+                val opMode =
+                    if (preferenceManager.myPrefs.operationMODE == 0) "Simple" else "Expert"
+                SettingItem(icon = Icons.Filled.Hub,
+                    title = "Operation Mode : $opMode",
+                    subtitle = "Select mode for app operation",
+                    onClick = { showOperationDialog = true })
             }
 
+            item {
+                HorizontalDividerLineTrx("App Start")
+            }
 
 
             item {
@@ -407,7 +300,7 @@ fun SettingsScreen(
             }
 
             item {
-                HorizontalDividerLine()
+                HorizontalDividerLineTrx("Server Config")
             }
 
 
@@ -447,7 +340,7 @@ fun SettingsScreen(
             }
 
             item {
-                HorizontalDividerLine()
+                HorizontalDividerLineTrx("IPTV")
             }
 
             item {
@@ -465,7 +358,14 @@ fun SettingsScreen(
                     title = "Auto IPTV",
                     subtitle = "Automatically start IPTV on app start",
                     isChecked = isSwitchOnForAutoIPTV,
-                    onCheckedChange = { isChecked -> isSwitchOnForAutoIPTV = isChecked }
+                    onCheckedChange = { isChecked ->
+                        isSwitchOnForAutoIPTV = isChecked
+                        val iptv = preferenceManager.myPrefs.iptvAppName
+                        if (isChecked && ( iptv == null || iptv == "No IPTV")) {
+                            val intent = Intent(activity, AppListActivity::class.java)
+                            activity.startActivity(intent)
+                        }
+                    }
                 )
             }
             val iptvNameSaved = preferenceManager.myPrefs.iptvAppName
@@ -533,7 +433,6 @@ fun SettingsScreen(
                     icon = Icons.Filled.Mediation,
                     title = "Configure WEBTV filters",
                     subtitle = "Select default language, category, and quality.",
-                    showBadge = showNewBadge,
                     onClick = {
                         showModeDialog = true
                         showNewBadge = false
@@ -542,16 +441,27 @@ fun SettingsScreen(
             }
 
             item {
-                HorizontalDividerLine()
+                HorizontalDividerLineTrx("Miscellaneous")
+            }
+
+            if (true) {
+                item {
+                    SettingSwitchItem(icon = Icons.Filled.DarkMode,
+                        title = "Always Dark Mode",
+                        subtitle = "Toggle between dark and auto",
+                        isChecked = isSwitchDarkMode,
+                        onCheckedChange = { isChecked -> isSwitchDarkMode = isChecked })
+                }
             }
 
             item {
                 SettingSwitchItem(icon = Icons.Filled.SoupKitchen,
-                    title = "Check for auto updates",
+                    title = "Check for Auto Updates",
                     subtitle = "Check for updates when the app starts",
                     isChecked = isSwitchOnCheckForUpdate,
                     onCheckedChange = { isChecked -> isSwitchOnCheckForUpdate = isChecked })
             }
+
             item {
                 SettingItem(icon = Icons.Filled.ArrowCircleUp,
                     title = "Check for Updates Now",
@@ -575,6 +485,16 @@ fun SettingsScreen(
                     )
                 }
 
+            }
+
+            item {
+                SettingItem(icon = Icons.Filled.Insights,
+                    title = "Device Info & Logs",
+                    subtitle = "View technical data and logs for debugging.",
+                    showBadge = showNewBadge,
+                    onClick = {
+                       onNavigate("Info")
+                    })
             }
 
             item {
@@ -712,6 +632,18 @@ fun SettingsScreen(
         }
     )
 
+    JTVModeSelectorPopup(
+        context = context,
+        isVisible = showOperationDialog,
+        preferenceManager = preferenceManager,
+        onModeSelected = {
+            showOperationDialog = false
+        },
+        onDismiss = {
+            showOperationDialog = false
+        }
+    )
+
     // Restart App Dialog
     if (showRestartAppDialog) {
         Dialog(
@@ -846,7 +778,39 @@ fun HorizontalDividerLine() {
         thickness = 2.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp)
+            .padding(vertical = 4.dp)
     )
 }
 
+@Composable
+fun HorizontalDividerLineTr() {
+    HorizontalDivider(
+        thickness = 1.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp)
+    )
+}
+
+@Composable
+fun HorizontalDividerLineTrx(text: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(end = 8.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        HorizontalDivider(
+            modifier = Modifier
+                .weight(1f)
+                .height(1.dp),
+            color = Color.Gray
+        )
+    }
+}

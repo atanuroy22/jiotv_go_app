@@ -211,7 +211,7 @@ fun RowScope.Button2(context: Context, onNavigate: (String) -> Unit) {
         colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
         contentPadding = PaddingValues(2.dp)
     ) {
-        ButtonContent("Sys Info", Icons.Sharp.Info)
+        ButtonContent("Info & Log", Icons.Sharp.Info)
     }
 }
 
