@@ -36,6 +36,7 @@ import androidx.compose.material.icons.twotone.ResetTv
 import androidx.compose.material.icons.twotone.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -218,18 +219,29 @@ fun HomeScreen(
                 outputScrollState.animateScrollTo(outputScrollState.maxValue)
             }
 
-            Text(
-                text = outputText,
-                color = Color.White,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Normal,
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(160.dp)
-                    .background(Color.Black)
-                    .padding(8.dp)
-                    .verticalScroll(outputScrollState)
-            )
+                    .padding(bottom = 16.dp)
+            ) {
+                Text(
+                    text = outputText,
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Normal,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = FontFamily.Monospace
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .background(Color.Black)
+                        .padding(8.dp)
+                        .verticalScroll(outputScrollState)
+                )
+            }
+
+
         }
     }
 }
