@@ -1,4 +1,5 @@
 [versions]
+accompanistSystemuicontroller = "0.30.1"
 agp = "8.7.2"
 compose = "1.0.0-beta01"
 customview = "1.1.0"
@@ -34,6 +35,7 @@ media3ExoplayerHls = "1.5.1"
 appcompat = "1.7.0"
 
 [libraries]
+accompanist-systemuicontroller = { module = "com.google.accompanist:accompanist-systemuicontroller", version.ref = "accompanistSystemuicontroller" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-customview = { group = "androidx.customview", name = "customview", version.ref = "customview" }
 androidx-customview-poolingcontainer = { module = "androidx.customview:customview-poolingcontainer", version.ref = "customviewPoolingcontainer" }
