@@ -15,6 +15,7 @@ class SkySharedPref(context: Context) {
         @Volatile
         private var instance: SkySharedPref? = null
 
+        @JvmStatic
         // Singleton instance
         fun getInstance(context: Context): SkySharedPref {
             return instance ?: synchronized(this) {
