@@ -564,7 +564,7 @@ class WebPlayerActivity : ComponentActivity() {
             )
 
             if (formattedPlayId != null) {
-                injectTVChannel(channel.channelName, formattedPlayId, channel.logoUrl)
+//                injectTVChannel(channel.channelName, formattedPlayId, channel.logoUrl)
             }
         }
 
