@@ -249,9 +249,11 @@ fun TVTabLayout(context: Context) {
                         }
                         .clickable {
                             Log.d("HT", channel.channel_name)
+                            Log.d("HT", channel.channel_url)
                             val intent =
                                 Intent(context, ExoplayerActivity::class.java).apply {
                                     putExtra("video_url", channel.channel_url)
+                                    putExtra("zone", "TV")
                                 }
                             startActivity(context, intent, null)
 

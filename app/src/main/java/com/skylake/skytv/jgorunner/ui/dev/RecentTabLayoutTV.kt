@@ -93,6 +93,7 @@ fun RecentTabLayoutTV(context: Context) {
                             Log.d("HT", channel.channel_name)
                             val intent = Intent(context, ExoplayerActivity::class.java).apply {
                                 putExtra("video_url", "http://localhost:${SkySharedPref.getInstance(context).myPrefs.jtvGoServerPort}/live/${channel.channel_id}" )
+                                putExtra("zone", "TV")
                             }
                             startActivity(context, intent, null)
 

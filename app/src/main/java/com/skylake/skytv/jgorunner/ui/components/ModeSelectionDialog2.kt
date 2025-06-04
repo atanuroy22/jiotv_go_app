@@ -56,10 +56,10 @@ fun ModeSelectionDialog2(
             ) {
                 // --- Quality Selection ---
                 var selectedQuality by remember {
-                    mutableStateOf(preferenceManager.myPrefs.filterQX ?: "Auto")
+                    mutableStateOf(preferenceManager.myPrefs.filterQX ?: "auto")
                 }
                 val qualityMap = mapOf(
-                    "Not yet implemented" to "auto",
+//                    "Not yet implemented" to "auto",
                     "Auto" to "auto",
                     "High" to "high",
                     "Medium" to "medium",
@@ -67,11 +67,14 @@ fun ModeSelectionDialog2(
                 )
                 val qualityOptions = qualityMap.keys.toList()
                 var qualityDropdownExpanded by remember { mutableStateOf(false) }
+                val selectedQualityLabel = qualityMap.entries.find { it.value == selectedQuality }?.key ?: selectedQuality[0]
                 DropdownSelection2(
                     title = "Quality",
                     options = qualityOptions,
-                    selectedOption = selectedQuality,
-                    onOptionSelected = { selectedQuality = it },
+                    selectedOption = selectedQualityLabel.toString(),
+                    onOptionSelected = { label ->
+                        selectedQuality = (qualityMap[label] ?: "auto")
+                    },
                     expanded = qualityDropdownExpanded,
                     onExpandChange = { qualityDropdownExpanded = it }
                 )
@@ -87,7 +90,7 @@ fun ModeSelectionDialog2(
                 val startOptionsTV = startScreenTV.keys.toList()
                 // Load as Int, fallback to 0
                 var selectedScreenTV by remember {
-                    mutableStateOf(preferenceManager.myPrefs.selectedScreenTV?.toIntOrNull() ?: 0)
+                    mutableIntStateOf(preferenceManager.myPrefs.selectedScreenTV?.toIntOrNull() ?: 0)
                 }
                 var screenDropdownExpanded by remember { mutableStateOf(false) }
                 // Find the label for the selectedScreenTV int value
@@ -304,7 +307,7 @@ fun ModeSelectionDialog2(
                     }
                     Button(
                         onClick = {
-                            selectedQuality = "Auto"
+                            selectedQuality = "auto"
                             selectedScreenTV = 0
                             selectedCategories.value.clear()
                             selectedCategoryInts.value.clear()
@@ -312,7 +315,7 @@ fun ModeSelectionDialog2(
                             selectedLanguageInts.value.clear()
                             preferenceManager.apply {
                                 myPrefs.selectedScreenTV = "0"
-                                myPrefs.filterQX = "Auto"
+                                myPrefs.filterQX = "auto"
                                 myPrefs.filterCI = ""
                                 myPrefs.filterLI = ""
                                 savePreferences()
