@@ -284,19 +284,55 @@ fun copy2ToClipboard(context: Context, text: String) {
     clipboard.setPrimaryClip(clip)
 }
 
-fun readLogFile(context: Context): String {
-    return try {
-        val logDir = File(context.filesDir.parent, "files")
-        val logFile = File(logDir, "jiotv_go.log")
-        if (logFile.exists()) {
-            logFile.readText()
-        } else {
-            "Log file not found."
+//fun readLogFile(context: Context): String {
+//    return try {
+//        val logDir = File(context.filesDir.parent, "files")
+//        val logFile = File(logDir, "jiotv_go.log")
+//        if (logFile.exists()) {
+//            logFile.readText()
+//        } else {
+//            "Log file not found."
+//        }
+//    } catch (e: Exception) {
+//        "Error reading log file: ${e.localizedMessage}"
+//    }
+//}
+
+fun readLogFile(context: Context): String = buildString {
+    val logDir = File(context.filesDir.parent, "files")
+    val logFile = File(logDir, "jiotv_go.log")
+    val maxLines = 200
+
+    try {
+        when {
+            logFile.exists() && logFile.length() > 0 -> {
+                val lineCount = logFile.useLines { it.count() }
+                val linesToShow = minOf(maxLines, lineCount)
+
+                val queue = ArrayDeque<String>(maxLines)
+                logFile.bufferedReader(Charsets.UTF_8).useLines { lines ->
+                    for (line in lines) {
+                        if (queue.size == maxLines) queue.removeFirst()
+                        queue.addLast(line)
+                    }
+                }
+                queue.forEach { append("$it\n") }
+
+
+                append("\n--- Log Preview: ")
+                append("Showing last $linesToShow of $lineCount lines ")
+                append("(Path: ${logFile.absolutePath})")
+            }
+            logFile.exists() -> append("Log file is empty")
+            else -> append("Log file not found.")
         }
     } catch (e: Exception) {
-        "Error reading log file: ${e.localizedMessage}"
+        append("Error reading log (${e.javaClass.simpleName}): ")
+        append(e.message?.take(200) ?: "Unknown error")
+        append("\nStack trace: ${e.stackTraceToString().lines().take(5).joinToString("\n")}")
     }
-}
+}.trimEnd('\n')
+
 
 fun clearLogFile(context: Context): Boolean {
     return try {
