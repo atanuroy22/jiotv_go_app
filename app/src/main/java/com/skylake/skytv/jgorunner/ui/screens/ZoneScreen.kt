@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
 import androidx.core.view.WindowCompat
 import com.skylake.skytv.jgorunner.R
+import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.ui.components.ModeSelectionDialog2
 import com.skylake.skytv.jgorunner.ui.dev.RecentTabLayout
 import com.skylake.skytv.jgorunner.ui.dev.RecentTabLayoutTV
@@ -90,9 +91,12 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
     val isRemoteNavigation = context.resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK == Configuration.UI_MODE_TYPE_TELEVISION
 
     Log.d("ZoneScreen", "Running in TV Mode: $isRemoteNavigation")
+    val preferenceManager = SkySharedPref.getInstance(context)
 
-
-    var selectedTabIndex by remember { mutableIntStateOf(1) }
+    var selectedScreenTV by remember {
+        mutableIntStateOf(preferenceManager.myPrefs.selectedScreenTV?.toIntOrNull() ?: 0)
+    }
+    var selectedTabIndex by remember { mutableIntStateOf(2) }
     val tabFocusRequester = remember { FocusRequester() }
 
     var backPressHandled by remember { mutableStateOf(false) }
@@ -224,9 +228,9 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
         onReset = {
             showModeDialog = false
             Handler(Looper.getMainLooper()).postDelayed({
-                selectedTabIndex = 0
+                selectedTabIndex = preferenceManager.myPrefs.selectedScreenTV?.toInt() ?: 0
             }, 100)
-            selectedTabIndex = 1
+            selectedTabIndex = 2
             Toast.makeText(context, "Refreshing Channels", Toast.LENGTH_LONG).show()
                   },
         onSelectionsMade = { selectedQualities, selectedCategories, _, selectedLanguages, _ ->
@@ -234,9 +238,9 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
             Log.d("ZoneScreen","Qualities: $selectedQualities, Categories: $selectedCategories, Languages: $selectedLanguages")
             Toast.makeText(context, "Refreshing Channels", Toast.LENGTH_LONG).show()
             Handler(Looper.getMainLooper()).postDelayed({
-                selectedTabIndex = 0
-            }, 100)
-            selectedTabIndex = 1
+                selectedTabIndex = preferenceManager.myPrefs.selectedScreenTV?.toInt() ?: 0
+            }, 200)
+            selectedTabIndex = 2
         },
         context = context
     )
@@ -245,7 +249,7 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
     LaunchedEffect(Unit) {
         tabFocusRequester.requestFocus()
         Handler(Looper.getMainLooper()).postDelayed({
-            selectedTabIndex = 0
+            selectedTabIndex = preferenceManager.myPrefs.selectedScreenTV?.toInt() ?: 0
         }, 100)
     }
 }
