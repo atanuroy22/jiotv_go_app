@@ -143,12 +143,15 @@ class MainActivity : ComponentActivity() {
             preferenceManager.myPrefs.filterCX = ""
             preferenceManager.myPrefs.filterLI = ""
             preferenceManager.myPrefs.filterCI = ""
+            preferenceManager.myPrefs.filterQX = "auto"
             preferenceManager.myPrefs.operationMODE = -1
             preferenceManager.savePreferences()
         }
 
         if (preferenceManager.myPrefs.operationMODE == null || (preferenceManager.myPrefs.operationMODE == 999)) {
-            preferenceManager.myPrefs.operationMODE = 1;
+            preferenceManager.myPrefs.operationMODE = 1
+            preferenceManager.myPrefs.filterQX = "auto"
+            preferenceManager.myPrefs.selectedScreenTV = "0"
         }
 
         if (preferenceManager.myPrefs.operationMODE == -1) {
