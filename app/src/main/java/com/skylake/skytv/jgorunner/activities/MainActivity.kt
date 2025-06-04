@@ -145,6 +145,7 @@ class MainActivity : ComponentActivity() {
             preferenceManager.myPrefs.filterCI = ""
             preferenceManager.myPrefs.filterQX = "auto"
             preferenceManager.myPrefs.operationMODE = -1
+            preferenceManager.myPrefs.selectedScreenTV = "0"
             preferenceManager.savePreferences()
         }
 
