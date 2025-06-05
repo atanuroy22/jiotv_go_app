@@ -1,5 +1,6 @@
 package com.skylake.skytv.jgorunner.ui.dev
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.util.Log
@@ -65,10 +66,25 @@ import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateValueAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 
+@SuppressLint("MutableCollectionMutableState")
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
 fun TVTabLayout(context: Context) {
@@ -86,6 +102,44 @@ fun TVTabLayout(context: Context) {
     var epgData by remember { mutableStateOf<EpgProgram?>(null) }
 
     val focusRequester = remember { FocusRequester() }
+
+    val categoryMap = mapOf(
+        "Reset" to null,
+        "Entertainment" to 5,
+        "Movies" to 6,
+        "Kids" to 7,
+        "Sports" to 8,
+        "Lifestyle" to 9,
+        "Infotainment" to 10,
+        "News" to 12,
+        "Music" to 13,
+        "Devotional" to 15,
+        "Business" to 16,
+        "Educational" to 17,
+        "Shopping" to 18,
+        "JioDarshan" to 19
+    )
+
+    val categoryIdMap = categoryMap.filterValues { it != null }.map { it.value!! to it.key }.toMap()
+    val savedCategoryIds = preferenceManager.myPrefs.filterCI
+        ?.split(",")?.mapNotNull { it.toIntOrNull() }?.toMutableSet() ?: mutableSetOf()
+    var selectedCategoryIds by remember { mutableStateOf(savedCategoryIds) }
+    val selectedCategories = categoryMap.filterValues { it in selectedCategoryIds }.keys
+
+
+    val sortedCategories = remember(selectedCategoryIds) {
+        val resetCategoryName = "Reset"
+        val allCategoryNames = categoryMap.keys.toList()
+        val otherCategoryNames = allCategoryNames.filter { it != resetCategoryName }
+        val (selectedOtherCategories, unselectedOtherCategories) = otherCategoryNames.partition { categoryName ->
+            val categoryId = categoryMap[categoryName]
+            categoryId != null && selectedCategoryIds.contains(categoryId)
+        }
+        listOf(resetCategoryName) + selectedOtherCategories + unselectedOtherCategories
+    }
+
+
+
 
     LaunchedEffect(Unit) {
         var attempts = 0
@@ -137,6 +191,22 @@ fun TVTabLayout(context: Context) {
         fetched = true
     }
 
+    LaunchedEffect(selectedCategoryIds) {
+        channelsResponse.value?.let { response ->
+            val languages = preferenceManager.myPrefs.filterLI
+                ?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.isNotEmpty() }
+
+            val filtered = ChannelUtils.filterChannels(
+                response,
+                categoryIds = selectedCategoryIds.takeIf { it.isNotEmpty() }?.toList(),
+                languageIds = languages
+            )
+            filteredChannels.value = filtered
+        }
+    }
+
+
+
     LaunchedEffect(selectedChannel) {
         if (selectedChannel != null) {
             val epgURLc = "$basefinURL/epg/${selectedChannel?.channel_id}/0"
@@ -154,75 +224,140 @@ fun TVTabLayout(context: Context) {
             )
         }
     } else {
-        // Content Above the Grid (EPG Details)
+        //////////////////////////
+
+
+        LazyRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            items(sortedCategories) { categoryName ->
+                val categoryId = categoryMap[categoryName]
+                val isSelected = categoryId != null && selectedCategoryIds.contains(categoryId)
+
+                FilterChip(
+                    onClick = {
+                        if (categoryName == "Reset") {
+                            selectedCategoryIds = mutableSetOf()
+                        } else if (categoryId != null) {
+                            // Toggle selection for other categories
+                            selectedCategoryIds = if (isSelected) {
+                                (selectedCategoryIds - categoryId).toMutableSet()
+                            } else {
+                                (selectedCategoryIds + categoryId).toMutableSet()
+                            }
+                        }
+                        val updatedCI = selectedCategoryIds.joinToString(",")
+                        preferenceManager.myPrefs.filterCI = updatedCI
+                        preferenceManager.savePreferences()
+                        Log.d("CHIP_SELECTION", "Updated filterCI for $categoryName = $updatedCI")
+                    },
+                    label = { Text(categoryName) },
+                    selected = isSelected,
+                    leadingIcon = when {
+                        categoryName == "Reset" -> {
+                            {
+                                Icon(
+                                    imageVector = Icons.Filled.Refresh,
+                                    contentDescription = "Reset icon",
+                                    modifier = Modifier.size(FilterChipDefaults.IconSize)
+                                )
+                            }
+                        }
+                        isSelected -> {
+                            {
+                                Icon(
+                                    imageVector = Icons.Filled.Done,
+                                    contentDescription = "Done icon",
+                                    modifier = Modifier.size(FilterChipDefaults.IconSize)
+                                )
+                            }
+                        }
+                        else -> null
+                    },
+                )
+            }
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        //////////////////////////
         if (epgData != null) {
             Column(
                 modifier = Modifier
-                    .padding(5.dp)
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
                     .fillMaxWidth()
-                    .height(100.dp)
-                    .background(Color.Transparent)
             ) {
-                Row(
-                    modifier = Modifier
-                        .padding(5.dp)
-                        .fillMaxWidth()
-                        .height(IntrinsicSize.Min)
-                        .background(Color.Transparent),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                    shape = RoundedCornerShape(16.dp)
                 ) {
-                    // Description Column
-                    Column(
+                    Row(
                         modifier = Modifier
-                            .padding(5.dp)
-                            .weight(1f)
-                            .background(Color.Transparent),
-                        horizontalAlignment = Alignment.Start
+                            .fillMaxWidth()
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (epgData != null) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(start = 8.dp, end = 12.dp)
+                        ) {
                             Text(
                                 text = epgData!!.channel_name,
                                 style = TextStyle(fontSize = 14.sp)
                             )
+                            Spacer(modifier = Modifier.height(6.dp))
                             Text(
                                 text = epgData!!.showname,
                                 maxLines = 1,
-                                style = TextStyle(fontSize = 22.sp)
+                                style = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold)
                             )
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = epgData!!.description,
-                                style = TextStyle(fontSize = 12.sp),
-                                maxLines = 3
-                            )
-                        } else {
-                            Text(
-                                text = selectedChannel?.channel_name ?: "No channel selected",
-                                style = TextStyle(fontSize = 24.sp)
-                            )
-                            Text(
-                                text = "No EPG data available",
-                                style = TextStyle(color = Color.Gray, fontSize = 14.sp)
+                                style = TextStyle(fontSize = 13.sp),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
-                    }
 
-                    GlideImage(
-                        model = "$basefinURL/jtvposter/${epgData?.episodePoster}",
-                        contentDescription = null,
-                        modifier = Modifier.height(75.dp),
-                        contentScale = ContentScale.Fit,
-                    )
+                        GlideImage(
+                            model = "$basefinURL/jtvposter/${epgData!!.episodePoster}",
+                            contentDescription = null,
+
+                            modifier = Modifier
+                                .height(90.dp)
+                                .clip(RoundedCornerShape(12.dp)),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
                 }
             }
         } else {
             Log.d("HANA4k", "EPG ERROR")
         }
 
+
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 100.dp),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             items(filteredChannels.value) { channel ->
@@ -304,7 +439,9 @@ fun TVTabLayout(context: Context) {
                             contentDescription =
                             channel.channel_name,
                             modifier =
-                            Modifier.fillMaxWidth().height(80.dp),
+                            Modifier
+                                .fillMaxWidth()
+                                .height(80.dp),
                             contentScale =
                             ContentScale.Fit
                         )
