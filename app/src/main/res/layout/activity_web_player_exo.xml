@@ -1,10 +1,9 @@
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/black"
-    tools:context=".activities.ExoplayerActivity">
+    android:background="@android:color/black">
 
     <androidx.media3.ui.PlayerView
         android:id="@+id/player_view"
@@ -13,5 +12,36 @@
         app:use_controller="true"
         app:resize_mode="fit"/>
 
-</RelativeLayout>
+    <!-- Floating Channel Info Box -->
+    <LinearLayout
+        android:id="@+id/floating_channel_info_layout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@drawable/rounded_black_box"
+        android:padding="12dp"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="24dp"
+        android:layout_marginTop="24dp"
+        android:visibility="gone"
+        android:elevation="4dp">
 
+    <ImageView
+        android:id="@+id/channel_logo_imageview"
+        android:layout_width="65.dp"
+        android:layout_height="65.dp"
+        android:layout_marginEnd="12dp"
+        android:scaleType="fitCenter"
+        android:contentDescription="Channel Logo"/>
+
+    <TextView
+        android:id="@+id/channel_name_textview"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@android:color/white"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:layout_gravity="center_vertical"/>
+</LinearLayout>
+
+    </FrameLayout>

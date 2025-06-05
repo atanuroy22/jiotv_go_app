@@ -83,6 +83,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import com.skylake.skytv.jgorunner.activities.ChannelInfo
+import com.skylake.skytv.jgorunner.activities.ExoplayerActivityPass
 
 @SuppressLint("MutableCollectionMutableState")
 @OptIn(ExperimentalGlideComposeApi::class)
@@ -386,9 +388,23 @@ fun TVTabLayout(context: Context) {
                             Log.d("HT", channel.channel_name)
                             Log.d("HT", channel.channel_url)
                             val intent =
-                                Intent(context, ExoplayerActivity::class.java).apply {
-                                    putExtra("video_url", channel.channel_url)
+                                Intent(context, ExoplayerActivityPass::class.java).apply {
                                     putExtra("zone", "TV")
+
+                                    // Prepare channel list for ExoplayerActivityPass
+                                    val allChannelsData = ArrayList(filteredChannels.value.map { ch ->
+                                        val fullLogoUrl = "http://localhost:${localPORT}/jtvimage/${ch.logoUrl}"
+                                        ChannelInfo(ch.channel_url, fullLogoUrl, ch.channel_name)
+                                    })
+                                    putParcelableArrayListExtra("channel_list_data", allChannelsData)
+
+                                    val currentChannelIndex = filteredChannels.value.indexOf(channel)
+                                    putExtra("current_channel_index", currentChannelIndex)
+
+                                    // Also pass the individual details of the selected channel for initial setup (or fallback)
+                                    putExtra("video_url", channel.channel_url)
+                                    putExtra("logo_url", "http://localhost:${localPORT}/jtvimage/${channel.logoUrl}")
+                                    putExtra("ch_name", channel.channel_name)
                                 }
                             startActivity(context, intent, null)
 

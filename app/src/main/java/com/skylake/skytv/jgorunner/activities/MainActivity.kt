@@ -116,7 +116,7 @@ class MainActivity : ComponentActivity() {
 
         // DEL
 
-//        currentScreen = "Info"
+//        currentScreen = "Debug"
 
         val appPackageName = preferenceManager.myPrefs.iptvAppPackageName
 

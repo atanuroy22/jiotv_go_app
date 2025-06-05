@@ -66,7 +66,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-
+import com.skylake.skytv.jgorunner.activities.ChannelInfo
+import com.skylake.skytv.jgorunner.activities.ExoplayerActivityPass
 
 
 @OptIn(ExperimentalGlideComposeApi::class)
@@ -382,9 +383,23 @@ fun TVTabLayoutTV(context: Context) {
                     onClick = {
                         Log.d("HT", channel.channel_name)
                         val intent =
-                            Intent(context, ExoplayerActivity::class.java).apply {
+                            Intent(context, ExoplayerActivityPass::class.java).apply {
                                 putExtra("video_url", channel.channel_url)
                                 putExtra("zone", "TV")
+                                // Prepare channel list for ExoplayerActivityPass
+                                // Prepare channel list for ExoplayerActivityPass
+                                val allChannelsData = ArrayList(filteredChannels.value.map { ch ->
+                                    val fullLogoUrl = "http://localhost:${localPORT}/jtvimage/${ch.logoUrl}"
+                                    ChannelInfo(ch.channel_url, fullLogoUrl, ch.channel_name)
+                                })
+
+                                val currentChannelIndex = filteredChannels.value.indexOf(channel)
+                                putExtra("current_channel_index", currentChannelIndex)
+
+                                // Also pass the individual details of the selected channel for initial setup (or fallback)
+                                putExtra("video_url", channel.channel_url)
+                                putExtra("logo_url", "http://localhost:${localPORT}/jtvimage/${channel.logoUrl}")
+                                putExtra("ch_name", channel.channel_name)
                             }
                         startActivity(context, intent, null)
 

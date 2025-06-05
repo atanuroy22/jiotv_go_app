@@ -46,8 +46,10 @@ import com.skylake.skytv.jgorunner.ui.components.ButtonContent
 
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.core.content.ContextCompat.startActivity
 import com.skylake.skytv.jgorunner.activities.CastActivity
 import com.skylake.skytv.jgorunner.activities.ExoplayerActivity
+import com.skylake.skytv.jgorunner.activities.ExoplayerActivityPass
 
 @Composable
 fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
@@ -409,8 +411,13 @@ fun handleButton5Click(context: Context, onNavigate: (String) -> Unit) {
 
 fun handleButton6Click(context: Context) {
     Toast.makeText(context, "Demo Stream Playing", Toast.LENGTH_SHORT).show()
-    val intent = Intent(context, ExoplayerActivity::class.java)
+    val intent = Intent(context, ExoplayerActivityPass::class.java)
+    intent.putExtra("video_url", "http://localhost:5350/live/144.m3u8")
+    intent.putExtra("zone", "TV")
+    intent.putExtra("logo_url", "TV")
+    intent.putExtra("ch_name", "Colors TV")
     context.startActivity(intent)
+
 }
 
 fun handleButton7Click(context: Context, onNavigate: (String) -> Unit) {
