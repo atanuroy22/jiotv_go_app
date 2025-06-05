@@ -48,6 +48,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.core.content.ContextCompat.startActivity
 import com.skylake.skytv.jgorunner.activities.CastActivity
+import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.activities.ExoplayerActivity
 import com.skylake.skytv.jgorunner.activities.ExoplayerActivityPass
 
@@ -416,6 +417,7 @@ fun handleButton6Click(context: Context) {
     intent.putExtra("zone", "TV")
     intent.putExtra("logo_url", "TV")
     intent.putExtra("ch_name", "Colors TV")
+    intent.putExtra("current_channel_index", 0)
     context.startActivity(intent)
 
 }
