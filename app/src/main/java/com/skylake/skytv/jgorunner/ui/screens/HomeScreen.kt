@@ -192,15 +192,15 @@ fun HomeScreen(
             RunIPTVButton {
                 onRunIPTVButtonClick()
             }
-            WebTVButton(
-                enabled = isServerRunning
-            ) {
-                onWebTVButtonClick()
-            }
             DebugButton(
                 enabled = isServerRunning
             ) {
                 onDebugButtonClick()
+            }
+            WebTVButton(
+                enabled = isServerRunning
+            ) {
+                onWebTVButtonClick()
             }
             ExitButton {
                 onExitButtonClick()
