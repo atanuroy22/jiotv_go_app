@@ -387,11 +387,11 @@ fun TVTabLayoutTV(context: Context) {
                                 putExtra("video_url", channel.channel_url)
                                 putExtra("zone", "TV")
                                 // Prepare channel list for ExoplayerActivityPass
-                                // Prepare channel list for ExoplayerActivityPass
                                 val allChannelsData = ArrayList(filteredChannels.value.map { ch ->
                                     val fullLogoUrl = "http://localhost:${localPORT}/jtvimage/${ch.logoUrl}"
                                     ChannelInfo(ch.channel_url, fullLogoUrl, ch.channel_name)
                                 })
+                                putParcelableArrayListExtra("channel_list_data", allChannelsData)
 
                                 val currentChannelIndex = filteredChannels.value.indexOf(channel)
                                 putExtra("current_channel_index", currentChannelIndex)

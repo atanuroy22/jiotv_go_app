@@ -132,6 +132,7 @@ class MainActivity : ComponentActivity() {
 
         if (preferenceManager.myPrefs.iptvLaunchCountdown == 0) {
             preferenceManager.myPrefs.iptvLaunchCountdown = 4
+//            preferenceManager.myPrefs.autoStartServer = true
             preferenceManager.myPrefs.enableAutoUpdate = true
             preferenceManager.myPrefs.loginChk = true
             preferenceManager.myPrefs.jtvGoServerPort = 5350
@@ -291,7 +292,8 @@ class MainActivity : ComponentActivity() {
                                     )
                                 },
                                 onRunIPTVButtonClick = {
-                                    iptvRedirectFunc()
+//                                    iptvRedirectFunc()
+                                    launchIPTV()
                                 },
                                 onWebTVButtonClick = {
                                     val intent =
@@ -784,7 +786,8 @@ class MainActivity : ComponentActivity() {
                             showRedirectPopup = false
 
                             if (shouldLaunchIPTV) {
-                                startIPTV()
+//                                startIPTV()
+                                launchIPTV()
                             }
                         }
                     }
@@ -811,7 +814,8 @@ class MainActivity : ComponentActivity() {
                                 showRedirectPopup = false
 
                                 if (shouldLaunchIPTV) {
-                                    startIPTV()
+//                                    startIPTV()
+                                    launchIPTV()
                                 }
                             }
                         }
@@ -851,6 +855,65 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun launchIPTV() {
+        val appPackageName = preferenceManager.myPrefs.iptvAppPackageName
+        val appLaunchActivity = preferenceManager.myPrefs.iptvAppLaunchActivity
+        val appName = preferenceManager.myPrefs.iptvAppName
+
+        if (!appPackageName.isNullOrEmpty() && currentScreen != "Zone") {
+            Log.d("DIX", appPackageName)
+            when (appPackageName) {
+                "webtv" -> {
+                    val intent = Intent(this, WebPlayerActivity::class.java)
+                    Toast.makeText(this, "Opening WEBTV", Toast.LENGTH_SHORT).show()
+                    startActivity(intent)
+                }
+                "tvzone" -> {
+                    Toast.makeText(this, "Starting TV", Toast.LENGTH_SHORT).show()
+                    Log.d("DIX", "Opening TV")
+                    // Optionally: currentScreen = "Zone"
+                }
+                else -> {
+                    // Try launching a specific activity if provided
+                    if (!appLaunchActivity.isNullOrEmpty()) {
+                        val launchIntent = Intent().apply {
+                            setClassName(appPackageName, appLaunchActivity)
+                        }
+                        val packageManager = this.packageManager
+                        if (launchIntent.resolveActivity(packageManager) != null) {
+                            Toast.makeText(this, "Starting: $appName", Toast.LENGTH_SHORT).show()
+                            startActivity(launchIntent)
+                        } else {
+                            // Fallback: Try to launch the app's main activity
+                            val fallbackIntent = packageManager.getLaunchIntentForPackage(appPackageName)
+                            if (fallbackIntent != null) {
+                                Toast.makeText(this, "Opening $appName", Toast.LENGTH_SHORT).show()
+                                startActivity(fallbackIntent)
+                            } else {
+                                Toast.makeText(this, "Cannot find the specified application", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    } else {
+                        // If no specific activity, try to launch the app normally
+                        val launchIntent = packageManager.getLaunchIntentForPackage(appPackageName)
+                        if (launchIntent != null) {
+                            Toast.makeText(this, "Opening $appName", Toast.LENGTH_SHORT).show()
+                            startActivity(launchIntent)
+                        } else {
+                            Toast.makeText(this, "App launch activity not found", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            }
+        } else {
+            // No app selected: show app selection activity
+            val intent = Intent(this, AppListActivity::class.java)
+            startActivity(intent)
+            Toast.makeText(this, "IPTV app not selected", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+
     private fun startIPTV() {
         executor.execute {
             try {
@@ -885,7 +948,7 @@ class MainActivity : ComponentActivity() {
                         }
                     } else {
 //                        val intent = Intent(this@MainActivity, AppListActivity::class.java)
-                        Toast.makeText(this@MainActivity, "IPTV not set", Toast.LENGTH_SHORT).show()
+//                        Toast.makeText(this@MainActivity, "IPTV not set", Toast.LENGTH_SHORT).show()
                         Log.d("DIX", "IPTV not set")
 //                        startActivity(intent)
                     }

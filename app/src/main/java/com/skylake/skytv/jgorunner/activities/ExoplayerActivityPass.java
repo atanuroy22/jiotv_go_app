@@ -11,7 +11,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.util.Rational;
-import android.view.KeyEvent; // Import KeyEvent
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageView;
@@ -30,14 +30,13 @@ import androidx.media3.exoplayer.SeekParameters;
 import androidx.media3.exoplayer.hls.HlsMediaSource;
 import androidx.media3.exoplayer.source.MediaSource;
 import androidx.media3.ui.AspectRatioFrameLayout;
-import androidx.media3.ui.PlayerControlView; // Import PlayerControlView
+import androidx.media3.ui.PlayerControlView;
 import androidx.media3.ui.PlayerView;
 
 import com.bumptech.glide.Glide;
 import com.skylake.skytv.jgorunner.R;
 import com.skylake.skytv.jgorunner.data.SkySharedPref;
 
-import java.util.ArrayList; // Import ArrayList
 import java.util.List;
 
 public class ExoplayerActivityPass extends ComponentActivity {
