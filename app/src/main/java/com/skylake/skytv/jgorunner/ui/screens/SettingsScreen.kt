@@ -2,6 +2,8 @@ package com.skylake.skytv.jgorunner.ui.screens
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.AlarmManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.util.Log
@@ -93,6 +95,9 @@ import com.skylake.skytv.jgorunner.ui.components.BackupDialog
 import com.skylake.skytv.jgorunner.ui.components.JTVModeSelectorPopup
 import com.skylake.skytv.jgorunner.ui.components.ModeSelectionDialog
 import com.skylake.skytv.jgorunner.ui.components.restoreBackup
+import android.os.Process
+import kotlin.system.exitProcess
+
 
 @SuppressLint("UnrememberedMutableState", "AutoboxingStateCreation")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -684,11 +689,32 @@ fun SettingsScreen(
     }
 }
 
+//fun restartApp(context: Context) {
+//    val intent = Intent(context, MainActivity::class.java)
+//    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+//    context.startActivity(intent)
+//    (context as? Activity)?.finish()
+//}
+
+@SuppressLint("ServiceCast")
 fun restartApp(context: Context) {
-    val intent = Intent(context, MainActivity::class.java)
-    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-    context.startActivity(intent)
-    (context as? Activity)?.finish()
+    val packageManager = context.packageManager
+    val intent = packageManager.getLaunchIntentForPackage(context.packageName)
+    intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+    val pendingIntent = PendingIntent.getActivity(
+        context,
+        0,
+        intent,
+        PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+    val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+    alarmManager.set(
+        AlarmManager.RTC,
+        System.currentTimeMillis() + 100,
+        pendingIntent
+    )
+    Process.killProcess(Process.myPid())
+    exitProcess(0)
 }
 
 
