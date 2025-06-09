@@ -344,6 +344,9 @@ class WebPlayerActivity : ComponentActivity() {
 
 
     override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
+            if (prefManager.myPrefs.darkMODE) {
+                setDarkTheme()
+            }
             loadingSpinner!!.visibility = View.VISIBLE
         }
 
