@@ -374,6 +374,13 @@ fun SettingsScreen(
                 )
             }
             val iptvNameSaved = preferenceManager.myPrefs.iptvAppName
+            val iptvPKGNameSaved = preferenceManager.myPrefs.iptvAppPackageName
+            val result = if (iptvPKGNameSaved == "tvzone" || iptvPKGNameSaved == "webtv") {
+                "No IPTV"
+            } else {
+                iptvNameSaved
+            }
+
             item {
                 Spacer(modifier = Modifier.height(12.dp))
                 SettingItem(
@@ -382,7 +389,7 @@ fun SettingsScreen(
                     subtitle = if (iptvNameSaved.isNullOrEmpty() || iptvNameSaved == "No IPTV") {
                         "Choose your preferred IPTV to start"
                     } else {
-                        "Selected IPTV: $iptvNameSaved"
+                        "Selected IPTV: $result"
                     },
                     onClick = {
                         val intent = Intent(activity, AppListActivity::class.java)

@@ -871,7 +871,7 @@ class MainActivity : ComponentActivity() {
                 "tvzone" -> {
                     Toast.makeText(this, "Starting TV", Toast.LENGTH_SHORT).show()
                     Log.d("DIX", "Opening TV")
-                    // Optionally: currentScreen = "Zone"
+                    currentScreen = "Zone" // OP
                 }
                 else -> {
                     // Try launching a specific activity if provided
