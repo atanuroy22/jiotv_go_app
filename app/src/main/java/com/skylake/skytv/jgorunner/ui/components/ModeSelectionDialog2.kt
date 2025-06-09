@@ -108,6 +108,41 @@ fun ModeSelectionDialog2(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // --- TV Remote Navigation Configuration ---
+                val tvRemoteNavigationOptions = mapOf(
+                    "Channel Up / Channel Down" to 0,
+                    "Remote Up / Remote Down" to 1,
+                    "Disable" to -1,
+                )
+                val tvRemoteNavigationLabels = tvRemoteNavigationOptions.keys.toList()
+
+                var selectedTvRemoteNavOption by remember {
+                    mutableIntStateOf(preferenceManager.myPrefs.selectedRemoteNavTV?.toIntOrNull() ?: 0)
+                }
+
+
+
+
+                var isTvRemoteNavDropdownExpanded by remember { mutableStateOf(false) }
+
+                val selectedTvRemoteNavLabel = tvRemoteNavigationOptions.entries
+                    .find { it.value == selectedTvRemoteNavOption }
+                    ?.key ?: tvRemoteNavigationLabels[0]
+
+                DropdownSelection2(
+                    title = "Select Channel change keys",
+                    options = tvRemoteNavigationLabels,
+                    selectedOption = selectedTvRemoteNavLabel,
+                    onOptionSelected = { label ->
+                        selectedTvRemoteNavOption = tvRemoteNavigationOptions[label] ?: 0
+                    },
+                    expanded = isTvRemoteNavDropdownExpanded,
+                    onExpandChange = { isExpanded -> isTvRemoteNavDropdownExpanded = isExpanded }
+                )
+
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 // --- Category Selection ---
                 val categoryMap = mapOf(
                     "All Categories" to null,
@@ -309,6 +344,7 @@ fun ModeSelectionDialog2(
                         onClick = {
                             selectedQuality = "auto"
                             selectedScreenTV = 0
+                            selectedTvRemoteNavOption = 0
                             selectedCategories.value.clear()
                             selectedCategoryInts.value.clear()
                             selectedLanguages.value.clear()
@@ -318,6 +354,7 @@ fun ModeSelectionDialog2(
                                 myPrefs.filterQX = "auto"
                                 myPrefs.filterCI = ""
                                 myPrefs.filterLI = ""
+                                myPrefs.selectedRemoteNavTV = "0"
                                 savePreferences()
                             }
                             onReset()
@@ -336,6 +373,7 @@ fun ModeSelectionDialog2(
                         )
                         preferenceManager.apply {
                             myPrefs.selectedScreenTV = selectedScreenTV.toString()
+                            myPrefs.selectedRemoteNavTV = selectedTvRemoteNavOption.toString()
                             myPrefs.filterQX = selectedQuality
                             myPrefs.filterCI = selectedCategoryInts.value.joinToString(",")
                             myPrefs.filterLI = selectedLanguageInts.value.joinToString(",")

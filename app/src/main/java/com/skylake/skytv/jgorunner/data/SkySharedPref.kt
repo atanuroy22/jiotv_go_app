@@ -140,6 +140,7 @@ class SkySharedPref(context: Context) {
         @SharedPrefKey("operationMODE") var operationMODE: Int = 999,
         @SharedPrefKey("darkMODE") var darkMODE: Boolean = false,
         @SharedPrefKey("selectedScreenTV") var selectedScreenTV: String? = null,
+        @SharedPrefKey("selectedRemoteNavTV") var selectedRemoteNavTV: String? = null,
     )
 
     // Annotation class to define the key for SharedPreferences

@@ -147,6 +147,7 @@ class MainActivity : ComponentActivity() {
             preferenceManager.myPrefs.filterQX = "auto"
             preferenceManager.myPrefs.operationMODE = -1
             preferenceManager.myPrefs.selectedScreenTV = "0"
+            preferenceManager.myPrefs.selectedRemoteNavTV = "0"
             preferenceManager.savePreferences()
         }
 
@@ -154,6 +155,7 @@ class MainActivity : ComponentActivity() {
             preferenceManager.myPrefs.operationMODE = 1
             preferenceManager.myPrefs.filterQX = "auto"
             preferenceManager.myPrefs.selectedScreenTV = "0"
+            preferenceManager.myPrefs.selectedRemoteNavTV = "0"
         }
 
         if (preferenceManager.myPrefs.operationMODE == -1) {
