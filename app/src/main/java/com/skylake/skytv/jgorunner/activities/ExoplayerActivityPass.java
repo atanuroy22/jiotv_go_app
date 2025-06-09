@@ -44,7 +44,7 @@ public class ExoplayerActivityPass extends ComponentActivity {
     private static final String TAG = "EPAP-DIX";
     private static final String DEFAULT_VIDEO_URL = "http://localhost:5350/live/143.m3u8";
     private static final int HIDE_CONTROLS_DELAY_MS = 1000;
-    private static final int SHOW_CHANNEL_INFO_DURATION_MS = 4000;
+    private static final int SHOW_CHANNEL_INFO_DURATION_MS = 3000;
 
     private ExoPlayer player;
     private PlayerView playerView;
@@ -52,6 +52,7 @@ public class ExoplayerActivityPass extends ComponentActivity {
 
     private SkySharedPref skyPref;
     private String filterQX;
+    private String tv_NAV;
 
     private LinearLayout floatingChannelInfoLayout;
     private ImageView channelLogoImageView;
@@ -64,6 +65,13 @@ public class ExoplayerActivityPass extends ComponentActivity {
     private int currentChannelIndex = -1;
 
     private boolean isControllerActuallyVisible = false;
+
+    private Handler channelInfoHandler = new Handler(Looper.getMainLooper());
+    private Runnable hideChannelInfoRunnable = () -> {
+        if (floatingChannelInfoLayout != null) {
+            floatingChannelInfoLayout.setVisibility(View.GONE);
+        }
+    };
 
     @OptIn(markerClass = UnstableApi.class)
     @Override
@@ -121,6 +129,7 @@ public class ExoplayerActivityPass extends ComponentActivity {
 
         skyPref = SkySharedPref.getInstance(this);
         filterQX = skyPref.getMyPrefs().getFilterQX();
+        tv_NAV = skyPref.getMyPrefs().getSelectedRemoteNavTV();
 
         String formattedUrl = formatVideoUrl(initialVideoUrl, signatureFallback);
         Log.d(TAG, "Formatted URL for initial playback: " + formattedUrl);
@@ -158,6 +167,9 @@ public class ExoplayerActivityPass extends ComponentActivity {
             playerView.setResizeMode(AspectRatioFrameLayout.RESIZE_MODE_FIT);
             playerView.setShowNextButton(false);
             playerView.setShowPreviousButton(false);
+            playerView.setControllerAutoShow(false);
+            playerView.hideController();
+            playerView.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING);
             player.setSeekParameters(SeekParameters.CLOSEST_SYNC);
         }
 
@@ -173,16 +185,28 @@ public class ExoplayerActivityPass extends ComponentActivity {
         showAndHideChannelInfoBox();
     }
 
+//    private void showAndHideChannelInfoBox() {
+//        if (floatingChannelInfoLayout != null) {
+//            floatingChannelInfoLayout.setVisibility(View.VISIBLE);
+//            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+//                if (floatingChannelInfoLayout != null) {
+//                    floatingChannelInfoLayout.setVisibility(View.GONE);
+//                }
+//            }, SHOW_CHANNEL_INFO_DURATION_MS);
+//        }
+//    }
+
+
+
+
     private void showAndHideChannelInfoBox() {
         if (floatingChannelInfoLayout != null) {
             floatingChannelInfoLayout.setVisibility(View.VISIBLE);
-            new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                if (floatingChannelInfoLayout != null) {
-                    floatingChannelInfoLayout.setVisibility(View.GONE);
-                }
-            }, SHOW_CHANNEL_INFO_DURATION_MS);
+            channelInfoHandler.removeCallbacks(hideChannelInfoRunnable);
+            channelInfoHandler.postDelayed(hideChannelInfoRunnable, SHOW_CHANNEL_INFO_DURATION_MS);
         }
     }
+
 
     private String formatVideoUrl(String videoUrl, String signatureFallback) {
         if (videoUrl == null || videoUrl.isEmpty()) {
@@ -225,37 +249,58 @@ public class ExoplayerActivityPass extends ComponentActivity {
     @OptIn(markerClass = UnstableApi.class)
     @SuppressLint("RestrictedApi")
     @Override
-    public boolean dispatchKeyEvent(KeyEvent event) {
+    public boolean dispatchKeyEvent(@NonNull KeyEvent event) {
         if (player == null) {
             return super.dispatchKeyEvent(event);
         }
 
-        if (isControllerActuallyVisible && playerView.dispatchKeyEvent(event)) {
-            return true;
+        Log.d("HAN",tv_NAV);
+
+        if (tv_NAV == null) {
+            return super.dispatchKeyEvent(event);
+        }
+
+        if ("-1".equals(tv_NAV)) {
+            return super.dispatchKeyEvent(event);
         }
 
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
+            switch (tv_NAV) {
+                case "0":
+                    switch (event.getKeyCode()) {
+                        case KeyEvent.KEYCODE_CHANNEL_DOWN:
+                            playPreviousChannel();
+                            if (playerView != null) playerView.hideController();
+                            return true;
+                        case KeyEvent.KEYCODE_CHANNEL_UP:
+                            playNextChannel();
+                            if (playerView != null) playerView.hideController();
+                            return true;
+                    }
+                    break;
+                case "1":
+                    switch (event.getKeyCode()) {
+                        case KeyEvent.KEYCODE_DPAD_DOWN:
+                            playPreviousChannel();
+                            if (playerView != null) playerView.hideController();
+                            return true;
+                        case KeyEvent.KEYCODE_DPAD_UP:
+                            playNextChannel();
+                            if (playerView != null) playerView.hideController();
+                            return true;
+                    }
+                    break;
+            }
             switch (event.getKeyCode()) {
-                case KeyEvent.KEYCODE_CHANNEL_UP:
-                    Log.d(TAG, "CHANNEL UP pressed");
-                    playPreviousChannel();
-                    return true;
-                case KeyEvent.KEYCODE_CHANNEL_DOWN :
-                    Log.d(TAG, "CHANNEL_DOWN   pressed");
-                    playNextChannel();
-                    return true;
                 case KeyEvent.KEYCODE_DPAD_CENTER:
                 case KeyEvent.KEYCODE_ENTER:
-                    if (!isControllerActuallyVisible) {
-                        playerView.showController();
-                    } else {
-                        boolean showController = false;
-                    }
                     return true;
             }
         }
         return super.dispatchKeyEvent(event);
     }
+
+
 
     private void playNextChannel() {
         if (channelList == null || channelList.isEmpty()) {
@@ -285,6 +330,7 @@ public class ExoplayerActivityPass extends ComponentActivity {
         switchChannel();
     }
 
+    @OptIn(markerClass = UnstableApi.class)
     private void switchChannel() {
         if (channelList == null || currentChannelIndex < 0 || currentChannelIndex >= channelList.size()) {
             Log.e(TAG, "Cannot switch channel, invalid list or index.");
@@ -303,6 +349,8 @@ public class ExoplayerActivityPass extends ComponentActivity {
         signatureFallback = (signatureFallback == null || signatureFallback.isEmpty()) ? "0x0" : signatureFallback;
         String formattedUrl = formatVideoUrl(newChannel.getVideoUrl(), signatureFallback);
 
+        if (playerView != null) playerView.hideController();
+
         if (player != null) {
             player.stop();
             setupPlayer(formattedUrl);
@@ -310,7 +358,9 @@ public class ExoplayerActivityPass extends ComponentActivity {
             Log.e(TAG, "Player is null, cannot switch channel.");
             setupPlayer(formattedUrl);
         }
+        if (playerView != null) playerView.hideController();
     }
+
 
     @Override
     protected void onResume() {
@@ -335,7 +385,6 @@ public class ExoplayerActivityPass extends ComponentActivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && player != null && !isInPipMode) {
             releasePlayer();
         }
-        // If activity is finishing and not in PiP, release player
         if (isFinishing() && !isInPipMode) {
             releasePlayer();
         }
