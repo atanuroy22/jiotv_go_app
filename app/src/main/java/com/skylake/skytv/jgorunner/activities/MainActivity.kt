@@ -112,6 +112,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        runOnceAfterAppUpgrade()
         preferenceManager = SkySharedPref.getInstance(this)
 
         // DEL
@@ -128,7 +129,6 @@ class MainActivity : ComponentActivity() {
         }
 
         // DEL
-
 
         if (preferenceManager.myPrefs.iptvLaunchCountdown == 0) {
             preferenceManager.myPrefs.iptvLaunchCountdown = 4
@@ -152,7 +152,7 @@ class MainActivity : ComponentActivity() {
         }
 
         if (preferenceManager.myPrefs.operationMODE == null || (preferenceManager.myPrefs.operationMODE == 999)) {
-            preferenceManager.myPrefs.operationMODE = 1
+            preferenceManager.myPrefs.operationMODE = -1
             preferenceManager.myPrefs.filterQX = "auto"
             preferenceManager.myPrefs.selectedScreenTV = "0"
             preferenceManager.myPrefs.selectedRemoteNavTV = "0"
@@ -190,6 +190,97 @@ class MainActivity : ComponentActivity() {
             )
         }
     }
+
+//    private fun runOnceAfterAppUpgrade() { true or false
+//        val prefs = getSharedPreferences("app_update_prefs", Context.MODE_PRIVATE)
+//        val packageInfo = packageManager.getPackageInfo(packageName, 0)
+//        val currentVersion = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+//            packageInfo.longVersionCode
+//        } else {
+//            @Suppress("DEPRECATION")
+//            packageInfo.versionCode.toLong()
+//        }
+//        val lastVersion = prefs.getLong("last_version_code", -1L)
+//
+//        if (currentVersion > lastVersion) {
+//            Log.d("App-DIX", "App updated")
+//
+//
+//
+//
+//            preferenceManager.clearPreferences()
+//            Toast.makeText(
+//                this@MainActivity,
+//                "🔄 Welcome to JTV-GO Server!\nOld settings cleared for a smooth start. 🚀",
+//                Toast.LENGTH_SHORT
+//            ).show()
+//            prefs.edit().putLong("last_version_code", currentVersion).apply()
+//        }
+//    }
+
+    private fun runOnceAfterAppUpgrade() {
+        val skySharedPref = SkySharedPref.getInstance(this)
+        val prefs = getSharedPreferences("app_update_prefs", Context.MODE_PRIVATE)
+        val packageInfo = packageManager.getPackageInfo(packageName, 0)
+        val currentVersion = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            packageInfo.longVersionCode
+        } else {
+            @Suppress("DEPRECATION")
+            packageInfo.versionCode.toLong()
+        }
+        val lastVersion = prefs.getLong("last_version_code", -1L)
+
+        if (currentVersion > lastVersion) {
+            Log.d("App-DIX", "App updated")
+
+
+            val backupPrefs = skySharedPref.myPrefs.copy()
+
+            skySharedPref.clearPreferences()
+            skySharedPref.myPrefs = skySharedPref.myPrefs.copy(
+                serveLocal = backupPrefs.serveLocal,
+                autoStartServer = backupPrefs.autoStartServer,
+                autoStartOnBoot = backupPrefs.autoStartOnBoot,
+                autoStartOnBootForeground = backupPrefs.autoStartOnBootForeground,
+                autoStartIPTV = backupPrefs.autoStartIPTV,
+                enableAutoUpdate = backupPrefs.enableAutoUpdate,
+                jtvGoServerPort = backupPrefs.jtvGoServerPort,
+                jtvGoBinaryName = backupPrefs.jtvGoBinaryName,
+                jtvGoBinaryVersion = backupPrefs.jtvGoBinaryVersion,
+                jtvConfigLocation = backupPrefs.jtvConfigLocation,
+                iptvAppName = backupPrefs.iptvAppName,
+                iptvAppPackageName = backupPrefs.iptvAppPackageName,
+                iptvAppLaunchActivity = backupPrefs.iptvAppLaunchActivity,
+                iptvLaunchCountdown = backupPrefs.iptvLaunchCountdown,
+                overlayPermissionAttempts = backupPrefs.overlayPermissionAttempts,
+                loginChk = backupPrefs.loginChk,
+                recentChannelsJson = backupPrefs.recentChannelsJson,
+                currentPort = backupPrefs.currentPort,
+                filterQ = backupPrefs.filterQ,
+                filterL = backupPrefs.filterL,
+                filterC = backupPrefs.filterC,
+                filterQX = backupPrefs.filterQX,
+                filterLX = backupPrefs.filterLX,
+                filterCX = backupPrefs.filterCX,
+
+//                filterLI = backupPrefs.filterLI,
+//                filterCI = backupPrefs.filterCI,
+//                recentChannels = backupPrefs.recentChannels,
+//                operationMODE = backupPrefs.operationMODE,
+//                darkMODE = backupPrefs.darkMODE,
+//                selectedScreenTV = backupPrefs.selectedScreenTV,
+//                selectedRemoteNavTV = backupPrefs.selectedRemoteNavTV
+            )
+            skySharedPref.savePreferences()
+
+//            skySharedPref.myPrefs = backupPrefs // for all
+//            skySharedPref.savePreferences()
+
+            prefs.edit().putLong("last_version_code", currentVersion).apply()
+        }
+    }
+
+
 
 
 

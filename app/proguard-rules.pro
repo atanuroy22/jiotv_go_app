@@ -50,12 +50,30 @@
   <init>(...);
 }
 
+-keepclassmembers class com.skylake.skytv.jgorunner.activities.ChannelInfo {
+  <init>(...);
+}
+
 -keep class com.skylake.skytv.jgorunner.ui.dev.Channel
 -keep class com.skylake.skytv.jgorunner.ui.dev.ChannelResponse
 -keep class com.skylake.skytv.jgorunner.ui.dev.EpgProgram
 -keep class com.skylake.skytv.jgorunner.ui.dev.EpgResponse
+-keep class com.skylake.skytv.jgorunner.activities.ChannelInfo
 
 
+# Keep Kotlin metadata for reflection
+-keep class kotlin.Metadata { *; }
+
+# Keep runtime annotations and property signatures
+-keepattributes Signature,RuntimeVisibleAnnotations,RuntimeVisibleParameterAnnotations,RuntimeInvisibleAnnotations,RuntimeInvisibleParameterAnnotations,EnclosingMethod,InnerClasses,AnnotationDefault,SourceFile,LineNumberTable,LocalVariableTable,LocalVariableTypeTable
+
+# Keep all fields in SharedPrefStructure (for reflection)
+-keepclassmembers class com.skylake.skytv.jgorunner.data.SkySharedPref$SharedPrefStructure {
+    <fields>;
+}
+
+
+-keep class com.skylake.skytv.jgorunner.data.** { *; }
 
 
 

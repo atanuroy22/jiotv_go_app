@@ -29,7 +29,6 @@ class SkySharedPref(context: Context) {
     private val editor: SharedPreferences.Editor = sharedPreferences.edit()
 
     var myPrefs = readFromSharedPreferences() // This will be updated with saved preferences
-        private set
 
     // Save all preferences
     fun savePreferences() {
@@ -129,18 +128,18 @@ class SkySharedPref(context: Context) {
         @SharedPrefKey("filterQX") var filterQX: String? = null,
         @SharedPrefKey("filterLX") var filterLX: String? = null,
         @SharedPrefKey("filterCX") var filterCX: String? = null,
-        @SharedPrefKey("filterLI") var filterLI: String? = null,
-        @SharedPrefKey("filterCI") var filterCI: String? = null,
+        @SharedPrefKey("filterLI") var filterLI: String? = "",
+        @SharedPrefKey("filterCI") var filterCI: String? = "",
         @SharedPrefKey("login_chk") var loginChk: Boolean = true,
         @SharedPrefKey("cast_channel_name") var castChannelName: String? = "",
         @SharedPrefKey("cast_channel_logo") var castChannelLogo: String? = "",
         @SharedPrefKey("lastFetchTime") var lastFetchTime: Int? = 0,
         @SharedPrefKey("currentPort") var currentPort: Int = 0,
-        @SharedPrefKey("recentChannels") var recentChannels: String? = null,
+        @SharedPrefKey("recentChannels") var recentChannels: String? = "",
         @SharedPrefKey("operationMODE") var operationMODE: Int = 999,
         @SharedPrefKey("darkMODE") var darkMODE: Boolean = false,
-        @SharedPrefKey("selectedScreenTV") var selectedScreenTV: String? = null,
-        @SharedPrefKey("selectedRemoteNavTV") var selectedRemoteNavTV: String? = null,
+        @SharedPrefKey("selectedScreenTV") var selectedScreenTV: String? = "",
+        @SharedPrefKey("selectedRemoteNavTV") var selectedRemoteNavTV: String? = "",
     )
 
     // Annotation class to define the key for SharedPreferences
