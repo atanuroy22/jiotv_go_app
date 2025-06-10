@@ -1,5 +1,5 @@
 //Version Config
 ext {
-    appVersionCode = 9
-    appVersionName = "1.1.7"
+    appVersionCode = 8
+    appVersionName = "1.1.6"
 }
