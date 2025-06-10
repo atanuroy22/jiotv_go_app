@@ -1,5 +1,7 @@
 [versions]
+accompanistSystemuicontroller = "0.30.1"
 agp = "8.7.2"
+compose = "1.0.0-beta01"
 customview = "1.1.0"
 customviewPoolingcontainer = "1.0.0"
 exoplayer = "2.19.1"
@@ -23,6 +25,8 @@ media3Ui = "1.5.1"
 mediarouter = "1.7.0"
 nanohttpd = "2.3.1"
 playServicesCastFramework = "22.0.0"
+tvFoundation = "1.0.0-alpha12"
+tvMaterial = "1.1.0-alpha01"
 versionParser = "5.0.0"
 okhttp = "4.12.0"
 ketch = "2.0.2"
@@ -31,6 +35,7 @@ media3ExoplayerHls = "1.5.1"
 appcompat = "1.7.0"
 
 [libraries]
+accompanist-systemuicontroller = { module = "com.google.accompanist:accompanist-systemuicontroller", version.ref = "accompanistSystemuicontroller" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-customview = { group = "androidx.customview", name = "customview", version.ref = "customview" }
 androidx-customview-poolingcontainer = { module = "androidx.customview:customview-poolingcontainer", version.ref = "customviewPoolingcontainer" }
@@ -40,7 +45,10 @@ androidx-media3-exoplayer = { module = "androidx.media3:media3-exoplayer", versi
 androidx-media3-exoplayer-dash = { module = "androidx.media3:media3-exoplayer-dash", version.ref = "media3ExoplayerDash" }
 androidx-media3-ui = { module = "androidx.media3:media3-ui", version.ref = "media3Ui" }
 androidx-mediarouter = { module = "androidx.mediarouter:mediarouter", version.ref = "mediarouter" }
+androidx-tv-foundation = { module = "androidx.tv:tv-foundation", version.ref = "tvFoundation" }
+androidx-tv-material = { module = "androidx.tv:tv-material", version.ref = "tvMaterial" }
 arthenica-ffmpeg-kit-full = { module = "com.arthenica:ffmpeg-kit-full" }
+compose = { module = "com.github.bumptech.glide:compose", version.ref = "compose" }
 exoplayer = { module = "com.google.android.exoplayer:exoplayer", version.ref = "exoplayer" }
 exoplayer-drm = { module = "com.google.android.exoplayer:exoplayer-drm", version.ref = "exoplayerDrm" }
 ffmpeg-kit-full = { module = "com.arthenica:ffmpeg-kit-full", version.ref = "ffmpegKitFull" }

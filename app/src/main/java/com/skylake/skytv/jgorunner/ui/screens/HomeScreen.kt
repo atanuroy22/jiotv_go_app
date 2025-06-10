@@ -29,12 +29,14 @@ import androidx.compose.material.icons.automirrored.twotone.ExitToApp
 import androidx.compose.material.icons.twotone.Cast
 import androidx.compose.material.icons.twotone.CastConnected
 import androidx.compose.material.icons.twotone.Deblur
+import androidx.compose.material.icons.twotone.Landscape
 import androidx.compose.material.icons.twotone.LiveTv
 import androidx.compose.material.icons.twotone.PlayArrow
 import androidx.compose.material.icons.twotone.ResetTv
 import androidx.compose.material.icons.twotone.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -190,15 +192,15 @@ fun HomeScreen(
             RunIPTVButton {
                 onRunIPTVButtonClick()
             }
-            WebTVButton(
-                enabled = isServerRunning
-            ) {
-                onWebTVButtonClick()
-            }
             DebugButton(
                 enabled = isServerRunning
             ) {
                 onDebugButtonClick()
+            }
+            WebTVButton(
+                enabled = isServerRunning
+            ) {
+                onWebTVButtonClick()
             }
             ExitButton {
                 onExitButtonClick()
@@ -217,18 +219,29 @@ fun HomeScreen(
                 outputScrollState.animateScrollTo(outputScrollState.maxValue)
             }
 
-            Text(
-                text = outputText,
-                color = Color.White,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Normal,
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(160.dp)
-                    .background(Color.Black)
-                    .padding(8.dp)
-                    .verticalScroll(outputScrollState)
-            )
+                    .padding(bottom = 16.dp)
+            ) {
+                Text(
+                    text = outputText,
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Normal,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = FontFamily.Monospace
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .background(Color.Black)
+                        .padding(8.dp)
+                        .verticalScroll(outputScrollState)
+                )
+            }
+
+
         }
     }
 }
@@ -381,7 +394,7 @@ fun RowScope.DebugButton(
         contentPadding = PaddingValues(2.dp),
         enabled = enabled
     ) {
-        ButtonContent("Debug", Icons.TwoTone.Deblur)
+        ButtonContent("TV", Icons.TwoTone.Landscape)
     }
 }
 

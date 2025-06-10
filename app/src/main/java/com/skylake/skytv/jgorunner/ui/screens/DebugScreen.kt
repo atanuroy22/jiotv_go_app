@@ -46,8 +46,11 @@ import com.skylake.skytv.jgorunner.ui.components.ButtonContent
 
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.core.content.ContextCompat.startActivity
 import com.skylake.skytv.jgorunner.activities.CastActivity
+import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.activities.ExoplayerActivity
+import com.skylake.skytv.jgorunner.activities.ExoplayerActivityPass
 
 @Composable
 fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
@@ -135,7 +138,7 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
 
-            Button7(context)
+            Button7(context, onNavigate)
             Button8(context)
         }
 
@@ -211,7 +214,7 @@ fun RowScope.Button2(context: Context, onNavigate: (String) -> Unit) {
         colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
         contentPadding = PaddingValues(2.dp)
     ) {
-        ButtonContent("Sys Info", Icons.Sharp.Info)
+        ButtonContent("Info & Log", Icons.Sharp.Info)
     }
 }
 
@@ -324,14 +327,14 @@ fun RowScope.Button6(context: Context) {
 }
 
 @Composable
-fun RowScope.Button7(context: Context) {
+fun RowScope.Button7(context: Context, onNavigate: (String) -> Unit) {
     val colorPRIME = MaterialTheme.colorScheme.primary
     val colorSECOND = colorPRIME.copy(alpha = 0.5f)
     val buttonColor = remember { mutableStateOf(colorPRIME) }
 
     Button(
         onClick = {
-            handleButton7Click(context)
+            handleButton7Click(context, onNavigate)
         },
         modifier = Modifier
             .weight(1f)
@@ -409,11 +412,18 @@ fun handleButton5Click(context: Context, onNavigate: (String) -> Unit) {
 
 fun handleButton6Click(context: Context) {
     Toast.makeText(context, "Demo Stream Playing", Toast.LENGTH_SHORT).show()
-    val intent = Intent(context, ExoplayerActivity::class.java)
+    val intent = Intent(context, ExoplayerActivityPass::class.java)
+    intent.putExtra("video_url", "http://localhost:5350/live/144.m3u8")
+    intent.putExtra("zone", "TV")
+    intent.putExtra("logo_url", "TV")
+    intent.putExtra("ch_name", "Colors TV")
+    intent.putExtra("current_channel_index", 0)
     context.startActivity(intent)
+
 }
 
-fun handleButton7Click(context: Context) {
+fun handleButton7Click(context: Context, onNavigate: (String) -> Unit) {
+    onNavigate("Zone")
     Toast.makeText(context, "Pending Implementation", Toast.LENGTH_SHORT).show()
 }
 
