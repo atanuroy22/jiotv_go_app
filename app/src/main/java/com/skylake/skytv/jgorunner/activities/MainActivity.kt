@@ -112,6 +112,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        runOnceAfterAppUpgrade()
         preferenceManager = SkySharedPref.getInstance(this)
 
         // DEL
@@ -128,8 +129,7 @@ class MainActivity : ComponentActivity() {
         }
 
         // DEL
-
-
+        
         if (preferenceManager.myPrefs.iptvLaunchCountdown == 0) {
             preferenceManager.myPrefs.iptvLaunchCountdown = 4
 //            preferenceManager.myPrefs.autoStartServer = true
@@ -152,7 +152,7 @@ class MainActivity : ComponentActivity() {
         }
 
         if (preferenceManager.myPrefs.operationMODE == null || (preferenceManager.myPrefs.operationMODE == 999)) {
-            preferenceManager.myPrefs.operationMODE = 1
+            preferenceManager.myPrefs.operationMODE = -1
             preferenceManager.myPrefs.filterQX = "auto"
             preferenceManager.myPrefs.selectedScreenTV = "0"
             preferenceManager.myPrefs.selectedRemoteNavTV = "0"
@@ -190,6 +190,30 @@ class MainActivity : ComponentActivity() {
             )
         }
     }
+
+    private fun runOnceAfterAppUpgrade() {
+        val prefs = getSharedPreferences("app_update_prefs", Context.MODE_PRIVATE)
+        val packageInfo = packageManager.getPackageInfo(packageName, 0)
+        val currentVersion = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            packageInfo.longVersionCode
+        } else {
+            @Suppress("DEPRECATION")
+            packageInfo.versionCode.toLong()
+        }
+        val lastVersion = prefs.getLong("last_version_code", -1L)
+
+        if (currentVersion > lastVersion) {
+            Log.d("App-DIX", "App updated")
+            preferenceManager.clearPreferences()
+            Toast.makeText(
+                this@MainActivity,
+                "🔄 Welcome to JTV-GO Server!\nOld settings cleared for a smooth start. 🚀",
+                Toast.LENGTH_SHORT
+            ).show()
+            prefs.edit().putLong("last_version_code", currentVersion).apply()
+        }
+    }
+
 
 
 

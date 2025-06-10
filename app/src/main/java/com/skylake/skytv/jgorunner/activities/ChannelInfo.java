@@ -1,4 +1,4 @@
-package com.skylake.skytv.jgorunner.activities; // Or your appropriate package
+package com.skylake.skytv.jgorunner.activities;
 
 import android.os.Parcel;
 import android.os.Parcelable;
