@@ -262,6 +262,7 @@ class MainActivity : ComponentActivity() {
                 filterQX = backupPrefs.filterQX,
                 filterLX = backupPrefs.filterLX,
                 filterCX = backupPrefs.filterCX,
+                operationMODE = backupPrefs.operationMODE,
 
 //                filterLI = backupPrefs.filterLI,
 //                filterCI = backupPrefs.filterCI,

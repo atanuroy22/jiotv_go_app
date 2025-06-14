@@ -37,6 +37,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import android.util.Log
 import androidx.compose.animation.Animatable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.sharp.Info
 import androidx.compose.material.icons.sharp.Support
@@ -46,6 +50,7 @@ import com.skylake.skytv.jgorunner.ui.components.ButtonContent
 
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.ripple.rememberRipple
 import androidx.core.content.ContextCompat.startActivity
 import com.skylake.skytv.jgorunner.activities.CastActivity
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
@@ -160,15 +165,15 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
 }
 
 
+@OptIn(ExperimentalFoundationApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun RowScope.Button1(context: Context, onNavigate: (String) -> Unit) {
     val colorPRIME = MaterialTheme.colorScheme.primary
     val colorSECOND = MaterialTheme.colorScheme.secondary
     val buttonColor = remember { mutableStateOf(colorPRIME) }
-    Button(
-        onClick = {
-            handleButton1Click(context,onNavigate)
-        },
+    val preferenceManager = SkySharedPref.getInstance(context)
+
+    Box(
         modifier = Modifier
             .weight(1f)
             .padding(8.dp)
@@ -178,14 +183,30 @@ fun RowScope.Button1(context: Context, onNavigate: (String) -> Unit) {
                 } else {
                     colorPRIME
                 }
-            },
-        shape = RoundedCornerShape(8.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
-        contentPadding = PaddingValues(2.dp)
+            }
+            .background(
+                color = buttonColor.value,
+                shape = RoundedCornerShape(8.dp)
+            )
+            .combinedClickable(
+                onClick = {
+                    handleButton1Click(context, onNavigate)
+                },
+                onLongClick = {
+                    val current = preferenceManager.myPrefs.expDebug
+                    preferenceManager.myPrefs.expDebug = !current
+                    val status = if (!current) "enabled" else "disabled"
+                    Toast.makeText(context, "Experimental features $status!", Toast.LENGTH_SHORT).show()
+                }
+            ),
+        contentAlignment = Alignment.Center
     ) {
         ButtonContent("Runner", Icons.AutoMirrored.Filled.DirectionsRun)
     }
 }
+
+
+
 
 @Composable
 fun RowScope.Button2(context: Context, onNavigate: (String) -> Unit) {

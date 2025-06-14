@@ -42,3 +42,12 @@ data class EpgProgram(
     val startEpoch: Long,
     val endEpoch: Long
 )
+
+// Data class for parsed channels
+@Keep
+data class M3UChannelExp(
+    val name: String,
+    val url: String,
+    val logo: String?,
+    val category: String?
+)

@@ -1,14 +1,11 @@
 package com.skylake.skytv.jgorunner.ui.screens
 
 import android.annotation.SuppressLint
-import android.app.UiModeManager
 import android.content.Context
 import android.content.res.Configuration
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.view.WindowInsets
-import android.view.WindowInsetsController
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Animatable
@@ -53,16 +50,17 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
-import androidx.core.view.WindowCompat
 import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.ui.components.ModeSelectionDialog2
+import com.skylake.skytv.jgorunner.ui.dev.TVTabLayout_exp
 import com.skylake.skytv.jgorunner.ui.dev.RecentTabLayout
 import com.skylake.skytv.jgorunner.ui.dev.RecentTabLayoutTV
 import com.skylake.skytv.jgorunner.ui.dev.SearchTabLayout
 import com.skylake.skytv.jgorunner.ui.dev.SearchTabLayoutTV
 import com.skylake.skytv.jgorunner.ui.dev.TVTabLayout
 import com.skylake.skytv.jgorunner.ui.dev.TVTabLayoutTV
+import com.skylake.skytv.jgorunner.ui.dev.TVTabLayoutTV_exp
 import kotlin.random.Random
 
 @SuppressLint("NewApi")
@@ -216,10 +214,25 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
         }
 
         when (selectedTabIndex) {
-            0 -> if (isRemoteNavigation) TVTabLayoutTV(context) else TVTabLayout(context)
+            0 -> {
+                if (preferenceManager.myPrefs.expDebug && !preferenceManager.myPrefs.showPLAYLIST) {
+                    if (isRemoteNavigation) {
+                        TVTabLayoutTV_exp(context)
+                    } else {
+                        TVTabLayout_exp(context)
+                    }
+                } else {
+                    if (isRemoteNavigation) {
+                        TVTabLayoutTV(context)
+                    } else {
+                        TVTabLayout(context)
+                    }
+                }
+            }
             1 -> if (isRemoteNavigation) RecentTabLayoutTV(context) else RecentTabLayout(context)
             2 -> if (isRemoteNavigation) SearchTabLayoutTV(context, tabFocusRequester) else SearchTabLayout(context, tabFocusRequester)
         }
+
     }
 
     ModeSelectionDialog2(

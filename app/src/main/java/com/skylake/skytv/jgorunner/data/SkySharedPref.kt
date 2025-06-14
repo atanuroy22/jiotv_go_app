@@ -140,7 +140,13 @@ class SkySharedPref(context: Context) {
         @SharedPrefKey("darkMODE") var darkMODE: Boolean = false,
         @SharedPrefKey("selectedScreenTV") var selectedScreenTV: String? = "",
         @SharedPrefKey("selectedRemoteNavTV") var selectedRemoteNavTV: String? = "",
+        @SharedPrefKey("custURL") var custURL: String? = "",
+        @SharedPrefKey("channelListJson") var channelListJson: String? = "",
+        @SharedPrefKey("expDebug") var expDebug: Boolean = false,
+        @SharedPrefKey("last_selected_category_exp") var lastSelectedCategoryExp: String? = "All",
+        @SharedPrefKey("showPLAYLIST") var showPLAYLIST: Boolean = false,
     )
+
 
     // Annotation class to define the key for SharedPreferences
     @Target(AnnotationTarget.PROPERTY)

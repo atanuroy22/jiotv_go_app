@@ -20,6 +20,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.ComponentActivity;
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.OptIn;
 import androidx.media3.common.MediaItem;
@@ -86,6 +87,27 @@ public class ExoplayerActivityPass extends ComponentActivity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         Intent intent = getIntent();
+
+
+        ////////////////////////
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true /* enabled by default */) {
+            @Override
+            public void handleOnBackPressed() {
+                if (isInPipMode) {
+                    finish();
+                } else {
+                    if (playerView != null && isControllerActuallyVisible) {
+                        playerView.hideController();
+                    } else {
+                        releasePlayer();
+
+                        setEnabled(false);
+                        getOnBackPressedDispatcher().onBackPressed();
+                    }
+                }
+            }
+        });
+        ////////////////////////
 
         channelList = intent.getParcelableArrayListExtra("channel_list_data");
         currentChannelIndex = intent.getIntExtra("current_channel_index", -1);
@@ -490,18 +512,21 @@ public class ExoplayerActivityPass extends ComponentActivity {
         }
     }
 
-    @OptIn(markerClass = UnstableApi.class)
-    @Override
-    public void onBackPressed() {
-        if (isInPipMode) {
-            finish();
-        } else {
-            if (playerView != null && isControllerActuallyVisible) {
-                playerView.hideController();
-            } else {
-                super.onBackPressed();
-            }
-        }
-    }
+//    @OptIn(markerClass = UnstableApi.class)
+//    @Override
+//    public void onBackPressed() {
+//        if (isInPipMode) {
+//            finish();
+//        } else {
+//            if (playerView != null && isControllerActuallyVisible) {
+//                playerView.hideController();
+//            } else {
+//                releasePlayer();
+//                super.onBackPressed();
+//            }
+//        }
+//    }
+
+
 }
 

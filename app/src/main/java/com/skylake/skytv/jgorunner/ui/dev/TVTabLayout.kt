@@ -358,8 +358,8 @@ fun TVTabLayout(context: Context) {
 
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 100.dp),
-            contentPadding = PaddingValues(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             items(filteredChannels.value) { channel ->
