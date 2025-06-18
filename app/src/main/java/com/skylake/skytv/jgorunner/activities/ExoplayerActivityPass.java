@@ -66,6 +66,9 @@ public class ExoplayerActivityPass extends ComponentActivity {
     private int currentChannelIndex = -1;
 
     private boolean isControllerActuallyVisible = false;
+    private boolean playWhenReady = true;
+    private String lastKnownVideoUrl;
+
 
     private Handler channelInfoHandler = new Handler(Looper.getMainLooper());
     private Runnable hideChannelInfoRunnable = () -> {
@@ -78,6 +81,10 @@ public class ExoplayerActivityPass extends ComponentActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            updatePictureInPictureParams();
+        }
 
         getWindow().setFlags(
                 WindowManager.LayoutParams.FLAG_FULLSCREEN,
@@ -156,8 +163,22 @@ public class ExoplayerActivityPass extends ComponentActivity {
         String formattedUrl = formatVideoUrl(initialVideoUrl, signatureFallback);
         Log.d(TAG, "Formatted URL for initial playback: " + formattedUrl);
 
+        lastKnownVideoUrl = formattedUrl;
         setupPlayer(formattedUrl);
         hideControlsAfterDelay();
+    }
+
+    private void updatePictureInPictureParams() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Rational aspectRatio = new Rational(16, 9);
+            PictureInPictureParams.Builder pipBuilder = new PictureInPictureParams.Builder()
+                    .setAspectRatio(aspectRatio);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                pipBuilder.setAutoEnterEnabled(true);
+            }
+            setPictureInPictureParams(pipBuilder.build());
+        }
     }
 
     private void updateChannelInfoDisplay() {
@@ -375,9 +396,11 @@ public class ExoplayerActivityPass extends ComponentActivity {
 
         if (player != null) {
             player.stop();
+            lastKnownVideoUrl = formattedUrl;
             setupPlayer(formattedUrl);
         } else {
             Log.e(TAG, "Player is null, cannot switch channel.");
+            lastKnownVideoUrl = formattedUrl;
             setupPlayer(formattedUrl);
         }
         if (playerView != null) playerView.hideController();
@@ -391,23 +414,36 @@ public class ExoplayerActivityPass extends ComponentActivity {
             player.setPlayWhenReady(true);
         }
         setImmersiveMode();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            updatePictureInPictureParams();
+        }
     }
 
+    @Override
+    protected void onStart() {
+        super.onStart();
+        if (player == null) {
+            setupPlayer(lastKnownVideoUrl);
+            player.setPlayWhenReady(playWhenReady);
+        }
+    }
+
+
+    @SuppressLint("NewApi")
     @Override
     protected void onPause() {
         super.onPause();
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N && player != null && !isInPipMode) {
+        if (!isInPictureInPictureMode() && player != null) {
+            playWhenReady = player.getPlayWhenReady();
             releasePlayer();
         }
     }
 
+    @SuppressLint("NewApi")
     @Override
     protected void onStop() {
         super.onStop();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && player != null && !isInPipMode) {
-            releasePlayer();
-        }
-        if (isFinishing() && !isInPipMode) {
+        if (!isInPictureInPictureMode() && player != null) {
             releasePlayer();
         }
     }
@@ -423,10 +459,21 @@ public class ExoplayerActivityPass extends ComponentActivity {
     @Override
     public void onUserLeaveHint() {
         super.onUserLeaveHint();
-        if (player != null && player.isPlaying()) {
-            createPIPMode();
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && player != null && player.isPlaying()) {
+            enterPipModeManually();
         }
     }
+
+    private void enterPipModeManually() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Rational aspectRatio = new Rational(16, 9);
+            PictureInPictureParams.Builder pipBuilder = new PictureInPictureParams.Builder()
+                    .setAspectRatio(aspectRatio);
+            enterPictureInPictureMode(pipBuilder.build());
+            isInPipMode = true;
+        }
+    }
+
 
     @Override
     protected void onNewIntent(@NonNull Intent intent) {
