@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,6 +41,7 @@ fun RunnerScreen(context: Context) {
     var commandInput by remember { mutableStateOf("") }
     var selectedFilePath by remember { mutableStateOf("") }
     val preferenceManager = SkySharedPref.getInstance(context)
+    val focusRequester = remember { FocusRequester() }
     var isChecked by remember { mutableStateOf(preferenceManager.myPrefs.expDebug) }
 
     // File picker launcher to allow user to select a file
