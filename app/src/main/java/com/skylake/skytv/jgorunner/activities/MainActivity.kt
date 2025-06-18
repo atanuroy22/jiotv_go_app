@@ -34,6 +34,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.lifecycleScope
 import com.skylake.skytv.jgorunner.core.update.DownloadModelNew
 import com.skylake.skytv.jgorunner.BuildConfig
 import com.skylake.skytv.jgorunner.core.checkServerStatus
@@ -53,6 +54,7 @@ import com.skylake.skytv.jgorunner.ui.components.JTVModeSelectorPopup
 import com.skylake.skytv.jgorunner.ui.components.LoginPopup
 import com.skylake.skytv.jgorunner.ui.components.ProgressPopup
 import com.skylake.skytv.jgorunner.ui.components.RedirectPopup
+import com.skylake.skytv.jgorunner.ui.dev.ChannelUtils
 import com.skylake.skytv.jgorunner.ui.screens.CastScreen
 import com.skylake.skytv.jgorunner.ui.screens.DebugScreen
 import com.skylake.skytv.jgorunner.ui.screens.HomeScreen
@@ -166,6 +168,8 @@ class MainActivity : ComponentActivity() {
 
         JTVConfigurationManager.getInstance(this).saveJTVConfiguration()
         isServerRunning = BinaryService.isRunning
+
+
         if (isServerRunning) {
             BinaryService.instance?.binaryOutput?.observe(this) {
                 outputText = it
@@ -337,6 +341,19 @@ class MainActivity : ComponentActivity() {
                 IntentFilter(BinaryService.ACTION_BINARY_STOPPED)
             )
         }
+
+
+        val sharedPref = getSharedPreferences("channel_cache", Context.MODE_PRIVATE)
+        try {
+            with(sharedPref.edit()) {
+                remove("channels_json")
+                apply()
+                Log.d("DIXf", "Cleared channel cache")
+            }
+        } catch (e: Exception) {
+            Log.e("DIXf", "Error message", e)
+        }
+
 
         // Register the OnBackPressedCallback
         onBackPressedDispatcher.addCallback(this, backPressedCallback)
