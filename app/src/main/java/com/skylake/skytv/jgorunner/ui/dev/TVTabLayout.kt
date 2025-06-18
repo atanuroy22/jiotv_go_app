@@ -144,54 +144,101 @@ fun TVTabLayout(context: Context) {
 
 
     LaunchedEffect(Unit) {
-        var attempts = 0
-        var success = false
+        val sharedPref = context.getSharedPreferences("channel_cache", Context.MODE_PRIVATE)
+        var useCache = true
+        var cachedChannels: ChannelResponse? = null
 
-        while (attempts < 2 && !success) {
-            attempts++
+        val cachedJson = sharedPref.getString("channels_json", null)
+        if (cachedJson != null) {
             try {
-                val response = ChannelUtils.fetchChannels("$basefinURL/channels")
-                channelsResponse.value = response
-
-                if (response != null) {
-                    val categories = preferenceManager.myPrefs.filterCI
-                        ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
-                    val languages = preferenceManager.myPrefs.filterLI
-                        ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
-
-                    Log.d("DIX#2", "CAT:$categories, Lang:$languages")
-
-                    val filtered = when {
-                        categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(response)
-                        categories.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                            response,
-                            languageIds = languages?.mapNotNull { it.toIntOrNull() }.takeIf { it!!.isNotEmpty() }
-                        )
-                        languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                            response,
-                            categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
-                        )
-                        else -> ChannelUtils.filterChannels(
-                            response,
-                            categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() },
-                            languageIds = languages.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
-                        )
-                    }
-
-                    filteredChannels.value = filtered
-                    success = true
-                }
+                cachedChannels = Gson().fromJson(cachedJson, ChannelResponse::class.java)
+                channelsResponse.value = cachedChannels
             } catch (e: Exception) {
-                Log.e("TVTabLayout", "Error fetching channels: ${e.message}")
+                Log.e("DIX", "Error parsing cached JSON: ${e.message}")
+                with(sharedPref.edit()) {
+                    remove("channels_json")
+                    apply()
+                }
+                useCache = false
             }
-
-            if (!success) {
-                kotlinx.coroutines.delay(300)
-            }
+        } else {
+            useCache = false
         }
 
-        fetched = true
+        if (useCache && cachedChannels != null) {
+            val categories = preferenceManager.myPrefs.filterCI
+                ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+            val languages = preferenceManager.myPrefs.filterLI
+                ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+
+            val filtered = when {
+                categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(cachedChannels)
+                categories.isNullOrEmpty() -> ChannelUtils.filterChannels(
+                    cachedChannels,
+                    languageIds = languages?.mapNotNull { it.toIntOrNull() }.takeIf { it!!.isNotEmpty() }
+                )
+                languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
+                    cachedChannels,
+                    categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
+                )
+                else -> ChannelUtils.filterChannels(
+                    cachedChannels,
+                    categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() },
+                    languageIds = languages.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
+                )
+            }
+            filteredChannels.value = filtered
+            fetched = true
+        } else {
+            var attempts = 0
+            var success = false
+            while (attempts < 2 && !success) {
+                attempts++
+                try {
+                    val response = ChannelUtils.fetchChannels("$basefinURL/channels")
+                    channelsResponse.value = response
+
+                    if (response != null) {
+                        val responseJsonString = Gson().toJson(response)
+                        with(sharedPref.edit()) {
+                            putString("channels_json", responseJsonString)
+                            apply()
+                        }
+                        val categories = preferenceManager.myPrefs.filterCI
+                            ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+                        val languages = preferenceManager.myPrefs.filterLI
+                            ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+
+                        val filtered = when {
+                            categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(response)
+                            categories.isNullOrEmpty() -> ChannelUtils.filterChannels(
+                                response,
+                                languageIds = languages?.mapNotNull { it.toIntOrNull() }.takeIf { it!!.isNotEmpty() }
+                            )
+                            languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
+                                response,
+                                categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
+                            )
+                            else -> ChannelUtils.filterChannels(
+                                response,
+                                categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() },
+                                languageIds = languages.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
+                            )
+                        }
+                        filteredChannels.value = filtered
+                        success = true
+                    }
+                } catch (e: Exception) {
+                    Log.e("DIX", "Error fetching channels: ${e.message}")
+                }
+                if (!success) {
+                    kotlinx.coroutines.delay(300)
+                }
+            }
+            fetched = true
+        }
     }
+
 
     LaunchedEffect(selectedCategoryIds) {
         channelsResponse.value?.let { response ->
