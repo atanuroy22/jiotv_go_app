@@ -48,7 +48,7 @@ fun ModeSelectionDialog2(
 
     // State for playlist selection
     var showPlaylist by remember {
-        mutableStateOf(preferenceManager.myPrefs.showPLAYLIST ?: true)
+        mutableStateOf(preferenceManager.myPrefs.showPLAYLIST ?: false)
     }
 
     Dialog(
@@ -366,14 +366,14 @@ fun ModeSelectionDialog2(
                             selectedCategoryInts.value.clear()
                             selectedLanguages.value.clear()
                             selectedLanguageInts.value.clear()
-                            showPlaylist = true // Reset playlist selection
+                            showPlaylist = false // Reset playlist selection
                             preferenceManager.apply {
                                 myPrefs.selectedScreenTV = "0"
                                 myPrefs.filterQX = "auto"
                                 myPrefs.filterCI = ""
                                 myPrefs.filterLI = ""
                                 myPrefs.selectedRemoteNavTV = "0"
-                                myPrefs.showPLAYLIST = true
+                                myPrefs.showPLAYLIST = false
                                 savePreferences()
                             }
                             onReset()
