@@ -20,6 +20,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.ComponentActivity;
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.OptIn;
 import androidx.media3.common.MediaItem;
@@ -65,6 +66,9 @@ public class ExoplayerActivityPass extends ComponentActivity {
     private int currentChannelIndex = -1;
 
     private boolean isControllerActuallyVisible = false;
+    private boolean playWhenReady = true;
+    private String lastKnownVideoUrl;
+
 
     private Handler channelInfoHandler = new Handler(Looper.getMainLooper());
     private Runnable hideChannelInfoRunnable = () -> {
@@ -78,6 +82,10 @@ public class ExoplayerActivityPass extends ComponentActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            updatePictureInPictureParams();
+        }
+
         getWindow().setFlags(
                 WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN
@@ -86,6 +94,27 @@ public class ExoplayerActivityPass extends ComponentActivity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         Intent intent = getIntent();
+
+
+        ////////////////////////
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true /* enabled by default */) {
+            @Override
+            public void handleOnBackPressed() {
+                if (isInPipMode) {
+                    finish();
+                } else {
+                    if (playerView != null && isControllerActuallyVisible) {
+                        playerView.hideController();
+                    } else {
+                        releasePlayer();
+
+                        setEnabled(false);
+                        getOnBackPressedDispatcher().onBackPressed();
+                    }
+                }
+            }
+        });
+        ////////////////////////
 
         channelList = intent.getParcelableArrayListExtra("channel_list_data");
         currentChannelIndex = intent.getIntExtra("current_channel_index", -1);
@@ -134,8 +163,22 @@ public class ExoplayerActivityPass extends ComponentActivity {
         String formattedUrl = formatVideoUrl(initialVideoUrl, signatureFallback);
         Log.d(TAG, "Formatted URL for initial playback: " + formattedUrl);
 
+        lastKnownVideoUrl = formattedUrl;
         setupPlayer(formattedUrl);
         hideControlsAfterDelay();
+    }
+
+    private void updatePictureInPictureParams() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Rational aspectRatio = new Rational(16, 9);
+            PictureInPictureParams.Builder pipBuilder = new PictureInPictureParams.Builder()
+                    .setAspectRatio(aspectRatio);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                pipBuilder.setAutoEnterEnabled(true);
+            }
+            setPictureInPictureParams(pipBuilder.build());
+        }
     }
 
     private void updateChannelInfoDisplay() {
@@ -353,9 +396,11 @@ public class ExoplayerActivityPass extends ComponentActivity {
 
         if (player != null) {
             player.stop();
+            lastKnownVideoUrl = formattedUrl;
             setupPlayer(formattedUrl);
         } else {
             Log.e(TAG, "Player is null, cannot switch channel.");
+            lastKnownVideoUrl = formattedUrl;
             setupPlayer(formattedUrl);
         }
         if (playerView != null) playerView.hideController();
@@ -369,23 +414,36 @@ public class ExoplayerActivityPass extends ComponentActivity {
             player.setPlayWhenReady(true);
         }
         setImmersiveMode();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            updatePictureInPictureParams();
+        }
     }
 
+    @Override
+    protected void onStart() {
+        super.onStart();
+        if (player == null) {
+            setupPlayer(lastKnownVideoUrl);
+            player.setPlayWhenReady(playWhenReady);
+        }
+    }
+
+
+    @SuppressLint("NewApi")
     @Override
     protected void onPause() {
         super.onPause();
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N && player != null && !isInPipMode) {
+        if (!isInPictureInPictureMode() && player != null) {
+            playWhenReady = player.getPlayWhenReady();
             releasePlayer();
         }
     }
 
+    @SuppressLint("NewApi")
     @Override
     protected void onStop() {
         super.onStop();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && player != null && !isInPipMode) {
-            releasePlayer();
-        }
-        if (isFinishing() && !isInPipMode) {
+        if (!isInPictureInPictureMode() && player != null) {
             releasePlayer();
         }
     }
@@ -401,10 +459,21 @@ public class ExoplayerActivityPass extends ComponentActivity {
     @Override
     public void onUserLeaveHint() {
         super.onUserLeaveHint();
-        if (player != null && player.isPlaying()) {
-            createPIPMode();
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && player != null && player.isPlaying()) {
+            enterPipModeManually();
         }
     }
+
+    private void enterPipModeManually() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Rational aspectRatio = new Rational(16, 9);
+            PictureInPictureParams.Builder pipBuilder = new PictureInPictureParams.Builder()
+                    .setAspectRatio(aspectRatio);
+            enterPictureInPictureMode(pipBuilder.build());
+            isInPipMode = true;
+        }
+    }
+
 
     @Override
     protected void onNewIntent(@NonNull Intent intent) {
@@ -490,18 +559,21 @@ public class ExoplayerActivityPass extends ComponentActivity {
         }
     }
 
-    @OptIn(markerClass = UnstableApi.class)
-    @Override
-    public void onBackPressed() {
-        if (isInPipMode) {
-            finish();
-        } else {
-            if (playerView != null && isControllerActuallyVisible) {
-                playerView.hideController();
-            } else {
-                super.onBackPressed();
-            }
-        }
-    }
+//    @OptIn(markerClass = UnstableApi.class)
+//    @Override
+//    public void onBackPressed() {
+//        if (isInPipMode) {
+//            finish();
+//        } else {
+//            if (playerView != null && isControllerActuallyVisible) {
+//                playerView.hideController();
+//            } else {
+//                releasePlayer();
+//                super.onBackPressed();
+//            }
+//        }
+//    }
+
+
 }
 

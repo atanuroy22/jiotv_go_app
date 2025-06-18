@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -254,7 +255,8 @@ fun RowScope.RunServerButton(
     val colorPRIME = MaterialTheme.colorScheme.primary
     val colorSECOND = MaterialTheme.colorScheme.secondary
     val buttonColor = remember { mutableStateOf(colorPRIME) }
-
+    val colorBORDER = Color(0xFFFFD700)
+    val isFocused = remember { mutableStateOf(false) }
     Button(
         onClick = {
             onClick()
@@ -263,13 +265,11 @@ fun RowScope.RunServerButton(
             .weight(1f)
             .padding(8.dp)
             .onFocusChanged { focusState ->
-                buttonColor.value = if (focusState.isFocused) {
-                    colorSECOND
-                } else {
-                    colorPRIME
-                }
+                isFocused.value = focusState.isFocused
+                buttonColor.value = if (focusState.isFocused) colorSECOND else colorPRIME
             },
         shape = RoundedCornerShape(8.dp),
+        border = if (isFocused.value) BorderStroke(2.dp, colorBORDER) else null,
         colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
         contentPadding = PaddingValues(2.dp),
         enabled = enabled
@@ -286,6 +286,8 @@ fun RowScope.StopServerButton(
     val colorPRIME = MaterialTheme.colorScheme.primary
     val colorSECOND = MaterialTheme.colorScheme.secondary
     val buttonColor = remember { mutableStateOf(colorPRIME) }
+    val colorBORDER = Color(0xFFFFD700)
+    val isFocused = remember { mutableStateOf(false) }
     Button(
         onClick = {
             onClick()
@@ -295,13 +297,11 @@ fun RowScope.StopServerButton(
             .weight(1f)
             .padding(8.dp)
             .onFocusChanged { focusState ->
-                buttonColor.value = if (focusState.isFocused) {
-                    colorSECOND
-                } else {
-                    colorPRIME
-                }
+                isFocused.value = focusState.isFocused
+                buttonColor.value = if (focusState.isFocused) colorSECOND else colorPRIME
             },
         shape = RoundedCornerShape(8.dp),
+        border = if (isFocused.value) BorderStroke(2.dp, colorBORDER) else null,
         colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
         contentPadding = PaddingValues(2.dp)
     ) {
@@ -316,19 +316,19 @@ fun RowScope.RunIPTVButton(
     val colorPRIME = MaterialTheme.colorScheme.primary
     val colorSECOND = MaterialTheme.colorScheme.secondary
     val buttonColor = remember { mutableStateOf(colorPRIME) }
+    val colorBORDER = Color(0xFFFFD700)
+    val isFocused = remember { mutableStateOf(false) }
     Button(
         onClick = { onClick() },
         modifier = Modifier
             .weight(1f)
             .padding(8.dp)
             .onFocusChanged { focusState ->
-                buttonColor.value = if (focusState.isFocused) {
-                    colorSECOND
-                } else {
-                    colorPRIME
-                }
+                isFocused.value = focusState.isFocused
+                buttonColor.value = if (focusState.isFocused) colorSECOND else colorPRIME
             },
         shape = RoundedCornerShape(8.dp),
+        border = if (isFocused.value) BorderStroke(2.dp, colorBORDER) else null,
         colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
         contentPadding = PaddingValues(2.dp)
     ) {
@@ -344,6 +344,8 @@ fun RowScope.WebTVButton(
     val colorPRIME = MaterialTheme.colorScheme.primary
     val colorSECOND = MaterialTheme.colorScheme.secondary
     val buttonColor = remember { mutableStateOf(colorPRIME) }
+    val colorBORDER = Color(0xFFFFD700)
+    val isFocused = remember { mutableStateOf(false) }
     Button(
         onClick = {
             onClick()
@@ -352,13 +354,11 @@ fun RowScope.WebTVButton(
             .weight(1f)
             .padding(8.dp)
             .onFocusChanged { focusState ->
-                buttonColor.value = if (focusState.isFocused) {
-                    colorSECOND
-                } else {
-                    colorPRIME
-                }
+                isFocused.value = focusState.isFocused
+                buttonColor.value = if (focusState.isFocused) colorSECOND else colorPRIME
             },
         shape = RoundedCornerShape(8.dp),
+        border = if (isFocused.value) BorderStroke(2.dp, colorBORDER) else null,
         colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
         contentPadding = PaddingValues(2.dp),
         enabled = enabled
@@ -375,6 +375,8 @@ fun RowScope.DebugButton(
     val colorPRIME = MaterialTheme.colorScheme.primary
     val colorSECOND = MaterialTheme.colorScheme.secondary
     val buttonColor = remember { mutableStateOf(colorPRIME) }
+    val colorBORDER = Color(0xFFFFD700)
+    val isFocused = remember { mutableStateOf(false) }
     Button(
         onClick = {
             onClick()
@@ -383,13 +385,11 @@ fun RowScope.DebugButton(
             .weight(1f)
             .padding(8.dp)
             .onFocusChanged { focusState ->
-                buttonColor.value = if (focusState.isFocused) {
-                    colorSECOND
-                } else {
-                    colorPRIME
-                }
+                isFocused.value = focusState.isFocused
+                buttonColor.value = if (focusState.isFocused) colorSECOND else colorPRIME
             },
         shape = RoundedCornerShape(8.dp),
+        border = if (isFocused.value) BorderStroke(2.dp, colorBORDER) else null,
         colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
         contentPadding = PaddingValues(2.dp),
         enabled = enabled
@@ -405,6 +405,8 @@ fun RowScope.ExitButton(
     val colorPRIME = MaterialTheme.colorScheme.primary
     val colorSECOND = MaterialTheme.colorScheme.secondary
     val buttonColor = remember { mutableStateOf(colorPRIME) }
+    val colorBORDER = Color(0xFFFFD700)
+    val isFocused = remember { mutableStateOf(false) }
     Button(
         onClick = {
             onClick()
@@ -413,13 +415,11 @@ fun RowScope.ExitButton(
             .weight(1f)
             .padding(8.dp)
             .onFocusChanged { focusState ->
-                buttonColor.value = if (focusState.isFocused) {
-                    colorSECOND
-                } else {
-                    colorPRIME
-                }
+                isFocused.value = focusState.isFocused
+                buttonColor.value = if (focusState.isFocused) colorSECOND else colorPRIME
             },
         shape = RoundedCornerShape(8.dp),
+        border = if (isFocused.value) BorderStroke(2.dp, colorBORDER) else null,
         colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
         contentPadding = PaddingValues(2.dp)
     ) {

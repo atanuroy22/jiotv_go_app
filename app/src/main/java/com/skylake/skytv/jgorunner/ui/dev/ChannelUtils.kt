@@ -1,5 +1,6 @@
 package com.skylake.skytv.jgorunner.ui.dev
 
+import android.content.Context
 import android.util.Log
 import com.google.gson.Gson
 import kotlinx.coroutines.*
@@ -10,8 +11,7 @@ import java.util.TimeZone
 
 
 object ChannelUtils {
-    suspend fun fetchChannels(urlString: String): ChannelResponse? {
-
+    suspend fun fetchChannels(urlString: String, save2pref: Boolean = false,   context: Context? = null): ChannelResponse? {
 
         val gson = Gson()
         return try {
@@ -24,6 +24,18 @@ object ChannelUtils {
 
                 if (connection.responseCode == 200) {
                     val response = connection.inputStream.bufferedReader().readText()
+
+                    if (save2pref) {
+                        val responseJsonString = Gson().toJson(response)
+                        val sharedPref = context?.getSharedPreferences("channel_cache", Context.MODE_PRIVATE)
+                        if (sharedPref != null) {
+                            with(sharedPref.edit()) {
+                                putString("channels_json", responseJsonString)
+                                apply()
+                            }
+                        }
+                    }
+
                     gson.fromJson(response, ChannelResponse::class.java)
                 } else {
                     null

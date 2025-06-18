@@ -96,6 +96,10 @@ import com.skylake.skytv.jgorunner.ui.components.JTVModeSelectorPopup
 import com.skylake.skytv.jgorunner.ui.components.ModeSelectionDialog
 import com.skylake.skytv.jgorunner.ui.components.restoreBackup
 import android.os.Process
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.text.TextStyle
 import kotlin.system.exitProcess
 
 
@@ -121,12 +125,10 @@ fun SettingsScreen(
         preferenceManager.savePreferences()
     }
 
+    // Retrieve saved switch states
     val selectedIndex by remember {
         mutableIntStateOf(preferenceManager.myPrefs.operationMODE)
     }
-
-
-    // Retrieve saved switch states
     var isSwitchOnForLOCAL by remember {
         mutableStateOf(preferenceManager.myPrefs.serveLocal)
     }
@@ -238,11 +240,16 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(12.dp)
+            .padding(10.dp)
     ) {
-        // TopAppBar
-        TopAppBar(
-            title = { Text(text = "Settings", fontSize = 30.sp, fontFamily = customFontFamily) },
+
+        Text(
+            text = "Settings",
+            fontSize = 24.sp,
+            fontFamily = customFontFamily,
+            color = MaterialTheme.colorScheme.onBackground,
+            style =  TextStyle.Default,
+            modifier = Modifier.padding(bottom = 10.dp)
         )
 
 
@@ -338,7 +345,7 @@ fun SettingsScreen(
                 SettingSwitchItem(
                     icon = Icons.Filled.VerifiedUser,
                     title = "Login Checker",
-                    subtitle = "Toggle to enable or disable login checks",
+                    subtitle = if (isLoginCheckEnabled) "Enabled login checker" else "Disabled login checker",
                     isChecked = isLoginCheckEnabled,
                     onCheckedChange = { isChecked -> isLoginCheckEnabled = isChecked }
                 )
@@ -522,6 +529,19 @@ fun SettingsScreen(
 
     // Port Number Dialog
     if (showPortDialog) {
+
+        // safely clearing cache before port change
+        val sharedPref = context.getSharedPreferences("channel_cache", Context.MODE_PRIVATE)
+        try {
+            with(sharedPref.edit()) {
+                remove("channels_json")
+                apply()
+                Log.d("DIX-SetSec", "Cleared channel cache")
+            }
+        } catch (e: Exception) {
+            Log.e("DIX-SetSec", "Error message", e)
+        }
+
         Dialog(
             onDismissRequest = { showPortDialog = false },
             properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
