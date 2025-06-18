@@ -196,7 +196,7 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
                         text = {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp) // Add spacing between icon and text
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 Icon(
                                     imageVector = tab.icon,
