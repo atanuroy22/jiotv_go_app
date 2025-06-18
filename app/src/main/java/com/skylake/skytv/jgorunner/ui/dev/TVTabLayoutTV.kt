@@ -1,5 +1,6 @@
 package com.skylake.skytv.jgorunner.ui.dev
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.util.Log
@@ -54,6 +55,7 @@ import com.bumptech.glide.integration.compose.GlideImage
 import com.skylake.skytv.jgorunner.activities.ExoplayerActivity
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -249,6 +251,54 @@ fun TVTabLayoutTV(context: Context) {
             CircularProgressIndicator(
                 modifier = Modifier.size(60.dp)
             )
+        }
+    } else if (filteredChannels.value.isEmpty()) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "No channels found",
+                    style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold),
+                    color = Color.Red
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Try the following steps:",
+                    style = TextStyle(fontSize = 16.sp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "\n• Check your internet connection\n• Reload the app\n• Go to Main Screen for detailed information",
+                    style = TextStyle(fontSize = 15.sp, color = Color.Gray)
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                ElevatedCard(
+                    onClick = {
+                        (context as? Activity)?.let { activity ->
+                            val intent = activity.intent
+                            activity.finish()
+                            activity.startActivity(intent)
+                        }
+                    },
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Refresh,
+                            contentDescription = "Reload"
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Reload App")
+                    }
+                }
+            }
         }
 
     } else {
