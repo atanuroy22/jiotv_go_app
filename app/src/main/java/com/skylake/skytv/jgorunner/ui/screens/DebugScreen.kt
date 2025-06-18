@@ -37,10 +37,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import android.util.Log
 import androidx.compose.animation.Animatable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.sharp.Info
 import androidx.compose.material.icons.sharp.Support
@@ -51,6 +54,9 @@ import com.skylake.skytv.jgorunner.ui.components.ButtonContent
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.core.content.ContextCompat.startActivity
 import com.skylake.skytv.jgorunner.activities.CastActivity
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
@@ -71,7 +77,24 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
     )
     val glowColor = remember { Animatable(glowColors.first()) }
     val preferenceManager = SkySharedPref.getInstance(context)
+    var showNewBadge by remember { mutableStateOf(true) }
     val scrollState = rememberScrollState()
+
+    fun applySettings() {
+        preferenceManager.savePreferences()
+    }
+
+    // Retrieve saved switch states
+    var isSwitchForExp by remember {
+        mutableStateOf(preferenceManager.myPrefs.expDebug)
+    }
+
+    // Update shared preference when switch states change
+    LaunchedEffect(isSwitchForExp) {
+        preferenceManager.myPrefs.expDebug = isSwitchForExp
+        applySettings()
+    }
+
 
     LaunchedEffect(Unit) {
         launch(Dispatchers.IO) {
@@ -96,70 +119,87 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
         }
     }
 
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(10.dp)
     ) {
-        Text(
-            text = "JTV-GO SERVER",
-            fontSize = 24.sp,
-            fontFamily = customFontFamily,
-            color = MaterialTheme.colorScheme.onBackground,
-            style = if (isGlowing) {
-                TextStyle(
-                    shadow = Shadow(
-                        color = glowColor.value,
-                        blurRadius = 30f,
-                        offset = Offset(0f, 0f)
+        item {
+            Text(
+                text = "JTV-GO SERVER",
+                fontSize = 24.sp,
+                fontFamily = customFontFamily,
+                color = MaterialTheme.colorScheme.onBackground,
+                style = if (isGlowing) {
+                    TextStyle(
+                        shadow = Shadow(
+                            color = glowColor.value,
+                            blurRadius = 30f,
+                            offset = Offset(0f, 0f)
+                        )
                     )
-                )
-            } else {
-                TextStyle.Default
-            },
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .focusGroup(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            Button5(context, onNavigate)
-            Button6(context)
+                } else {
+                    TextStyle.Default
+                },
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .focusGroup(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-
-            Button7(context, onNavigate)
-            Button8(context)
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusGroup(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                Button5(context, onNavigate)
+                Button6(context)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusGroup(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                Button7(context, onNavigate)
+                Button8(context)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .focusGroup(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            Button1(context, onNavigate)
-            Button2(context, onNavigate)
-            Button3(context)
-            Button4(context)
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusGroup(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                Button1(context, onNavigate)
+                Button2(context, onNavigate)
+                Button3(context)
+                Button4(context)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
 
+        item {
+            HorizontalDividerLineTr()
+        }
+
+        item {
+            DebugSwitchItem(
+                icon = Icons.Filled.Api,
+                title = "Experimental Features",
+                subtitle = if (isSwitchForExp) "Enabled experimental features \n- ▶️ Custom Playlist Support" else "Disabled experimental features",
+                isChecked = isSwitchForExp,
+                onCheckedChange = { isChecked -> isSwitchForExp = isChecked
+                    val status = if (isSwitchForExp) "enabled" else "disabled"
+                    Toast.makeText(context, "Experimental features $status", Toast.LENGTH_SHORT).show()
+                })
         }
     }
 }
@@ -224,7 +264,7 @@ fun RowScope.Button2(context: Context, onNavigate: (String) -> Unit) {
             .padding(8.dp)
             .onFocusChanged { focusState ->
                 buttonColor.value = if (focusState.isFocused) {
-                    borderColor.value = Color.White
+                    borderColor.value = Color.Green
                     colorSECOND
                 } else {
                     borderColor.value = Color.Transparent
@@ -244,6 +284,8 @@ fun RowScope.Button3(context: Context) {
     val colorPRIME = MaterialTheme.colorScheme.primary
     val colorSECOND = MaterialTheme.colorScheme.secondary
     val buttonColor = remember { mutableStateOf(colorPRIME) }
+    val colorBORDER = Color(0xFFFFD700)
+    val isFocused = remember { mutableStateOf(false) }
 
     Button(
         onClick = { handleButton3Click(context) },
@@ -251,19 +293,18 @@ fun RowScope.Button3(context: Context) {
             .weight(1f)
             .padding(8.dp)
             .onFocusChanged { focusState ->
-                buttonColor.value = if (focusState.isFocused) {
-                    colorSECOND
-                } else {
-                    colorPRIME
-                }
+                isFocused.value = focusState.isFocused
+                buttonColor.value = if (focusState.isFocused) colorSECOND else colorPRIME
             },
         shape = RoundedCornerShape(8.dp),
+        border = if (isFocused.value) BorderStroke(2.dp, colorBORDER) else null,
         colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
         contentPadding = PaddingValues(2.dp)
     ) {
         ButtonContent("Support", Icons.Sharp.Support)
     }
 }
+
 
 @Composable
 fun RowScope.Button4(context: Context) {
@@ -402,6 +443,77 @@ fun RowScope.Button8(context: Context) {
         ButtonContent("CAST", Icons.Default.Cast)
     }
 }
+
+@Composable
+fun DebugItem(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    showBadge: Boolean = false,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+            .clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(24.dp))
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = title, fontWeight = FontWeight.Bold)
+                if (showBadge) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "New",
+                        color = Color.Red,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .background(
+                                color = Color.Red.copy(alpha = 0.1f),
+                                shape = MaterialTheme.shapes.small
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+            Text(text = subtitle, fontSize = 12.sp, color = Color.Gray)
+        }
+    }
+}
+
+@Composable
+fun DebugSwitchItem(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    isChecked: Boolean,
+    enabled: Boolean = true,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+            .alpha(if (enabled) 1f else 0.25f)
+            .clickable {
+                if (enabled) onCheckedChange(!isChecked)
+            }, verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(24.dp))
+        Spacer(modifier = Modifier.width(16.dp))
+        Column {
+            Text(text = title, fontWeight = FontWeight.Bold)
+            Text(text = subtitle, fontSize = 12.sp, color = Color.Gray)
+        }
+        Spacer(modifier = Modifier.weight(1f))
+        Switch(checked = isChecked, onCheckedChange = { onCheckedChange(it) }, enabled = enabled)
+    }
+}
+
 
 
 
