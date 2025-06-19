@@ -267,14 +267,19 @@ class MainActivity : ComponentActivity() {
                 filterLX = backupPrefs.filterLX,
                 filterCX = backupPrefs.filterCX,
                 operationMODE = backupPrefs.operationMODE,
+                darkMODE = backupPrefs.darkMODE,
+                filterLI = backupPrefs.filterLI,
+                filterCI = backupPrefs.filterCI,
+                recentChannels = backupPrefs.recentChannels,
+                selectedScreenTV = backupPrefs.selectedScreenTV,
+                selectedRemoteNavTV = backupPrefs.selectedRemoteNavTV,
 
-//                filterLI = backupPrefs.filterLI,
-//                filterCI = backupPrefs.filterCI,
-//                recentChannels = backupPrefs.recentChannels,
-//                operationMODE = backupPrefs.operationMODE,
-//                darkMODE = backupPrefs.darkMODE,
-//                selectedScreenTV = backupPrefs.selectedScreenTV,
-//                selectedRemoteNavTV = backupPrefs.selectedRemoteNavTV
+//                custURL = backupPrefs.custURL,
+//                channelListJson = backupPrefs.channelListJson,
+//                expDebug = backupPrefs.expDebug,
+//                lastSelectedCategoryExp = backupPrefs.lastSelectedCategoryExp,
+//                showPLAYLIST = backupPrefs.showPLAYLIST,
+
             )
             skySharedPref.savePreferences()
 
