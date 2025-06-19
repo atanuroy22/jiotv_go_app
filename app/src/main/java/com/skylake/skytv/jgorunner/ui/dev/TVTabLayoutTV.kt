@@ -3,21 +3,7 @@ package com.skylake.skytv.jgorunner.ui.dev
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.util.Log
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -27,19 +13,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.*
 import androidx.tv.material3.ClassicCard
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,11 +25,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat.startActivity
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
-import kotlinx.coroutines.launch
-import androidx.compose.material3.Text as CText
 import com.bumptech.glide.integration.compose.GlideImage
-import com.skylake.skytv.jgorunner.activities.ExoplayerActivity
+import com.skylake.skytv.jgorunner.activities.ChannelInfo
+import com.skylake.skytv.jgorunner.activities.ExoplayerActivityPass
 import com.skylake.skytv.jgorunner.data.SkySharedPref
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.launch
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
@@ -66,21 +44,17 @@ import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
-import com.skylake.skytv.jgorunner.activities.ChannelInfo
-import com.skylake.skytv.jgorunner.activities.ExoplayerActivityPass
-
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
-fun TVTabLayoutTV(context: Context) {
+fun TVTabLayoutTV(context: Context?) {
+    if (context == null) return
     val scope = rememberCoroutineScope()
     val channelsResponse = remember { mutableStateOf<ChannelResponse?>(null) }
     val filteredChannels = remember { mutableStateOf<List<Channel>>(emptyList()) }
     val preferenceManager = SkySharedPref.getInstance(context)
     val localPORT by remember {
-        mutableIntStateOf(preferenceManager.myPrefs.jtvGoServerPort)
+        mutableIntStateOf(preferenceManager.myPrefs.jtvGoServerPort ?: 8080)
     }
     val basefinURL = "http://localhost:$localPORT"
     var fetched by remember { mutableStateOf(false) }
@@ -106,12 +80,9 @@ fun TVTabLayoutTV(context: Context) {
         "JioDarshan" to 19
     )
 
-    val categoryIdMap = categoryMap.filterValues { it != null }.map { it.value!! to it.key }.toMap()
     val savedCategoryIds = preferenceManager.myPrefs.filterCI
         ?.split(",")?.mapNotNull { it.toIntOrNull() }?.toMutableSet() ?: mutableSetOf()
     var selectedCategoryIds by remember { mutableStateOf(savedCategoryIds) }
-    val selectedCategories = categoryMap.filterValues { it in selectedCategoryIds }.keys
-
 
     val sortedCategories = remember(selectedCategoryIds) {
         val resetCategoryName = "Reset"
@@ -124,19 +95,18 @@ fun TVTabLayoutTV(context: Context) {
         listOf(resetCategoryName) + selectedOtherCategories + unselectedOtherCategories
     }
 
-
+    // Fetch and filter channels (cache/network)
     LaunchedEffect(Unit) {
         val sharedPref = context.getSharedPreferences("channel_cache", Context.MODE_PRIVATE)
         var useCache = true
         var cachedChannels: ChannelResponse? = null
 
         val cachedJson = sharedPref.getString("channels_json", null)
-        if (cachedJson != null) {
+        if (!cachedJson.isNullOrEmpty()) {
             try {
                 cachedChannels = Gson().fromJson(cachedJson, ChannelResponse::class.java)
                 channelsResponse.value = cachedChannels
             } catch (e: Exception) {
-                Log.e("DIX", "Error parsing cached JSON: ${e.message}")
                 with(sharedPref.edit()) {
                     remove("channels_json")
                     apply()
@@ -157,7 +127,7 @@ fun TVTabLayoutTV(context: Context) {
                 categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(cachedChannels)
                 categories.isNullOrEmpty() -> ChannelUtils.filterChannels(
                     cachedChannels,
-                    languageIds = languages?.mapNotNull { it.toIntOrNull() }.takeIf { it!!.isNotEmpty() }
+                    languageIds = languages?.mapNotNull { it.toIntOrNull() }?.takeIf { it.isNotEmpty() }
                 )
                 languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
                     cachedChannels,
@@ -169,7 +139,7 @@ fun TVTabLayoutTV(context: Context) {
                     languageIds = languages.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
                 )
             }
-            filteredChannels.value = filtered
+            filteredChannels.value = filtered ?: emptyList()
             fetched = true
         } else {
             var attempts = 0
@@ -179,7 +149,6 @@ fun TVTabLayoutTV(context: Context) {
                 try {
                     val response = ChannelUtils.fetchChannels("$basefinURL/channels")
                     channelsResponse.value = response
-
                     if (response != null) {
                         val responseJsonString = Gson().toJson(response)
                         with(sharedPref.edit()) {
@@ -195,7 +164,7 @@ fun TVTabLayoutTV(context: Context) {
                             categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(response)
                             categories.isNullOrEmpty() -> ChannelUtils.filterChannels(
                                 response,
-                                languageIds = languages?.mapNotNull { it.toIntOrNull() }.takeIf { it!!.isNotEmpty() }
+                                languageIds = languages?.mapNotNull { it.toIntOrNull() }?.takeIf { it.isNotEmpty() }
                             )
                             languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
                                 response,
@@ -207,11 +176,11 @@ fun TVTabLayoutTV(context: Context) {
                                 languageIds = languages.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
                             )
                         }
-                        filteredChannels.value = filtered
+                        filteredChannels.value = filtered ?: emptyList()
                         success = true
                     }
                 } catch (e: Exception) {
-                    Log.e("DIX", "Error fetching channels: ${e.message}")
+                    // ignore, retry
                 }
                 if (!success) {
                     kotlinx.coroutines.delay(300)
@@ -221,6 +190,7 @@ fun TVTabLayoutTV(context: Context) {
         }
     }
 
+    // Re-filter channels when category changes
     LaunchedEffect(selectedCategoryIds) {
         channelsResponse.value?.let { response ->
             val languages = preferenceManager.myPrefs.filterLI
@@ -231,35 +201,36 @@ fun TVTabLayoutTV(context: Context) {
                 categoryIds = selectedCategoryIds.takeIf { it.isNotEmpty() }?.toList(),
                 languageIds = languages
             )
-            filteredChannels.value = filtered
+            filteredChannels.value = filtered ?: emptyList()
         }
     }
 
-
+    // Fetch EPG data for selected channel
     LaunchedEffect(selectedChannel) {
-        if (selectedChannel != null) {
-            val epgURLc = "$basefinURL/epg/${selectedChannel?.channel_id}/0"
+        selectedChannel?.let { channel ->
+            val epgURLc = "$basefinURL/epg/${channel.channel_id ?: ""}/0"
             epgData = ChannelUtils.fetchEpg(epgURLc)
+        } ?: run {
+            epgData = null
         }
     }
 
+    // UI: Loading state
     if (!fetched) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxSize()
         ) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(60.dp)
-            )
+            CircularProgressIndicator(modifier = Modifier.size(60.dp))
         }
-    } else if (filteredChannels.value.isEmpty()) {
+    }
+    // UI: Empty state
+    else if (filteredChannels.value.isNullOrEmpty()) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxSize()
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = "No channels found",
                     style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold),
@@ -300,10 +271,10 @@ fun TVTabLayoutTV(context: Context) {
                 }
             }
         }
-
-    } else {
-
-        ////////////////////////////
+    }
+    // UI: Main content
+    else {
+        // CATEGORY CHIPS
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
@@ -319,19 +290,18 @@ fun TVTabLayoutTV(context: Context) {
                         if (categoryName == "Reset") {
                             selectedCategoryIds = mutableSetOf()
                         } else if (categoryId != null) {
-                            // Toggle selection for other categories
-                            selectedCategoryIds = if (isSelected) {
+                            val newSelection = if (isSelected) {
                                 (selectedCategoryIds - categoryId).toMutableSet()
                             } else {
                                 (selectedCategoryIds + categoryId).toMutableSet()
                             }
+                            selectedCategoryIds = newSelection
                         }
                         val updatedCI = selectedCategoryIds.joinToString(",")
                         preferenceManager.myPrefs.filterCI = updatedCI
                         preferenceManager.savePreferences()
-                        Log.d("CHIP_SELECTION", "Updated filterCI for $categoryName = $updatedCI")
                     },
-                    label = { Text(categoryName) },
+                    label = { Text(categoryName ?: "Unknown") },
                     selected = isSelected,
                     leadingIcon = when {
                         categoryName == "Reset" -> {
@@ -358,9 +328,8 @@ fun TVTabLayoutTV(context: Context) {
             }
         }
 
-        ////////////////////////////
-
-        if (epgData != null) {
+        // EPG CARD (null-safe)
+        epgData?.let { epg ->
             Column(
                 modifier = Modifier
                     .padding(horizontal = 12.dp, vertical = 4.dp)
@@ -383,70 +352,47 @@ fun TVTabLayoutTV(context: Context) {
                                 .padding(start = 8.dp, end = 12.dp)
                         ) {
                             Text(
-                                text = epgData!!.channel_name,
+                                text = epg.channel_name ?: "Unknown Channel",
                                 style = TextStyle(fontSize = 14.sp)
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = epgData!!.showname,
+                                text = epg.showname ?: "No Program Info",
                                 maxLines = 1,
                                 style = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold)
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = epgData!!.description,
+                                text = epg.description ?: "No description available",
                                 style = TextStyle(fontSize = 13.sp),
                                 maxLines = 3,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
-
-                        GlideImage(
-                            model = "$basefinURL/jtvposter/${epgData!!.episodePoster}",
-                            contentDescription = null,
-
-                            modifier = Modifier
-                                .height(90.dp)
-                                .clip(RoundedCornerShape(12.dp)),
-                            contentScale = ContentScale.Fit
-                        )
+                        epg.episodePoster?.let { poster ->
+                            GlideImage(
+                                model = "$basefinURL/jtvposter/$poster",
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .height(90.dp)
+                                    .clip(RoundedCornerShape(12.dp)),
+                                contentScale = ContentScale.Fit
+                            )
+                        }
                     }
                 }
             }
-        } else {
-            if (false)  {
-                Column(
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .fillMaxWidth()
-                        .height(120.dp)
-                        .background(Color.Transparent),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = selectedChannel?.channel_name ?: "No channel selected",
-                        style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Medium)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "No EPG data available",
-                        style = TextStyle(color = Color.Gray, fontSize = 14.sp)
-                    )
-                }
-            }
-            Log.d("HANA4k", "EPG ERROR")
         }
 
-
-
+        // CHANNEL GRID
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 100.dp),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(filteredChannels.value) { channel ->
+            items(filteredChannels.value ?: emptyList()) { channel ->
+                if (channel == null) return@items // Defensive: skip nulls
                 ClassicCard(
                     modifier = Modifier
                         .height(120.dp)
@@ -457,53 +403,54 @@ fun TVTabLayoutTV(context: Context) {
                             }
                         },
                     image = {
+                        val logoUrl = channel.logoUrl ?: ""
+                        val imageUrl = "$basefinURL/jtvimage/$logoUrl"
                         GlideImage(
-                            model = "$basefinURL/jtvimage/${channel.logoUrl}",
-                            contentDescription = channel.channel_name,
+                            model = imageUrl,
+                            contentDescription = channel.channel_name ?: "Channel",
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(80.dp)
                         )
                     },
                     title = {
-                        CText(
-                            text = channel.channel_name,
+                        Text(
+                            text = channel.channel_name ?: "Channel",
                             fontSize = 12.sp,
                             modifier = Modifier.padding(8.dp)
                         )
                     },
                     onClick = {
-                        Log.d("HT", channel.channel_name)
-                        val intent =
-                            Intent(context, ExoplayerActivityPass::class.java).apply {
-                                putExtra("video_url", channel.channel_url)
-                                putExtra("zone", "TV")
-                                // Prepare channel list for ExoplayerActivityPass
-                                val allChannelsData = ArrayList(filteredChannels.value.map { ch ->
-                                    val fullLogoUrl = "http://localhost:${localPORT}/jtvimage/${ch.logoUrl}"
-                                    ChannelInfo(ch.channel_url, fullLogoUrl, ch.channel_name)
-                                })
-                                putParcelableArrayListExtra("channel_list_data", allChannelsData)
-
-                                val currentChannelIndex = filteredChannels.value.indexOf(channel)
-                                putExtra("current_channel_index", currentChannelIndex)
-
-                                // Also pass the individual details of the selected channel for initial setup (or fallback)
-                                putExtra("video_url", channel.channel_url)
-                                putExtra("logo_url", "http://localhost:${localPORT}/jtvimage/${channel.logoUrl}")
-                                putExtra("ch_name", channel.channel_name)
-                            }
+                        val intent = Intent(context, ExoplayerActivityPass::class.java).apply {
+                            putExtra("video_url", channel.channel_url ?: "")
+                            putExtra("zone", "TV")
+                            // Prepare channel list for ExoplayerActivityPass
+                            val allChannelsData = ArrayList((filteredChannels.value ?: emptyList()).mapNotNull { ch ->
+                                if (ch == null) return@mapNotNull null
+                                ChannelInfo(
+                                    ch.channel_url ?: "",
+                                    "http://localhost:$localPORT/jtvimage/${ch.logoUrl ?: ""}",
+                                    ch.channel_name ?: ""
+                                )
+                            })
+                            putParcelableArrayListExtra("channel_list_data", allChannelsData)
+                            val currentChannelIndex = (filteredChannels.value ?: emptyList()).indexOf(channel)
+                            putExtra("current_channel_index", currentChannelIndex)
+                            putExtra("logo_url", "http://localhost:$localPORT/jtvimage/${channel.logoUrl ?: ""}")
+                            putExtra("ch_name", channel.channel_name ?: "")
+                        }
                         startActivity(context, intent, null)
 
-
+                        // Update recent channels
                         val recentChannelsJson = preferenceManager.myPrefs.recentChannels
                         val type = object : TypeToken<List<Channel>>() {}.type
                         val recentChannels: MutableList<Channel> =
-                            Gson().fromJson(recentChannelsJson, type) ?: mutableListOf()
+                            if (!recentChannelsJson.isNullOrEmpty())
+                                Gson().fromJson(recentChannelsJson, type) ?: mutableListOf()
+                            else
+                                mutableListOf()
 
-                        val existingIndex =
-                            recentChannels.indexOfFirst { it.channel_id == channel.channel_id }
-
+                        val existingIndex = recentChannels.indexOfFirst { it.channel_id == channel.channel_id }
                         if (existingIndex != -1) {
                             val existingChannel = recentChannels[existingIndex]
                             recentChannels.removeAt(existingIndex)
@@ -515,23 +462,14 @@ fun TVTabLayoutTV(context: Context) {
                             }
                         }
 
-                        val gson = Gson()
-                        val recentChannelsJsonx = gson.toJson(recentChannels)
-                        preferenceManager.myPrefs.recentChannels = recentChannelsJsonx
+                        preferenceManager.myPrefs.recentChannels = Gson().toJson(recentChannels)
                         preferenceManager.savePreferences()
                     },
-                    colors = CardDefaultsTV.colors(
+                    colors = androidx.tv.material3.CardDefaults.colors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
                     )
                 )
             }
         }
     }
-
-//    // Request focus on the first item when the grid is initialized
-//    LaunchedEffect(filteredChannels.value.isNotEmpty()) {
-//        if (filteredChannels.value.isNotEmpty()) {
-//            focusRequester.requestFocus()
-//        }
-//    }
 }
