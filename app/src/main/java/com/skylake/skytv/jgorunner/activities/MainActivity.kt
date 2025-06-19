@@ -15,6 +15,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.os.Process
 import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
@@ -60,6 +61,7 @@ import com.skylake.skytv.jgorunner.ui.screens.DebugScreen
 import com.skylake.skytv.jgorunner.ui.screens.HomeScreen
 import com.skylake.skytv.jgorunner.ui.screens.InfoScreen
 import com.skylake.skytv.jgorunner.ui.screens.LoginScreen
+import com.skylake.skytv.jgorunner.ui.screens.LoginScreenPop
 import com.skylake.skytv.jgorunner.ui.screens.RunnerScreen
 import com.skylake.skytv.jgorunner.ui.screens.SettingsScreen
 import com.skylake.skytv.jgorunner.ui.screens.ZoneScreen
@@ -95,6 +97,7 @@ class MainActivity : ComponentActivity() {
     private var showBinaryUpdatePopup by mutableStateOf(false)
     private var showAppUpdatePopup by mutableStateOf(false)
     private var showLoginPopup by mutableStateOf(false)
+    private var showLoginPopupD by mutableStateOf(false)
     private var isServerRunning by mutableStateOf(false)
 
     private var isGlowBox by mutableStateOf(false)
@@ -224,9 +227,9 @@ class MainActivity : ComponentActivity() {
 
     private fun runOnceAfterAppUpgrade() {
         val skySharedPref = SkySharedPref.getInstance(this)
-        val prefs = getSharedPreferences("app_update_prefs", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences("app_update_prefs", MODE_PRIVATE)
         val packageInfo = packageManager.getPackageInfo(packageName, 0)
-        val currentVersion = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+        val currentVersion = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             packageInfo.longVersionCode
         } else {
             @Suppress("DEPRECATION")
@@ -320,7 +323,7 @@ class MainActivity : ComponentActivity() {
 
         // Request Ignore Battery Optimizations if not already granted
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            val powerManager = getSystemService(POWER_SERVICE) as PowerManager
             val packageName = packageName
             if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
                 val intentSettings = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
@@ -348,7 +351,7 @@ class MainActivity : ComponentActivity() {
         }
 
 
-        val sharedPref = getSharedPreferences("channel_cache", Context.MODE_PRIVATE)
+        val sharedPref = getSharedPreferences("channel_cache", MODE_PRIVATE)
         try {
             with(sharedPref.edit()) {
                 remove("channels_json")
@@ -430,7 +433,7 @@ class MainActivity : ComponentActivity() {
                                             isServerRunning = false
                                             outputText = "Server stopped"
                                             finish()
-                                            android.os.Process.killProcess(android.os.Process.myPid())
+                                            Process.killProcess(Process.myPid())
                                             exitProcess(0)
                                         }
                                     )
@@ -500,6 +503,18 @@ class MainActivity : ComponentActivity() {
                             confirmButtonText = "Login",
                             dismissButtonText = "Cancel",
                             onConfirm = {
+//                                currentScreen = "Login"
+                                showLoginPopupD = true
+                                showLoginPopup = false
+
+//                                onNavigate("Runner")
+                                return@LoginPopup
+                            },
+                            onDismiss = {
+                                showLoginPopup = false
+                                return@LoginPopup
+                            },
+                            onSettingsClick = {
                                 showLoginPopup = false
                                 val intent =
                                     Intent(this@MainActivity, WebPlayerActivity::class.java)
@@ -511,18 +526,15 @@ class MainActivity : ComponentActivity() {
                                 ).show()
                                 Log.d("DIX", "Opening WEBTV")
                                 return@LoginPopup
-                            },
-                            onDismiss = {
-                                showLoginPopup = false
-                                return@LoginPopup
-                            },
-                            onSettingsClick = {
-                                currentScreen = "Login"
-                                showLoginPopup = false
-
-//                                onNavigate("Runner")
-                                return@LoginPopup
                             }
+                        )
+
+                        LoginScreenPop(
+                            showDialog = showLoginPopupD,
+                            onDismissRequest =  {
+                                showLoginPopupD = false
+                            },
+                            context = this@MainActivity
                         )
 
                         CustPopup(
@@ -771,7 +783,7 @@ class MainActivity : ComponentActivity() {
                                     val intent = Intent(this@MainActivity, MainActivity::class.java)
                                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                     this@MainActivity.startActivity(intent)
-                                    android.os.Process.killProcess(android.os.Process.myPid())
+                                    Process.killProcess(Process.myPid())
                                 }
                             }, 500)
 
