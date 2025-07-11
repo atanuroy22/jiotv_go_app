@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -38,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
+import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
 @SuppressLint("MutableCollectionMutableState")
 @OptIn(ExperimentalGlideComposeApi::class)
@@ -123,23 +126,30 @@ fun TVTabLayout(context: Context?) {
                 categories.isNullOrEmpty() && languages.isNullOrEmpty() -> {
                     ChannelUtils.filterChannels(cachedChannels)
                 }
+
                 categories.isNullOrEmpty() -> {
                     ChannelUtils.filterChannels(
                         cachedChannels,
-                        languageIds = languages?.mapNotNull { it.toIntOrNull() }?.takeIf { it.isNotEmpty() }
+                        languageIds = languages?.mapNotNull { it.toIntOrNull() }
+                            ?.takeIf { it.isNotEmpty() }
                     )
                 }
+
                 languages.isNullOrEmpty() -> {
                     ChannelUtils.filterChannels(
                         cachedChannels,
-                        categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
+                        categoryIds = categories.mapNotNull { it.toIntOrNull() }
+                            .takeIf { it.isNotEmpty() }
                     )
                 }
+
                 else -> {
                     ChannelUtils.filterChannels(
                         cachedChannels,
-                        categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() },
-                        languageIds = languages.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
+                        categoryIds = categories.mapNotNull { it.toIntOrNull() }
+                            .takeIf { it.isNotEmpty() },
+                        languageIds = languages.mapNotNull { it.toIntOrNull() }
+                            .takeIf { it.isNotEmpty() }
                     )
                 }
             }
@@ -168,37 +178,106 @@ fun TVTabLayout(context: Context?) {
                             categories.isNullOrEmpty() && languages.isNullOrEmpty() -> {
                                 ChannelUtils.filterChannels(response)
                             }
+
                             categories.isNullOrEmpty() -> {
                                 ChannelUtils.filterChannels(
                                     response,
-                                    languageIds = languages?.mapNotNull { it.toIntOrNull() }?.takeIf { it.isNotEmpty() }
+                                    languageIds = languages?.mapNotNull { it.toIntOrNull() }
+                                        ?.takeIf { it.isNotEmpty() }
                                 )
                             }
+
                             languages.isNullOrEmpty() -> {
                                 ChannelUtils.filterChannels(
                                     response,
-                                    categoryIds = categories.mapNotNull { it.toIntOrNull() }?.takeIf { it.isNotEmpty() }
+                                    categoryIds = categories.mapNotNull { it.toIntOrNull() }
+                                        ?.takeIf { it.isNotEmpty() }
                                 )
                             }
+
                             else -> {
                                 ChannelUtils.filterChannels(
                                     response,
-                                    categoryIds = categories.mapNotNull { it.toIntOrNull() }?.takeIf { it.isNotEmpty() },
-                                    languageIds = languages.mapNotNull { it.toIntOrNull() }?.takeIf { it.isNotEmpty() }
+                                    categoryIds = categories.mapNotNull { it.toIntOrNull() }
+                                        ?.takeIf { it.isNotEmpty() },
+                                    languageIds = languages.mapNotNull { it.toIntOrNull() }
+                                        ?.takeIf { it.isNotEmpty() }
                                 )
                             }
                         }
                         filteredChannels.value = filtered ?: emptyList()
                         success = true
                     }
-                } catch (_: Exception) {}
+                } catch (_: Exception) {
+                }
                 if (!success) {
                     kotlinx.coroutines.delay(300)
                 }
             }
             fetched = true
         }
+
+
+
+
+        if (preferenceManager.myPrefs.startTvAutomatically) {
+            if (!AppStartTracker.shouldPlayChannel) {
+
+
+                val firstChannel = filteredChannels.value.first()
+                val intent = Intent(context, ExoplayerActivityPass::class.java).apply {
+                    putExtra("zone", "TV")
+                    putParcelableArrayListExtra("channel_list_data", ArrayList(
+                        filteredChannels.value.map { ch ->
+                            ChannelInfo(
+                                ch.channel_url ?: "",
+                                "http://localhost:$localPORT/jtvimage/${ch.logoUrl ?: ""}",
+                                ch.channel_name ?: ""
+                            )
+                        }
+                    ))
+                    putExtra("current_channel_index", 0) // Index 0 for the first channel
+                    putExtra("video_url", firstChannel.channel_url ?: "")
+                    putExtra(
+                        "logo_url",
+                        "http://localhost:$localPORT/jtvimage/${firstChannel.logoUrl ?: ""}"
+                    )
+                    putExtra("ch_name", firstChannel.channel_name ?: "")
+                }
+                kotlinx.coroutines.delay(1000)
+
+                startActivity(context, intent, null)
+
+                //Recent Channels
+                val recentChannelsJson = preferenceManager.myPrefs.recentChannels
+                val type = object : TypeToken<List<Channel>>() {}.type
+                val recentChannels: MutableList<Channel> =
+                    Gson().fromJson(recentChannelsJson, type) ?: mutableListOf()
+
+                val existingIndex =
+                    recentChannels.indexOfFirst { it.channel_id == firstChannel.channel_id }
+
+                if (existingIndex != -1) {
+                    val existingChannel = recentChannels[existingIndex]
+                    recentChannels.removeAt(existingIndex)
+                    recentChannels.add(0, existingChannel)
+                } else {
+                    recentChannels.add(0, firstChannel)
+                    if (recentChannels.size > 25) {
+                        recentChannels.removeAt(recentChannels.size - 1)
+                    }
+                }
+                preferenceManager.myPrefs.recentChannels = Gson().toJson(recentChannels)
+                preferenceManager.savePreferences()
+            }
+
+            AppStartTracker.shouldPlayChannel = true
+        }
     }
+
+
+
+
 
     LaunchedEffect(selectedCategoryIds) {
         channelsResponse.value?.let { response ->

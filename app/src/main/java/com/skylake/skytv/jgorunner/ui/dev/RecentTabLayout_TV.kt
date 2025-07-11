@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,7 +30,6 @@ import com.google.gson.reflect.TypeToken
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import androidx.tv.material3.ClassicCard
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
-import com.skylake.skytv.jgorunner.activities.ExoplayerActivity
 import com.skylake.skytv.jgorunner.activities.ExoplayerActivityPass
 
 @OptIn(ExperimentalGlideComposeApi::class)

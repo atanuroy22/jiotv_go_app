@@ -31,19 +31,18 @@ import com.skylake.skytv.jgorunner.activities.ExoplayerActivityPass
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import kotlinx.coroutines.launch
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
-import androidx.tv.material3.CardDefaults as CardDefaultsTV
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
@@ -188,6 +187,59 @@ fun TVTabLayoutTV(context: Context?) {
             }
             fetched = true
         }
+
+        if (preferenceManager.myPrefs.startTvAutomatically) {
+            if (!AppStartTracker.shouldPlayChannel) {
+
+                val firstChannel = filteredChannels.value.first()
+                val intent = Intent(context, ExoplayerActivityPass::class.java).apply {
+                    putExtra("zone", "TV")
+                    putParcelableArrayListExtra("channel_list_data", ArrayList(
+                        filteredChannels.value.map { ch ->
+                            ChannelInfo(
+                                ch.channel_url ?: "",
+                                "http://localhost:$localPORT/jtvimage/${ch.logoUrl ?: ""}",
+                                ch.channel_name ?: ""
+                            )
+                        }
+                    ))
+                    putExtra("current_channel_index", 0) // Index 0 for the first channel
+                    putExtra("video_url", firstChannel.channel_url ?: "")
+                    putExtra(
+                        "logo_url",
+                        "http://localhost:$localPORT/jtvimage/${firstChannel.logoUrl ?: ""}"
+                    )
+                    putExtra("ch_name", firstChannel.channel_name ?: "")
+                }
+                kotlinx.coroutines.delay(1000)
+                startActivity(context, intent, null)
+
+                //Recent Channels
+                val recentChannelsJson = preferenceManager.myPrefs.recentChannels
+                val type = object : TypeToken<List<Channel>>() {}.type
+                val recentChannels: MutableList<Channel> =
+                    Gson().fromJson(recentChannelsJson, type) ?: mutableListOf()
+
+                val existingIndex =
+                    recentChannels.indexOfFirst { it.channel_id == firstChannel.channel_id }
+
+                if (existingIndex != -1) {
+                    val existingChannel = recentChannels[existingIndex]
+                    recentChannels.removeAt(existingIndex)
+                    recentChannels.add(0, existingChannel)
+                } else {
+                    recentChannels.add(0, firstChannel)
+                    if (recentChannels.size > 25) {
+                        recentChannels.removeAt(recentChannels.size - 1)
+                    }
+                }
+                preferenceManager.myPrefs.recentChannels = Gson().toJson(recentChannels)
+                preferenceManager.savePreferences()
+            }
+
+            AppStartTracker.shouldPlayChannel = true
+        }
+
     }
 
     // Re-filter channels when category changes

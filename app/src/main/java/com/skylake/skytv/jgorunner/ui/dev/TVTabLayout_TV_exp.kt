@@ -6,7 +6,6 @@ import android.util.Log
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -37,8 +36,9 @@ import com.skylake.skytv.jgorunner.activities.ExoplayerActivityPass
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import androidx.tv.material3.CardDefaults as CardDefaultsTV
 import androidx.tv.material3.ClassicCard
-import androidx.compose.material3.Text as CText
 import androidx.compose.material3.Text
+import androidx.core.content.ContextCompat.startActivity
+import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
 @Composable
 fun TVTabLayoutTV_exp(context: Context) {
@@ -72,7 +72,7 @@ fun TVTabLayoutTV_exp(context: Context) {
                 val savedCategory = preferenceManager.myPrefs.lastSelectedCategoryExp
 
                 selectedCategory = when {
-                    availableCategories.contains(" Marathi") -> " Marathi"
+                    availableCategories.contains("  Marathi") -> "  Marathi"
                     savedCategory != null && availableCategories.contains(savedCategory) -> savedCategory
                     else -> "All"
                 }
@@ -86,6 +86,35 @@ fun TVTabLayoutTV_exp(context: Context) {
         }
         isLoading = false
     }
+
+    LaunchedEffect(filteredChannels) {
+        if (preferenceManager.myPrefs.startTvAutomatically &&
+            !AppStartTracker.shouldPlayChannel &&
+            filteredChannels.isNotEmpty()
+        ) {
+            val firstChannel = filteredChannels.first()
+
+            val intent = Intent(context, ExoplayerActivityPass::class.java).apply {
+                putExtra("zone", "TV")
+                putParcelableArrayListExtra("channel_list_data", ArrayList(
+                    filteredChannels.map { ch ->
+                        ChannelInfo(ch.url, ch.logo ?: "", ch.name)
+                    }
+                ))
+                putExtra("current_channel_index", 0)
+                putExtra("video_url", firstChannel.url)
+                putExtra("logo_url", firstChannel.logo ?: "")
+                putExtra("ch_name", firstChannel.name)
+            }
+
+            kotlinx.coroutines.delay(1000)
+            startActivity(context, intent, null)
+
+            AppStartTracker.shouldPlayChannel = true
+        }
+    }
+
+
 
     if (isLoading) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {

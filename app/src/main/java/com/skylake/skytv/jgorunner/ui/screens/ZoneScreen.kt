@@ -2,6 +2,7 @@ package com.skylake.skytv.jgorunner.ui.screens
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.content.res.Configuration
 import android.os.Handler
 import android.os.Looper
@@ -17,9 +18,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterAlt
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -27,6 +28,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,11 +51,11 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.material3.Text
+import androidx.core.content.ContextCompat
 import com.skylake.skytv.jgorunner.R
+import com.skylake.skytv.jgorunner.activities.ExoplayerActivityPass
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.ui.components.ModeSelectionDialog2
-import com.skylake.skytv.jgorunner.ui.dev.TVTabLayout_exp
 import com.skylake.skytv.jgorunner.ui.dev.RecentTabLayout
 import com.skylake.skytv.jgorunner.ui.dev.RecentTabLayoutTV
 import com.skylake.skytv.jgorunner.ui.dev.SearchTabLayout
@@ -61,6 +63,7 @@ import com.skylake.skytv.jgorunner.ui.dev.SearchTabLayoutTV
 import com.skylake.skytv.jgorunner.ui.dev.TVTabLayout
 import com.skylake.skytv.jgorunner.ui.dev.TVTabLayoutTV
 import com.skylake.skytv.jgorunner.ui.dev.TVTabLayoutTV_exp
+import com.skylake.skytv.jgorunner.ui.dev.TVTabLayout_exp
 import kotlin.random.Random
 
 @SuppressLint("NewApi")
@@ -123,6 +126,8 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
     )
     val glowColor = remember { Animatable(glowColors[Random.nextInt(glowColors.size)]) }
     val customFontFamily = FontFamily(Font(R.font.chakrapetch_bold))
+
+    val ko = preferenceManager.myPrefs.startTvAutomatically
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -260,6 +265,20 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
 
 
     LaunchedEffect(Unit) {
+
+//        if (preferenceManager.myPrefs.startTvAutomatically){
+//            if (!AppStartTracker.shouldPlayChannel) {
+//                Toast.makeText(context, "Welcome to the APP", Toast.LENGTH_LONG).show()
+//
+//                ///
+//
+//                AppStartTracker.shouldPlayChannel = true
+//            }
+//        }
+
+
+
+
         tabFocusRequester.requestFocus()
         Handler(Looper.getMainLooper()).postDelayed({
             selectedTabIndex = preferenceManager.myPrefs.selectedScreenTV?.toInt() ?: 0

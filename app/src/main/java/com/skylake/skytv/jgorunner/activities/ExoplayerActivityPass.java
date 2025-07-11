@@ -51,7 +51,8 @@ public class ExoplayerActivityPass extends ComponentActivity {
     private PlayerView playerView;
     private boolean isInPipMode = false;
 
-    private SkySharedPref skyPref;
+//    private SkySharedPref skyPref;
+    SkySharedPref skyPref = SkySharedPref.getInstance(this);
     private String filterQX;
     private String tv_NAV;
 
@@ -140,6 +141,18 @@ public class ExoplayerActivityPass extends ComponentActivity {
             if (CHANNEL_LOGO_URL == null) CHANNEL_LOGO_URL = "";
             if (CHANNEL_NAME_TEXT == null) CHANNEL_NAME_TEXT = "Unknown Channel";
         }
+
+        /// Saving Current Channel Data-
+        skyPref.getMyPrefs().setCurrChannelName(CHANNEL_NAME_TEXT);
+        skyPref.getMyPrefs().setCurrChannelLogo(CHANNEL_LOGO_URL);
+        skyPref.getMyPrefs().setCurrChannelUrl(initialVideoUrl);
+        skyPref.savePreferences();
+
+        ///
+
+
+        skyPref.getMyPrefs().setCurrChannelName(CHANNEL_NAME_TEXT);
+        skyPref.savePreferences();
 
         setContentView(R.layout.activity_web_player_exo);
 

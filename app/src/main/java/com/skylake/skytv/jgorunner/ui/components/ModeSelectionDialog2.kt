@@ -43,6 +43,7 @@ fun ModeSelectionDialog2(
     val preferenceManager = SkySharedPref.getInstance(context)
     var showCustomUrlInputDialog by remember { mutableStateOf(false) }
     var customUrl by remember { mutableStateOf(preferenceManager.myPrefs.custURL ?: "") }
+    var startTvAutomatically by remember { mutableStateOf(preferenceManager.myPrefs.startTvAutomatically ?: false) }
     var showProcessingDialog by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
@@ -113,6 +114,7 @@ fun ModeSelectionDialog2(
                     expanded = screenDropdownExpanded,
                     onExpandChange = { screenDropdownExpanded = it }
                 )
+
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -298,6 +300,27 @@ fun ModeSelectionDialog2(
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 
+                //////////////////////////////////////
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Checkbox(
+                        checked = startTvAutomatically,
+                        onCheckedChange = { checked ->
+                            startTvAutomatically = checked
+                        }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "Play Channel at Start")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                //////////////////////////////////////
+
+
                 if (showCustomUrlInputDialog) {
                     Dialog(onDismissRequest = { showCustomUrlInputDialog = false }) {
                         Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface, modifier = Modifier.padding(16.dp)) {
@@ -374,6 +397,8 @@ fun ModeSelectionDialog2(
                                 myPrefs.filterLI = ""
                                 myPrefs.selectedRemoteNavTV = "0"
                                 myPrefs.showPLAYLIST = false
+                                myPrefs.startTvAutomatically = false
+
                                 savePreferences()
                             }
                             onReset()
@@ -398,6 +423,7 @@ fun ModeSelectionDialog2(
                                 if (myPrefs.expDebug) {
                                     myPrefs.showPLAYLIST = showPlaylist
                                 }
+                                myPrefs.startTvAutomatically = startTvAutomatically
                                 savePreferences()
                             }
                             onDismiss()
