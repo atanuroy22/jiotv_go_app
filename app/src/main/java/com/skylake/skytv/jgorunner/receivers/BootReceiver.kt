@@ -3,7 +3,7 @@ package com.skylake.skytv.jgorunner.receivers
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
+import android.os.*
 import android.util.Log
 import android.widget.Toast
 import com.skylake.skytv.jgorunner.data.SkySharedPref
@@ -13,21 +13,28 @@ class BootReceiver : BroadcastReceiver() {
 
     companion object {
         private const val TAG = "JGO_BootReceiver"
-        private const val ACTION_LOCKED_BOOT_COMPLETED = "android.intent.action.LOCKED_BOOT_COMPLETED"
+        private const val ACTION_QUICKBOOT_POWERON = "android.intent.action.QUICKBOOT_POWERON"
+        private const val INITIAL_DELAY_MS = 2000L
+        private const val RETRY_DELAY_MS = 60_000L
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             Intent.ACTION_BOOT_COMPLETED,
-            ACTION_LOCKED_BOOT_COMPLETED,
-            "android.intent.action.QUICKBOOT_POWERON" -> {
+            ACTION_QUICKBOOT_POWERON -> {
                 Log.d(TAG, "Received boot action: ${intent.action}")
-                handleBootCompleted(context)
+                postDelayedHandleBootCompleted(context, INITIAL_DELAY_MS)
             }
             else -> {
                 Log.w(TAG, "Received unexpected action: ${intent.action}")
             }
         }
+    }
+
+    private fun postDelayedHandleBootCompleted(context: Context, delay: Long) {
+        Handler(Looper.getMainLooper()).postDelayed({
+            handleBootCompleted(context)
+        }, delay)
     }
 
     private fun handleBootCompleted(context: Context) {
@@ -51,8 +58,10 @@ class BootReceiver : BroadcastReceiver() {
                 Log.d(TAG, "Auto-start on boot is disabled in preferences.")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "An error occurred in handleBootCompleted", e)
-            Toast.makeText(context, "[JGO] Error during boot startup.", Toast.LENGTH_LONG).show()
+            Log.e(TAG, "An error occurred in handleBootCompleted, will retry in 1 minute", e)
+            Toast.makeText(context, "[JGO] Error during boot startup. Retrying in 1 minute...", Toast.LENGTH_LONG).show()
+            //  1 minute
+            postDelayedHandleBootCompleted(context, RETRY_DELAY_MS)
         }
     }
 
@@ -61,7 +70,6 @@ class BootReceiver : BroadcastReceiver() {
         Toast.makeText(context, "[JGO] Starting server in background...", Toast.LENGTH_SHORT).show()
 
         val serviceIntent = Intent(context, BinaryService::class.java)
-
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(serviceIntent)
@@ -79,7 +87,6 @@ class BootReceiver : BroadcastReceiver() {
         Log.d(TAG, "Attempting to launch app in the foreground.")
 
         val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-
         if (launchIntent != null) {
             launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(launchIntent)

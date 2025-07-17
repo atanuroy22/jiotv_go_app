@@ -221,8 +221,8 @@ fun TVTabLayout(context: Context?) {
 
 
         if (preferenceManager.myPrefs.startTvAutomatically) {
-            if (!AppStartTracker.shouldPlayChannel) {
-
+            if (!AppStartTracker.shouldPlayChannel &&
+                filteredChannels.value.isNotEmpty()) {
 
                 val firstChannel = filteredChannels.value.first()
                 val intent = Intent(context, ExoplayerActivityPass::class.java).apply {

@@ -313,7 +313,7 @@ fun ModeSelectionDialog2(
                         }
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "Play Channel at Start")
+                    Text(text = "Play channel at start")
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))

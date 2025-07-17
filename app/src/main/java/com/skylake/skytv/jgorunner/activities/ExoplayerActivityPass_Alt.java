@@ -42,9 +42,8 @@ import com.skylake.skytv.jgorunner.R;
 import com.skylake.skytv.jgorunner.data.SkySharedPref;
 
 import java.util.List;
-import java.util.Locale;
 
-public class ExoplayerActivityPass extends ComponentActivity {
+public class ExoplayerActivityPass_Alt extends ComponentActivity {
 
     private static final String TAG = "EPAP-DIX";
     private static final String DEFAULT_VIDEO_URL = "http://localhost:5350/live/143.m3u8";
@@ -66,8 +65,6 @@ public class ExoplayerActivityPass extends ComponentActivity {
 
     private String CHANNEL_NAME_TEXT = "HANA4k";
     private String CHANNEL_LOGO_URL = "https://www.sonypicturesnetworks.com/images/logos/SET%20LOGO.png";
-    private TextView channelNumberTextView;
-
 
     private List<ChannelInfo> channelList;
     private int currentChannelIndex = -1;
@@ -108,7 +105,6 @@ public class ExoplayerActivityPass extends ComponentActivity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         Intent intent = getIntent();
-
 
 
         ////////////////////////
@@ -174,7 +170,6 @@ public class ExoplayerActivityPass extends ComponentActivity {
         floatingChannelInfoLayout = findViewById(R.id.floating_channel_info_layout);
         channelLogoImageView = findViewById(R.id.channel_logo_imageview);
         channelNameTextView = findViewById(R.id.channel_name_textview);
-        channelNumberTextView = findViewById(R.id.channel_number_textview);
 
         // Set up controller visibility listener
         playerView.setControllerVisibilityListener((PlayerControlView.VisibilityListener) visibility -> {
@@ -220,14 +215,7 @@ public class ExoplayerActivityPass extends ComponentActivity {
         } else if (channelLogoImageView != null) {
             channelLogoImageView.setImageDrawable(null);
         }
-
-        if (channelNumberTextView != null) {
-            int displayNumber = currentChannelIndex + 1;
-            String numberFormatted = String.format(Locale.US, "%02d", displayNumber);
-            channelNumberTextView.setText(numberFormatted);
-        }
     }
-
 
     private void setImmersiveMode() {
         getWindow().getDecorView().setSystemUiVisibility(
@@ -600,19 +588,10 @@ public class ExoplayerActivityPass extends ComponentActivity {
                 floatingChannelInfoLayout.setVisibility(View.GONE);
             }
         } else {
-            if (player != null) {
-                player.setPlayWhenReady(false);
-                player.stop();
-                releasePlayer();
-            }
-
-            finish();
-
             playerView.setUseController(true);
             setImmersiveMode();
         }
     }
-
 
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
