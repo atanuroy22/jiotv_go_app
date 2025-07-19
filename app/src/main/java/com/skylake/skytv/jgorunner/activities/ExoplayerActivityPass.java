@@ -55,7 +55,7 @@ public class ExoplayerActivityPass extends ComponentActivity {
     private PlayerView playerView;
     private boolean isInPipMode = false;
 
-//    private SkySharedPref skyPref;
+    //    private SkySharedPref skyPref;
     SkySharedPref skyPref = SkySharedPref.getInstance(this);
     private String filterQX;
     private String tv_NAV;
@@ -121,7 +121,7 @@ public class ExoplayerActivityPass extends ComponentActivity {
                     if (playerView != null && isControllerActuallyVisible) {
                         playerView.hideController();
                     } else {
-                        releasePlayer();
+                        cleanupBeforeExit();
 
                         setEnabled(false);
                         getOnBackPressedDispatcher().onBackPressed();
@@ -369,11 +369,18 @@ public class ExoplayerActivityPass extends ComponentActivity {
                     }
                     break;
             }
-            switch (event.getKeyCode()) {
-                case KeyEvent.KEYCODE_DPAD_CENTER:
-                case KeyEvent.KEYCODE_ENTER:
-                    return true;
-            }
+//            switch (event.getKeyCode()) {
+//                case KeyEvent.KEYCODE_DPAD_CENTER:
+//                case KeyEvent.KEYCODE_ENTER:
+//                    if (playerView != null) {
+//                        if (isControllerActuallyVisible) {
+//                            playerView.hideController();
+//                        } else {
+//                            playerView.showController();
+//                        }
+//                    }
+//                    return true;
+//            }
         }
         return super.dispatchKeyEvent(event);
     }
@@ -446,6 +453,7 @@ public class ExoplayerActivityPass extends ComponentActivity {
     protected void onResume() {
         super.onResume();
         if (player != null) {
+            playerView.setUseController(true);
             player.setPlayWhenReady(true);
         }
         setImmersiveMode();
@@ -470,7 +478,8 @@ public class ExoplayerActivityPass extends ComponentActivity {
         super.onPause();
         if (!isInPictureInPictureMode() && player != null) {
             playWhenReady = player.getPlayWhenReady();
-            releasePlayer();
+//            releasePlayer();
+            cleanupBeforeExit();
         }
     }
 
@@ -479,7 +488,8 @@ public class ExoplayerActivityPass extends ComponentActivity {
     protected void onStop() {
         super.onStop();
         if (!isInPictureInPictureMode() && player != null) {
-            releasePlayer();
+//            releasePlayer();
+            cleanupBeforeExit();
         }
     }
 
@@ -501,6 +511,7 @@ public class ExoplayerActivityPass extends ComponentActivity {
             }
         }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && player != null && player.isPlaying()) {
+            resetSystemUIVisibility();
             enterPipModeManually();
         }
     }
@@ -620,6 +631,35 @@ public class ExoplayerActivityPass extends ComponentActivity {
         if (hasFocus) {
             setImmersiveMode();
         }
+    }
+
+    private void resetSystemUIVisibility() {
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_VISIBLE
+        );
+    }
+
+    private void cleanupBeforeExit() {
+        resetSystemUIVisibility();
+
+
+        if (channelInfoHandler != null) {
+            channelInfoHandler.removeCallbacksAndMessages(null);
+        }
+
+
+        if (playerView != null) {
+            playerView.setPlayer(null);
+            playerView.setUseController(false);
+        }
+
+        if (player != null) {
+            player.release();
+            player = null;
+            Log.d(TAG, "Player released in cleanupBeforeExit()");
+        }
+
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
 
 //    @OptIn(markerClass = UnstableApi.class)

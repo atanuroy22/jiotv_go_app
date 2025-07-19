@@ -117,7 +117,7 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
                     if (playerView != null && isControllerActuallyVisible) {
                         playerView.hideController();
                     } else {
-                        releasePlayer();
+                        cleanupBeforeExit();
 
                         setEnabled(false);
                         getOnBackPressedDispatcher().onBackPressed();
@@ -357,11 +357,18 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
                     }
                     break;
             }
-            switch (event.getKeyCode()) {
-                case KeyEvent.KEYCODE_DPAD_CENTER:
-                case KeyEvent.KEYCODE_ENTER:
-                    return true;
-            }
+//            switch (event.getKeyCode()) {
+//                case KeyEvent.KEYCODE_DPAD_CENTER:
+//                case KeyEvent.KEYCODE_ENTER:
+//                    if (playerView != null) {
+//                        if (isControllerActuallyVisible) {
+//                            playerView.hideController();
+//                        } else {
+//                            playerView.showController();
+//                        }
+//                    }
+//                    return true;
+//            }
         }
         return super.dispatchKeyEvent(event);
     }
@@ -434,6 +441,7 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
     protected void onResume() {
         super.onResume();
         if (player != null) {
+            playerView.setUseController(true);
             player.setPlayWhenReady(true);
         }
         setImmersiveMode();
@@ -458,7 +466,8 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
         super.onPause();
         if (!isInPictureInPictureMode() && player != null) {
             playWhenReady = player.getPlayWhenReady();
-            releasePlayer();
+//            releasePlayer();
+            cleanupBeforeExit();
         }
     }
 
@@ -467,7 +476,8 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
     protected void onStop() {
         super.onStop();
         if (!isInPictureInPictureMode() && player != null) {
-            releasePlayer();
+//            releasePlayer();
+            cleanupBeforeExit();
         }
     }
 
@@ -482,16 +492,19 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
     @Override
     public void onUserLeaveHint() {
         super.onUserLeaveHint();
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             if (isTelevision(this)) {
-                // No PiP on TV
                 return;
             }
         }
+
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && player != null && player.isPlaying()) {
+            resetSystemUIVisibility();
             enterPipModeManually();
         }
     }
+
 
     private void enterPipModeManually() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -601,6 +614,39 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
         }
     }
 
+    private void resetSystemUIVisibility() {
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_VISIBLE
+        );
+    }
+
+    private void cleanupBeforeExit() {
+        // Reset immersive UI settings
+        resetSystemUIVisibility();
+
+        // Remove any pending callbacks to avoid memory leaks or unwanted delayed UI behavior
+        if (channelInfoHandler != null) {
+            channelInfoHandler.removeCallbacksAndMessages(null);
+        }
+
+        // Safely release the player
+        if (playerView != null) {
+            playerView.setPlayer(null);
+            playerView.setUseController(false);
+        }
+
+        if (player != null) {
+            player.release();
+            player = null;
+            Log.d(TAG, "Player released in cleanupBeforeExit()");
+        }
+
+        // Clear screen-on flag
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    }
+
+
+
 //    @OptIn(markerClass = UnstableApi.class)
 //    @Override
 //    public void onBackPressed() {
@@ -615,6 +661,8 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
 //            }
 //        }
 //    }
+
+
 
 
 }
