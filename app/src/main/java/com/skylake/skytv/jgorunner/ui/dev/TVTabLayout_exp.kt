@@ -37,6 +37,7 @@ import com.google.gson.reflect.TypeToken
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.activities.ExoplayerActivityPass
 import com.skylake.skytv.jgorunner.data.SkySharedPref
+import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
 
@@ -95,7 +96,7 @@ fun TVTabLayout_exp(context: Context) {
         ) {
             val firstChannel = filteredChannels.first()
 
-            val intent = Intent(context, ExoplayerActivityPass::class.java).apply {
+            val intent = Intent(context, ExoPlayJet::class.java).apply {
                 putExtra("zone", "TV")
                 putParcelableArrayListExtra("channel_list_data", ArrayList(
                     filteredChannels.map { ch ->
@@ -209,7 +210,7 @@ private fun ChannelGrid(context: Context, channels: List<M3UChannelExp>) {
                         })
                         val currentIndex = channels.indexOf(channel)
 
-                        val intent = Intent(context, ExoplayerActivityPass::class.java).apply {
+                        val intent = Intent(context, ExoPlayJet::class.java).apply {
                             putParcelableArrayListExtra("channel_list_data", channelInfoList)
                             putExtra("current_channel_index", currentIndex)
                         }

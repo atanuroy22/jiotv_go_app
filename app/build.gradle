@@ -90,6 +90,9 @@ dependencies {
     implementation libs.androidx.tv.material
     implementation "androidx.core:core-splashscreen:1.0.1"
 
+    implementation "io.coil-kt:coil-compose:2.4.0"
+
+
     implementation libs.okhttp
     implementation(libs.compose)
     testImplementation libs.junit

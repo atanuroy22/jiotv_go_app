@@ -49,6 +49,7 @@ import com.skylake.skytv.jgorunner.core.update.SemanticVersionNew
 import com.skylake.skytv.jgorunner.core.update.Status
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.BinaryService
+import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.components.BottomNavigationBar
 import com.skylake.skytv.jgorunner.ui.components.CustPopup
 import com.skylake.skytv.jgorunner.ui.components.JTVModeSelectorPopup
@@ -58,6 +59,7 @@ import com.skylake.skytv.jgorunner.ui.components.RedirectPopup
 import com.skylake.skytv.jgorunner.ui.dev.ChannelUtils
 import com.skylake.skytv.jgorunner.ui.screens.CastScreen
 import com.skylake.skytv.jgorunner.ui.screens.DebugScreen
+import com.skylake.skytv.jgorunner.ui.screens.ExoPlayJetScreen
 import com.skylake.skytv.jgorunner.ui.screens.HomeScreen
 import com.skylake.skytv.jgorunner.ui.screens.InfoScreen
 import com.skylake.skytv.jgorunner.ui.screens.LoginScreen
@@ -121,7 +123,10 @@ class MainActivity : ComponentActivity() {
         preferenceManager = SkySharedPref.getInstance(this)
 
         // DEL
-
+/////////////////
+//        val intent = Intent(this, ExoPlayJet::class.java)
+//        this.startActivity(intent)
+///////////////////
 //        currentScreen = "Debug"
 
         val appPackageName = preferenceManager.myPrefs.iptvAppPackageName
@@ -304,7 +309,7 @@ class MainActivity : ComponentActivity() {
             onJTVServerRun()
     }
 
-    @SuppressLint("UnspecifiedRegisterReceiverFlag")
+    @SuppressLint("UnspecifiedRegisterReceiverFlag", "NewApi")
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)

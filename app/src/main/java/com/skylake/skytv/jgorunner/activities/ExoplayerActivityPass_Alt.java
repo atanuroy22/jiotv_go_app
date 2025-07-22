@@ -11,6 +11,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.support.v4.media.session.MediaSessionCompat;
 import android.util.Log;
 import android.util.Rational;
 import android.view.KeyEvent;
@@ -20,7 +21,6 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
-
 import androidx.activity.ComponentActivity;
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
@@ -42,6 +42,7 @@ import com.skylake.skytv.jgorunner.R;
 import com.skylake.skytv.jgorunner.data.SkySharedPref;
 
 import java.util.List;
+import java.util.Locale;
 
 public class ExoplayerActivityPass_Alt extends ComponentActivity {
 
@@ -54,7 +55,9 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
     private PlayerView playerView;
     private boolean isInPipMode = false;
 
-//    private SkySharedPref skyPref;
+    private MediaSessionCompat mediaSession;
+
+    //    private SkySharedPref skyPref;
     SkySharedPref skyPref = SkySharedPref.getInstance(this);
     private String filterQX;
     private String tv_NAV;
@@ -65,6 +68,8 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
 
     private String CHANNEL_NAME_TEXT = "HANA4k";
     private String CHANNEL_LOGO_URL = "https://www.sonypicturesnetworks.com/images/logos/SET%20LOGO.png";
+    private TextView channelNumberTextView;
+
 
     private List<ChannelInfo> channelList;
     private int currentChannelIndex = -1;
@@ -105,6 +110,7 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         Intent intent = getIntent();
+
 
 
         ////////////////////////
@@ -170,6 +176,7 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
         floatingChannelInfoLayout = findViewById(R.id.floating_channel_info_layout);
         channelLogoImageView = findViewById(R.id.channel_logo_imageview);
         channelNameTextView = findViewById(R.id.channel_name_textview);
+        channelNumberTextView = findViewById(R.id.channel_number_textview);
 
         // Set up controller visibility listener
         playerView.setControllerVisibilityListener((PlayerControlView.VisibilityListener) visibility -> {
@@ -215,7 +222,14 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
         } else if (channelLogoImageView != null) {
             channelLogoImageView.setImageDrawable(null);
         }
+
+        if (channelNumberTextView != null) {
+            int displayNumber = currentChannelIndex + 1;
+            String numberFormatted = String.format(Locale.US, "%02d", displayNumber);
+            channelNumberTextView.setText(numberFormatted);
+        }
     }
+
 
     private void setImmersiveMode() {
         getWindow().getDecorView().setSystemUiVisibility(
@@ -237,8 +251,12 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
             playerView.hideController();
             playerView.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING);
             player.setSeekParameters(SeekParameters.CLOSEST_SYNC);
+
+            // 💡 Initialize MediaSession
+            initMediaSession();
         }
 
+        // Initialize media source
         DefaultHttpDataSource.Factory dataSourceFactory = new DefaultHttpDataSource.Factory();
         MediaSource hlsMediaSource = new HlsMediaSource.Factory(dataSourceFactory)
                 .setAllowChunklessPreparation(true)
@@ -248,8 +266,57 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
         player.prepare();
         player.setPlayWhenReady(true);
 
+        // Show floating info
         showAndHideChannelInfoBox();
     }
+
+    private void initMediaSession() {
+        if (mediaSession == null) {
+            mediaSession = new MediaSessionCompat(this, "playerSession");
+            mediaSession.setFlags(MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS |
+                    MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS);
+            mediaSession.setMediaButtonReceiver(null); // We handle events manually
+
+            mediaSession.setCallback(new MediaSessionCompat.Callback() {
+                @Override
+                public boolean onMediaButtonEvent(@NonNull Intent mediaButtonIntent) {
+                    KeyEvent keyEvent = mediaButtonIntent.getParcelableExtra(Intent.EXTRA_KEY_EVENT);
+                    if (keyEvent != null && keyEvent.getAction() == KeyEvent.ACTION_DOWN) {
+                        int keyCode = keyEvent.getKeyCode();
+                        Log.d("MediaSession", "Media key event: " + keyCode);
+
+                        switch (keyCode) {
+                            case KeyEvent.KEYCODE_MEDIA_PLAY:
+                            case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
+                            case KeyEvent.KEYCODE_DPAD_CENTER:
+                            case KeyEvent.KEYCODE_ENTER:
+                                if (player.isPlaying()) {
+                                    player.pause();
+                                } else {
+                                    player.play();
+                                }
+                                return true;
+
+                            case KeyEvent.KEYCODE_CHANNEL_DOWN:
+                            case KeyEvent.KEYCODE_DPAD_DOWN:
+                                playPreviousChannel();
+                                return true;
+
+                            case KeyEvent.KEYCODE_CHANNEL_UP:
+                            case KeyEvent.KEYCODE_DPAD_UP:
+                                playNextChannel();
+                                return true;
+                        }
+                    }
+                    return super.onMediaButtonEvent(mediaButtonIntent);
+                }
+            });
+
+            mediaSession.setActive(true);
+        }
+    }
+
+
 
 //    private void showAndHideChannelInfoBox() {
 //        if (floatingChannelInfoLayout != null) {
@@ -313,7 +380,7 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
     }
 
     @OptIn(markerClass = UnstableApi.class)
-    @SuppressLint("RestrictedApi")
+    @SuppressLint({"RestrictedApi", "NewApi"})
     @Override
     public boolean dispatchKeyEvent(@NonNull KeyEvent event) {
         if (player == null) {
@@ -329,6 +396,11 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
         if ("-1".equals(tv_NAV)) {
             return super.dispatchKeyEvent(event);
         }
+
+        if (isInPictureInPictureMode()) {
+            return super.dispatchKeyEvent(event);
+        }
+
 
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             switch (tv_NAV) {
@@ -357,18 +429,18 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
                     }
                     break;
             }
-//            switch (event.getKeyCode()) {
-//                case KeyEvent.KEYCODE_DPAD_CENTER:
-//                case KeyEvent.KEYCODE_ENTER:
-//                    if (playerView != null) {
-//                        if (isControllerActuallyVisible) {
-//                            playerView.hideController();
-//                        } else {
-//                            playerView.showController();
-//                        }
-//                    }
-//                    return true;
-//            }
+            switch (event.getKeyCode()) {
+                case KeyEvent.KEYCODE_DPAD_CENTER:
+                case KeyEvent.KEYCODE_ENTER:
+                    if (playerView != null) {
+                        if (isControllerActuallyVisible) {
+                            playerView.hideController();
+                        } else {
+                            playerView.showController();
+                        }
+                    }
+                    return true;
+            }
         }
         return super.dispatchKeyEvent(event);
     }
@@ -492,19 +564,17 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
     @Override
     public void onUserLeaveHint() {
         super.onUserLeaveHint();
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             if (isTelevision(this)) {
+                // No PiP on TV
                 return;
             }
         }
-
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && player != null && player.isPlaying()) {
             resetSystemUIVisibility();
             enterPipModeManually();
         }
     }
-
 
     private void enterPipModeManually() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -513,11 +583,15 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
                 return;
             }
         }
+
+
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Rational aspectRatio = new Rational(16, 9);
             PictureInPictureParams.Builder pipBuilder = new PictureInPictureParams.Builder()
                     .setAspectRatio(aspectRatio);
             enterPictureInPictureMode(pipBuilder.build());
+            playerView.clearFocus();
             isInPipMode = true;
         }
     }
@@ -601,18 +675,29 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
                 floatingChannelInfoLayout.setVisibility(View.GONE);
             }
         } else {
+            if (player != null) {
+                player.setPlayWhenReady(false);
+                player.stop();
+                releasePlayer();
+            }
+
+            finish();
+
             playerView.setUseController(true);
             setImmersiveMode();
         }
     }
+
 
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) {
             setImmersiveMode();
+            playerView.requestFocus();
         }
     }
+
 
     private void resetSystemUIVisibility() {
         getWindow().getDecorView().setSystemUiVisibility(
@@ -621,19 +706,26 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
     }
 
     private void cleanupBeforeExit() {
-        // Reset immersive UI settings
         resetSystemUIVisibility();
 
-        // Remove any pending callbacks to avoid memory leaks or unwanted delayed UI behavior
+
         if (channelInfoHandler != null) {
             channelInfoHandler.removeCallbacksAndMessages(null);
         }
 
-        // Safely release the player
+
         if (playerView != null) {
             playerView.setPlayer(null);
             playerView.setUseController(false);
         }
+
+        if (mediaSession != null) {
+            mediaSession.setActive(false);
+            mediaSession.release();
+            mediaSession = null;
+            Log.d(TAG, "MediaSession released");
+        }
+
 
         if (player != null) {
             player.release();
@@ -641,11 +733,8 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
             Log.d(TAG, "Player released in cleanupBeforeExit()");
         }
 
-        // Clear screen-on flag
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
-
-
 
 //    @OptIn(markerClass = UnstableApi.class)
 //    @Override
@@ -661,8 +750,6 @@ public class ExoplayerActivityPass_Alt extends ComponentActivity {
 //            }
 //        }
 //    }
-
-
 
 
 }
