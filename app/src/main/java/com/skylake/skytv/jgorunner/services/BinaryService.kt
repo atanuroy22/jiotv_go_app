@@ -172,7 +172,7 @@ class BinaryService : Service() {
                 .setContentTitle("JTV-GO Server Running")
                 .setContentText("The server is running in the background.")
                 .setSmallIcon(R.drawable.logo)
-                .setContentIntent(pendingIntent) // Set the intent to open the app
+                .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .addAction(
                     Notification.Action.Builder(

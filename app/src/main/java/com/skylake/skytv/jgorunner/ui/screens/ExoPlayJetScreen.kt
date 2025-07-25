@@ -102,9 +102,10 @@ fun ExoPlayJetScreen(
                 Lifecycle.Event.ON_RESUME -> {
                     if (exoPlayer == null) {
                         exoPlayer = initializePlayer(
-                            videoUrl = channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl,
+                            getCurrentVideoUrl = { channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl },
                             context = context,
-                            retryCountRef)
+                            retryCountRef = retryCountRef
+                        )
                     } else {
                         exoPlayer?.playWhenReady = true
                     }
@@ -256,7 +257,7 @@ fun ChannelInfoOverlay(channelList: List<ChannelInfo>?, currentIndex: Int) {
 }
 
 @UnstableApi
-fun initializePlayer(
+fun initializePlayer2(
     videoUrl: String,
     context: Context,
     retryCountRef: MutableState<Int>
@@ -302,6 +303,50 @@ fun initializePlayer(
 
     return player
 }
+
+@UnstableApi
+fun initializePlayer(
+    getCurrentVideoUrl: () -> String,
+    context: Context,
+    retryCountRef: MutableState<Int>
+): ExoPlayer {
+    val httpDataSourceFactory = DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true)
+    val mediaSourceFactory = DefaultMediaSourceFactory(context).setDataSourceFactory(httpDataSourceFactory)
+
+    val player = ExoPlayer.Builder(context).setMediaSourceFactory(mediaSourceFactory).build()
+    val maxRetries = 5
+    retryCountRef.value = 0
+
+    fun prepareAndPlay() {
+        val mediaItem = MediaItem.Builder()
+            .setUri(Uri.parse(getCurrentVideoUrl()))
+            .setMimeType(MimeTypes.APPLICATION_M3U8)
+            .build()
+        player.setMediaItem(mediaItem)
+        player.prepare()
+        player.playWhenReady = true
+    }
+
+    prepareAndPlay()
+
+    player.addListener(object : Player.Listener {
+        override fun onPlayerError(error: PlaybackException) {
+            if (retryCountRef.value < maxRetries) {
+                retryCountRef.value++
+                Log.d(TAG, "Retrying playback: attempt ${retryCountRef.value}")
+                player.stop()
+                prepareAndPlay()
+            } else {
+                Toast.makeText(context, "Playback failed after $maxRetries attempts", Toast.LENGTH_SHORT).show()
+                Log.e(TAG, "Playback permanently failed.")
+            }
+        }
+    })
+
+    return player
+}
+
+
 
 fun handleTVRemoteKey(
     event: KeyEvent,
