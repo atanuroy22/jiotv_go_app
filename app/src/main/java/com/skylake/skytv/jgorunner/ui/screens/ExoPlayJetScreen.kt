@@ -37,7 +37,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
@@ -70,7 +74,8 @@ fun ExoPlayJetScreen(
     var isKeyRemapActive by remember { mutableStateOf(true) }
     var showChannelOverlay by remember { mutableStateOf(false) }
 
-    val tvNAV = preferenceManager.myPrefs.selectedRemoteNavTV
+    val tvNAV = "0"
+//    val tvNAV = preferenceManager.myPrefs.selectedRemoteNavTV
 
     SideEffect {
         activity?.let {
@@ -81,7 +86,6 @@ fun ExoPlayJetScreen(
         }
     }
 
-    // Lifecycle observer to manage player
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -95,21 +99,16 @@ fun ExoPlayJetScreen(
                         exoPlayer?.playWhenReady = true
                     }
                 }
-
                 Lifecycle.Event.ON_PAUSE -> {
-                    exoPlayer?.pause()
                     exoPlayer?.playWhenReady = false
                 }
-
                 Lifecycle.Event.ON_STOP, Lifecycle.Event.ON_DESTROY -> {
                     exoPlayer?.release()
                     exoPlayer = null
                 }
-
                 else -> {}
             }
         }
-
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
@@ -118,20 +117,12 @@ fun ExoPlayJetScreen(
         }
     }
 
-    // Focus and key events
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
     DisposableEffect(lifecycleOwner, isKeyRemapActive) {
         val observer = LifecycleEventObserver { _, event ->
-            isKeyRemapActive = when (event) {
-                Lifecycle.Event.ON_RESUME -> true
-                Lifecycle.Event.ON_STOP, Lifecycle.Event.ON_DESTROY -> false
-                else -> isKeyRemapActive
-            }
+            isKeyRemapActive = event == Lifecycle.Event.ON_RESUME
         }
-
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
@@ -139,23 +130,17 @@ fun ExoPlayJetScreen(
         }
     }
 
-//    DisposableEffect(Unit) {
-//        view.keepScreenOn = true
-//        onDispose { view.keepScreenOn = false }
-//    }
-
-    // Change channel and show overlay
     LaunchedEffect(currentIndex) {
-        showChannelOverlay = true
-        exoPlayer?.apply {
+        exoPlayer?.let { player ->
+            showChannelOverlay = true
             channelList?.getOrNull(currentIndex)?.videoUrl?.let {
-                setMediaItem(MediaItem.fromUri(Uri.parse(it)))
-                prepare()
-                playWhenReady = true
+                player.setMediaItem(MediaItem.fromUri(Uri.parse(it)))
+                player.prepare()
+                player.playWhenReady = true
             }
+            delay(3000)
+            showChannelOverlay = false
         }
-        delay(3000)
-        showChannelOverlay = false
     }
 
     Box(
@@ -172,17 +157,15 @@ fun ExoPlayJetScreen(
                         context = context,
                         channelList = channelList,
                         currentIndexState = { currentIndex },
-                        onChannelChange = { newIndex ->
-                            currentIndex = newIndex
-                        }
+                        onChannelChange = { currentIndex = it }
                     )
                 } else false
             }
     ) {
         exoPlayer?.let { player ->
             AndroidView(
-                factory = { context ->
-                    PlayerView(context).apply {
+                factory = {
+                    PlayerView(it).apply {
                         useController = true
                         controllerAutoShow = false
                         setShowBuffering(SHOW_BUFFERING_WHEN_PLAYING)
@@ -196,7 +179,6 @@ fun ExoPlayJetScreen(
             )
         }
 
-        // Show channel overlay
         AnimatedVisibility(visible = showChannelOverlay && channelList != null, enter = fadeIn(), exit = fadeOut()) {
             ChannelInfoOverlay(channelList, currentIndex)
         }
@@ -206,8 +188,7 @@ fun ExoPlayJetScreen(
 @SuppressLint("DefaultLocale")
 @Composable
 fun ChannelInfoOverlay(channelList: List<ChannelInfo>?, currentIndex: Int) {
-    val channel = channelList?.getOrNull(currentIndex)
-    if (channel != null) {
+    channelList?.getOrNull(currentIndex)?.let { channel ->
         Box {
             Card(
                 modifier = Modifier
@@ -220,7 +201,6 @@ fun ChannelInfoOverlay(channelList: List<ChannelInfo>?, currentIndex: Int) {
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
                 ) {
-
                     Card(
                         modifier = Modifier.size(60.dp),
                         shape = RoundedCornerShape(16.dp),
@@ -233,11 +213,7 @@ fun ChannelInfoOverlay(channelList: List<ChannelInfo>?, currentIndex: Int) {
                             contentScale = ContentScale.Fit,
                             modifier = Modifier
                                 .size(60.dp)
-                                .shadow(
-                                    elevation = 8.dp,
-                                    shape = RoundedCornerShape(16.dp),
-                                    clip = false
-                                )
+                                .shadow(8.dp, RoundedCornerShape(16.dp), clip = false)
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(Color.White.copy(alpha = 0.8f))
                         )
@@ -268,15 +244,40 @@ fun ChannelInfoOverlay(channelList: List<ChannelInfo>?, currentIndex: Int) {
     }
 }
 
-
+@UnstableApi
 fun initializePlayer(videoUrl: String, context: Context): ExoPlayer {
-    return ExoPlayer.Builder(context)
-        .setMediaSourceFactory(DefaultMediaSourceFactory(context))
-        .build().apply {
-            setMediaItem(MediaItem.fromUri(Uri.parse(videoUrl)))
-            prepare()
-            playWhenReady = true
+    val mediaItem = MediaItem.Builder()
+        .setUri(Uri.parse(videoUrl))
+        .setMimeType(MimeTypes.APPLICATION_M3U8)
+        .build()
+
+    val httpDataSourceFactory = DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true)
+    val mediaSourceFactory = DefaultMediaSourceFactory(context).setDataSourceFactory(httpDataSourceFactory)
+
+    val player = ExoPlayer.Builder(context).setMediaSourceFactory(mediaSourceFactory).build()
+
+    var retryCount = 0
+    val maxRetries = 5
+
+    player.addListener(object : Player.Listener {
+        override fun onPlayerError(error: PlaybackException) {
+            if (retryCount++ < maxRetries) {
+                player.playWhenReady = false
+                player.seekTo(0)
+                player.setMediaItem(mediaItem)
+                player.prepare()
+                player.playWhenReady = true
+            } else {
+                Toast.makeText(context, "Playback failed after $maxRetries attempts", Toast.LENGTH_SHORT).show()
+            }
         }
+    })
+
+    player.setMediaItem(mediaItem)
+    player.prepare()
+    player.playWhenReady = true
+
+    return player
 }
 
 fun handleTVRemoteKey(
@@ -289,25 +290,21 @@ fun handleTVRemoteKey(
 ): Boolean {
     if (event.type != KeyEventType.KeyUp) return false
 
-    val key = event.key
     val currentIndex = currentIndexState()
     val newIndex = when (tvNAV) {
-        "0" -> when (key) {
+        "0" -> when (event.key) {
             Key.ChannelUp -> (currentIndex + 1) % (channelList?.size ?: return false)
             Key.ChannelDown -> if (currentIndex - 1 < 0) (channelList?.size ?: 1) - 1 else currentIndex - 1
             else -> return false
         }
-
-        "1" -> when (key) {
+        "1" -> when (event.key) {
             Key.DirectionUp -> (currentIndex + 1) % (channelList?.size ?: return false)
             Key.DirectionDown -> if (currentIndex - 1 < 0) (channelList?.size ?: 1) - 1 else currentIndex - 1
             else -> return false
         }
-
         else -> return false
     }
 
-    Log.d("TVRemote", "Switching to channel index: $newIndex")
     onChannelChange(newIndex)
     return true
 }

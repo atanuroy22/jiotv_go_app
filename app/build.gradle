@@ -78,6 +78,7 @@ dependencies {
     implementation libs.androidx.media3.ui
     implementation libs.androidx.media3.exoplayer.hls
     implementation libs.androidx.media3.datasource
+    implementation "androidx.media3:media3-datasource-okhttp:1.7.1"
 
     implementation libs.play.services.cast.framework
     implementation libs.androidx.appcompat
