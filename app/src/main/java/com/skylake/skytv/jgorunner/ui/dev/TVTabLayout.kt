@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
+import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
 @SuppressLint("MutableCollectionMutableState")
@@ -225,7 +226,7 @@ fun TVTabLayout(context: Context?) {
                 filteredChannels.value.isNotEmpty()) {
 
                 val firstChannel = filteredChannels.value.first()
-                val intent = Intent(context, ExoplayerActivityPass::class.java).apply {
+                val intent = Intent(context, ExoPlayJet::class.java).apply {
                     putExtra("zone", "TV")
                     putParcelableArrayListExtra("channel_list_data", ArrayList(
                         filteredChannels.value.map { ch ->
@@ -484,7 +485,7 @@ fun TVTabLayout(context: Context?) {
                             }
                         }
                         .clickable {
-                            val intent = Intent(context, ExoplayerActivityPass::class.java).apply {
+                            val intent = Intent(context, ExoPlayJet::class.java).apply {
                                 putExtra("zone", "TV")
                                 putParcelableArrayListExtra("channel_list_data", ArrayList(
                                     (filteredChannels.value ?: emptyList()).map { ch ->

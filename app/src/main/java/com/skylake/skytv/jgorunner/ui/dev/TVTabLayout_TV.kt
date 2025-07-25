@@ -42,6 +42,7 @@ import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
 @OptIn(ExperimentalGlideComposeApi::class)
@@ -193,7 +194,7 @@ fun TVTabLayoutTV(context: Context?) {
                 filteredChannels.value.isNotEmpty()) {
 
                 val firstChannel = filteredChannels.value.first()
-                val intent = Intent(context, ExoplayerActivityPass::class.java).apply {
+                val intent = Intent(context, ExoPlayJet::class.java).apply {
                     putExtra("zone", "TV")
                     putParcelableArrayListExtra("channel_list_data", ArrayList(
                         filteredChannels.value.map { ch ->
@@ -474,10 +475,10 @@ fun TVTabLayoutTV(context: Context?) {
                         )
                     },
                     onClick = {
-                        val intent = Intent(context, ExoplayerActivityPass::class.java).apply {
+                        val intent = Intent(context, ExoPlayJet::class.java).apply {
                             putExtra("video_url", channel.channel_url ?: "")
                             putExtra("zone", "TV")
-                            // Prepare channel list for ExoplayerActivityPass
+                            // Prepare channel list for ExoPlayJet
                             val allChannelsData = ArrayList((filteredChannels.value ?: emptyList()).mapNotNull { ch ->
                                 if (ch == null) return@mapNotNull null
                                 ChannelInfo(

@@ -30,6 +30,9 @@ class ExoPlayJet : ComponentActivity() {
         val channelList = intent.getParcelableArrayListExtra<ChannelInfo>("channel_list_data")
         val currentChannelIndex = intent.getIntExtra("current_channel_index", -1)
 
+        var signatureFallback = intent.getStringExtra("zone")
+        signatureFallback = if (signatureFallback.isNullOrEmpty()) "0x0" else signatureFallback
+
         if (!channelList.isNullOrEmpty() && currentChannelIndex in channelList.indices) {
             val currentChannel: ChannelInfo = channelList[currentChannelIndex]
             initialVideoUrl = currentChannel.videoUrl ?: initialVideoUrl
@@ -48,8 +51,10 @@ class ExoPlayJet : ComponentActivity() {
 
 
         val controller = WindowInsetsControllerCompat(window, window.decorView)
-        controller.hide(WindowInsets.Type.systemBars()) // Hides both status & nav bar
-        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE // Allow swipe to show
+        controller.hide(WindowInsets.Type.systemBars())
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+
+
 
         setContent {
             JGOTheme(themeOverride = prefManager.myPrefs.darkMODE) {
@@ -58,6 +63,7 @@ class ExoPlayJet : ComponentActivity() {
                     videoUrl = initialVideoUrl,
                     logoUrl = channelLogoUrl,
                     channelName = channelName,
+                    signatureFallback = signatureFallback,
                     channelList = channelList,
                     currentChannelIndex = currentChannelIndex
                 )

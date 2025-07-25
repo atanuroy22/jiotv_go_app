@@ -52,6 +52,13 @@ import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import kotlinx.coroutines.delay
 
+class PlayerWithRetry(
+    val player: ExoPlayer,
+    var retryCount: Int = 0
+)
+
+const val TAG = "ExoJetScreen"
+
 @OptIn(UnstableApi::class)
 @SuppressLint("AutoboxingStateCreation", "DefaultLocale")
 @Composable
@@ -61,21 +68,24 @@ fun ExoPlayJetScreen(
     logoUrl: String,
     channelName: String,
     channelList: ArrayList<ChannelInfo>?,
-    currentChannelIndex: Int
+    currentChannelIndex: Int,
+    signatureFallback: String
 ) {
     val context = LocalContext.current
     val view = LocalView.current
     val activity = context as? Activity
     val lifecycleOwner = LocalLifecycleOwner.current
 
+
     val focusRequester = remember { FocusRequester() }
     var currentIndex by remember { mutableStateOf(currentChannelIndex) }
     var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
     var isKeyRemapActive by remember { mutableStateOf(true) }
     var showChannelOverlay by remember { mutableStateOf(false) }
+    val retryCountRef = remember { mutableStateOf(0) }
 
-    val tvNAV = "0"
-//    val tvNAV = preferenceManager.myPrefs.selectedRemoteNavTV
+//    val tvNAV = "0"
+    val tvNAV = preferenceManager.myPrefs.selectedRemoteNavTV
 
     SideEffect {
         activity?.let {
@@ -93,8 +103,8 @@ fun ExoPlayJetScreen(
                     if (exoPlayer == null) {
                         exoPlayer = initializePlayer(
                             videoUrl = channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl,
-                            context = context
-                        )
+                            context = context,
+                            retryCountRef)
                     } else {
                         exoPlayer?.playWhenReady = true
                     }
@@ -132,6 +142,7 @@ fun ExoPlayJetScreen(
 
     LaunchedEffect(currentIndex) {
         exoPlayer?.let { player ->
+            retryCountRef.value = 0
             showChannelOverlay = true
             channelList?.getOrNull(currentIndex)?.videoUrl?.let {
                 player.setMediaItem(MediaItem.fromUri(Uri.parse(it)))
@@ -245,7 +256,11 @@ fun ChannelInfoOverlay(channelList: List<ChannelInfo>?, currentIndex: Int) {
 }
 
 @UnstableApi
-fun initializePlayer(videoUrl: String, context: Context): ExoPlayer {
+fun initializePlayer(
+    videoUrl: String,
+    context: Context,
+    retryCountRef: MutableState<Int>
+): ExoPlayer {
     val mediaItem = MediaItem.Builder()
         .setUri(Uri.parse(videoUrl))
         .setMimeType(MimeTypes.APPLICATION_M3U8)
@@ -259,16 +274,24 @@ fun initializePlayer(videoUrl: String, context: Context): ExoPlayer {
     var retryCount = 0
     val maxRetries = 5
 
+    player.playWhenReady = false
+    player.seekTo(0)
+    player.setMediaItem(mediaItem)
+    player.prepare()
+    player.playWhenReady = true
+
     player.addListener(object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
-            if (retryCount++ < maxRetries) {
+            if (retryCountRef.value++ < maxRetries) {
                 player.playWhenReady = false
                 player.seekTo(0)
                 player.setMediaItem(mediaItem)
                 player.prepare()
                 player.playWhenReady = true
+                Log.d(TAG,"Loading player :: $retryCountRef")
             } else {
                 Toast.makeText(context, "Playback failed after $maxRetries attempts", Toast.LENGTH_SHORT).show()
+                Log.d(TAG,"Playback failed after $maxRetries attempts")
             }
         }
     })
