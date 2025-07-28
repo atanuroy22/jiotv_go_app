@@ -25,6 +25,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.skylake.skytv.jgorunner.activities.ExoplayerActivity
 import com.skylake.skytv.jgorunner.data.SkySharedPref
+import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalGlideComposeApi::class)
@@ -137,7 +138,7 @@ fun SearchTabLayoutTV(context: Context, focusRequester: FocusRequester) {
                     },
                     onClick = {
                         Log.d("HT", channel.channel_name)
-                        val intent = Intent(context, ExoplayerActivity::class.java).apply {
+                        val intent = Intent(context, ExoPlayJet::class.java).apply {
                             putExtra("video_url", channel.channel_url)
                         }
                         startActivity(context, intent, null)

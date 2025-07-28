@@ -50,9 +50,6 @@ import androidx.media3.ui.PlayerView.SHOW_BUFFERING_WHEN_PLAYING
 import coil.compose.AsyncImage
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.data.SkySharedPref
-import com.skylake.skytv.jgorunner.ui.dev.ChannelUtils
-import com.skylake.skytv.jgorunner.ui.dev.EpgProgram
-import com.skylake.skytv.jgorunner.ui.dev.extractChannelIdFromPlayUrl
 import kotlinx.coroutines.delay
 
 class PlayerWithRetry(
@@ -86,12 +83,6 @@ fun ExoPlayJetScreen(
     var isKeyRemapActive by remember { mutableStateOf(true) }
     var showChannelOverlay by remember { mutableStateOf(false) }
     val retryCountRef = remember { mutableStateOf(0) }
-    var currentProgramName by remember { mutableStateOf<String?>(null) }
-
-    var epgData by remember { mutableStateOf<EpgProgram?>(null) }
-    val localPORT by remember { mutableIntStateOf(preferenceManager.myPrefs.jtvGoServerPort) }
-    val basefinURL = "http://localhost:$localPORT"
-
 
 //    val tvNAV = "0"
     val tvNAV = preferenceManager.myPrefs.selectedRemoteNavTV
@@ -164,20 +155,6 @@ fun ExoPlayJetScreen(
         }
     }
 
-    LaunchedEffect(currentIndex) {
-        val channel = channelList?.getOrNull(currentIndex)
-        val channelId = channel?.videoUrl?.let { extractChannelIdFromPlayUrl(it) }
-
-        Log.d("NANOdix0.1", ">>> $channelId")
-
-        currentProgramName = if (channelId != null) {
-            fetchCurrentProgram(basefinURL, channelId)
-        } else {
-            null
-        }
-    }
-
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -215,41 +192,16 @@ fun ExoPlayJetScreen(
         }
 
         AnimatedVisibility(visible = showChannelOverlay && channelList != null, enter = fadeIn(), exit = fadeOut()) {
-            ChannelInfoOverlay(
-                channelList = channelList,
-                currentIndex = currentIndex,
-                currentProgramName = currentProgramName
-            )
+            ChannelInfoOverlay(channelList, currentIndex)
         }
     }
 }
 
-suspend fun fetchCurrentProgram(basefinURL: String, channelId: String): String? {
-    val epgURLc = "$basefinURL/epg/${channelId}/0"
-    Log.d("NANOdix1", epgURLc)
-    val epgData = ChannelUtils.fetchEpg(epgURLc)
-//    Log.d(TAG, "Now playing: ${epgData?.showname}")
-    return epgData?.showname
-}
-
-
-//fun extractChannelIdFromPlayUrl(playUrl: String): String? {
-//    val regex = """.*/(\d+)(?:\.m3u8?|)?$""".toRegex()
-//    Log.d("NANOdix0", ">> $playUrl")
-//    return regex.find(playUrl)?.groups?.get(1)?.value
-//}
-
-
-
 @SuppressLint("DefaultLocale")
 @Composable
-fun ChannelInfoOverlay(
-    channelList: List<ChannelInfo>?,
-    currentIndex: Int,
-    currentProgramName: String?
-) {
+fun ChannelInfoOverlay(channelList: List<ChannelInfo>?, currentIndex: Int) {
     channelList?.getOrNull(currentIndex)?.let { channel ->
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box {
             Card(
                 modifier = Modifier
                     .align(Alignment.TopStart)
@@ -257,69 +209,100 @@ fun ChannelInfoOverlay(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.75f))
             ) {
-                Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Logo
-                        Card(
-                            modifier = Modifier.size(60.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.DarkGray.copy(alpha = 0.5f))
-                        ) {
-                            AsyncImage(
-                                model = channel.logoUrl,
-                                contentDescription = "Channel Logo",
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier
-                                    .size(60.dp)
-                                    .shadow(8.dp, RoundedCornerShape(16.dp), clip = false)
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(Color.White.copy(alpha = 0.8f))
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        Column {
-                            // Channel Number + Name
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = String.format("%02d", currentIndex + 1),
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    modifier = Modifier
-                                        .padding(end = 12.dp)
-                                        .widthIn(min = 36.dp)
-                                )
-                                Text(
-                                    text = channel.channelName,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 20.sp,
-                                    maxLines = 1
-                                )
-                            }
-
-                            currentProgramName?.let { programName ->
-                                Spacer(modifier = Modifier.height(0.dp))
-                                Text(
-                                    text = programName,
-                                    color = Color.White.copy(alpha = 0.8f),
-                                    fontWeight = FontWeight.Normal,
-                                    fontSize = 16.sp,
-                                    maxLines = 1,
-                                    modifier = Modifier.padding(start = 4.dp)
-                                )
-                            }
-                        }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                ) {
+                    Card(
+                        modifier = Modifier.size(60.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.DarkGray.copy(alpha = 0.5f))
+                    ) {
+                        AsyncImage(
+                            model = channel.logoUrl,
+                            contentDescription = "Channel Logo",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier
+                                .size(60.dp)
+                                .shadow(8.dp, RoundedCornerShape(16.dp), clip = false)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color.White.copy(alpha = 0.8f))
+                        )
                     }
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    Text(
+                        text = String.format("%02d", currentIndex + 1),
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier
+                            .padding(end = 12.dp)
+                            .widthIn(min = 36.dp)
+                    )
+
+                    Text(
+                        text = channel.channelName,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        maxLines = 1
+                    )
                 }
             }
         }
     }
 }
 
+@UnstableApi
+fun initializePlayer2(
+    videoUrl: String,
+    context: Context,
+    retryCountRef: MutableState<Int>
+): ExoPlayer {
+    val mediaItem = MediaItem.Builder()
+        .setUri(Uri.parse(videoUrl))
+        .setMimeType(MimeTypes.APPLICATION_M3U8)
+        .build()
+
+    val httpDataSourceFactory = DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true)
+    val mediaSourceFactory = DefaultMediaSourceFactory(context).setDataSourceFactory(httpDataSourceFactory)
+
+    val player = ExoPlayer.Builder(context).setMediaSourceFactory(mediaSourceFactory).build()
+
+    var retryCount = 0
+    val maxRetries = 5
+
+    player.playWhenReady = false
+    player.seekTo(0)
+    player.setMediaItem(mediaItem)
+    player.prepare()
+    player.playWhenReady = true
+
+    player.addListener(object : Player.Listener {
+        override fun onPlayerError(error: PlaybackException) {
+            if (retryCountRef.value++ < maxRetries) {
+                player.playWhenReady = false
+                player.seekTo(0)
+                player.setMediaItem(mediaItem)
+                player.prepare()
+                player.playWhenReady = true
+                Log.d(TAG,"Loading player :: $retryCountRef")
+            } else {
+                Toast.makeText(context, "Playback failed after $maxRetries attempts", Toast.LENGTH_SHORT).show()
+                Log.d(TAG,"Playback failed after $maxRetries attempts")
+            }
+        }
+    })
+
+    player.setMediaItem(mediaItem)
+    player.prepare()
+    player.playWhenReady = true
+
+    return player
+}
 
 @UnstableApi
 fun initializePlayer(

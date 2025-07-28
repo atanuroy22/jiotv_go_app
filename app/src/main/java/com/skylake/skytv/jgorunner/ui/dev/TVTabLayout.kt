@@ -297,7 +297,9 @@ fun TVTabLayout(context: Context?) {
     LaunchedEffect(selectedChannel) {
         selectedChannel?.let { channel ->
             val epgURLc = "$basefinURL/epg/${channel.channel_id}/0"
+            Log.d("NANOdix",epgURLc)
             epgData = ChannelUtils.fetchEpg(epgURLc)
+            Log.d("NANOdix", "Now playing: ${epgData?.showname}")
         } ?: run {
             epgData = null
         }

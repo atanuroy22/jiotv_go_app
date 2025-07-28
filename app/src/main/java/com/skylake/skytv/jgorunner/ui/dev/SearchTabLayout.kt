@@ -44,6 +44,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.onFocusEvent
+import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
@@ -154,7 +155,7 @@ fun SearchTabLayout(context: Context, focusRequester: FocusRequester) {
                             }
                             .clickable {
                                 Log.d("HT", channel.channel_name)
-                                val intent = Intent(context, ExoplayerActivity::class.java).apply {
+                                val intent = Intent(context, ExoPlayJet::class.java).apply {
                                     putExtra("video_url", channel.channel_url)
                                 }
                                 startActivity(context, intent, null)

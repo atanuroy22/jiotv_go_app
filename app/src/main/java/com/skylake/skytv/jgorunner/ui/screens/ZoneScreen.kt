@@ -222,13 +222,13 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
             0 -> {
                 if (preferenceManager.myPrefs.expDebug && !preferenceManager.myPrefs.showPLAYLIST) {
                     if (isRemoteNavigation) {
-                        TVTabLayoutTV_exp(context)
+                        TVTabLayoutTV_exp(context) //TVTabLayoutTV_exp(context)
                     } else {
                         TVTabLayout_exp(context)
                     }
                 } else {
                     if (isRemoteNavigation) {
-                        TVTabLayoutTV(context)
+                        TVTabLayoutTV(context) //TVTabLayoutTV(context)
                     } else {
                         TVTabLayout(context)
                     }

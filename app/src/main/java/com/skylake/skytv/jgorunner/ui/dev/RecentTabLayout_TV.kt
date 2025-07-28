@@ -31,6 +31,7 @@ import com.skylake.skytv.jgorunner.data.SkySharedPref
 import androidx.tv.material3.ClassicCard
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.activities.ExoplayerActivityPass
+import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
@@ -90,7 +91,7 @@ fun RecentTabLayoutTV(context: Context) {
                         },
                         onClick = {
                             Log.d("HT", channel.channel_name)
-                            val intent = Intent(context, ExoplayerActivityPass::class.java).apply {
+                            val intent = Intent(context, ExoPlayJet::class.java).apply {
                                 putExtra("video_url", "http://localhost:${SkySharedPref.getInstance(context).myPrefs.jtvGoServerPort}/live/${channel.channel_id}" )
                                 putExtra("zone", "TV")
                                 // Prepare channel list for ExoplayerActivityPass
@@ -103,7 +104,6 @@ fun RecentTabLayoutTV(context: Context) {
                                 val currentChannelIndex = recentChannels.value.indexOf(channel)
                                 putExtra("current_channel_index", currentChannelIndex)
 
-                                // Also pass the individual details of the selected channel for initial setup (or fallback)
                                 putExtra("video_url", channel.channel_url)
                                 putExtra("logo_url", "http://localhost:${SkySharedPref.getInstance(context).myPrefs.jtvGoServerPort}/jtvimage/${channel.logoUrl}")
                                 putExtra("ch_name", channel.channel_name)

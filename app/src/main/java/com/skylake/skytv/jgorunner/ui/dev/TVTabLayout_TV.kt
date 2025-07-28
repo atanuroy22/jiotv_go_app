@@ -3,6 +3,7 @@ package com.skylake.skytv.jgorunner.ui.dev
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -263,6 +264,7 @@ fun TVTabLayoutTV(context: Context?) {
     LaunchedEffect(selectedChannel) {
         selectedChannel?.let { channel ->
             val epgURLc = "$basefinURL/epg/${channel.channel_id ?: ""}/0"
+            Log.d("NANOdix",epgURLc)
             epgData = ChannelUtils.fetchEpg(epgURLc)
         } ?: run {
             epgData = null
