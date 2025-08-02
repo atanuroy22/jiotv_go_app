@@ -108,14 +108,12 @@
 
         <receiver android:name=".receivers.BootReceiver"
             android:enabled="true"
-            android:exported="true"
-            android:directBootAware="true">
+            android:exported="true">
             <intent-filter android:priority="999">
-                <action android:name="android.intent.action.BOOT_COMPLETED"/>
-<!--                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />-->
-                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.HOME" />
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
 
