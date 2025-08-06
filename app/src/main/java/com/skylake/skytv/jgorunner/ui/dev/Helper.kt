@@ -1,6 +1,7 @@
 package com.skylake.skytv.jgorunner.ui.dev
 
 import android.content.Context
+import android.util.Base64
 import android.util.Log
 import android.widget.Toast
 import androidx.annotation.Keep
@@ -58,36 +59,42 @@ fun extractChannelIdFromPlayUrl(playUrl: String): String? {
 }
 
 val channelDict = mapOf(
-    "0-9-9z5383486" to "445",
-    "0-9-zeemarathi" to "1360",
-    "/-_w3Jbq3QoW-mFCM2YIzxA" to "1146",
-    "0-9-zeeyuva" to "414",
-    "0-9-9z5383489" to "153",
-    "0-9-zeetalkies" to "1358",
-    "0-9-394" to "2758",
-    "0-9-zeetvhd" to "167",
-    "HgaB-u6rSpGx3mo4Xu3sLw" to "291",
-    "/UI4QFJ_uRk6aLxIcADqa_A" to "154",
-    "/H_ZvXWqHRGKpHcdDE5RcDA" to "1393",
-    "/rPzF28qORbKZkhci_04fdQ" to "474",
-    "0-9-zeecinema" to "484",
-    "0-9-zeecinemahd" to "165",
-    "0-9-pictures" to "1839",
-    "0-9-tvpictureshd" to "185",
-    "/oJ-TGgVFSgSMBUoTkauvFQ" to "289",
-    "/Qyqz40bSQriqSuAC7R8_Fw" to "476",
-    "/4Jcu195QTpCNBXGnpw2I6g" to "483",
-    "0-9-zeeclassic" to "487",
-    "0-9-zeeaction" to "488",
-    "0-9-176" to "1691",
-    "0-9-zeeanmolcinema" to "415",
-    "0-9-9z5543514" to "1349",
-    "0-9-channel_2105335046" to "1322",
+    "MC05LTl6NTM4MzQ4Ng==" to "445",
+    "MC05LXplZW1hcmF0aGk=" to "1360",
+    "Ly1fdzNKYnEzUW9XLW1GQ00yWUl6eEE=" to "1146",
+    "MC05LXplZXl1dmE=" to "414",
+    "MC05LTl6NTM4MzQ4OQ==" to "153",
+    "MC05LXplZXRhbGtpZXM=" to "1358",
+    "MC05LTM5NA==" to "2758",
+    "MC05LXplZXR2aGQ=" to "167",
+    "SGdhQi11NnJTcEd4M21vNFh1M3NMdw==" to "291",
+    "L1VJNFFGSl91Ums2YUx4SWNBRHFhX0E=" to "154",
+    "L0hfWnZYV3FIUkdLcEhjZERFNVJjREE=" to "1393",
+    "L3JQekYyOHFPUmJLWmtoY2lfMDRmZFE=" to "474",
+    "MC05LXplZWNpbmVtYQ==" to "484",
+    "MC05LXplZWNpbmVtYWhk" to "165",
+    "MC05LXBpY3R1cmVz" to "1839",
+    "MC05LXR2cGljdHVyZXNoZA==" to "185",
+    "L29KLVRHZ1ZGU2dTTUJVb1RrYXV2RlE=" to "289",
+    "L1F5cXo0MGJTUXJpcVN1QUM3UjhfRnc=" to "476",
+    "LzRKY3UxOTVRVHBDTkJYR25wdzJJNmc=" to "483",
+    "MC05LXplZWNsYXNzaWM=" to "487",
+    "MC05LXplZWFjdGlvbg==" to "488",
+    "MC05LTE3Ng==" to "1691",
+    "MC05LXplZWFubW9sY2luZW1h" to "415",
+    "MC05LTl6NTU0MzUxNA==" to "1349",
+    "MC05LWNoYW5uZWxfMjEwNTMzNTA0Ng==" to "1322",
     )
 
+fun decodeBase64(input: String): String {
+    val decodedBytes = Base64.decode(input, Base64.DEFAULT)
+    return String(decodedBytes, Charsets.UTF_8)
+}
+
 fun extraLoader(playUrl: String): String {
-    channelDict.forEach { (keyword, code) ->
-        if (playUrl.contains(keyword, ignoreCase = true)) {
+    channelDict.forEach { (encodedKey, code) ->
+        val key = decodeBase64(encodedKey)
+        if (playUrl.contains(key, ignoreCase = true)) {
             return code
         }
     }
