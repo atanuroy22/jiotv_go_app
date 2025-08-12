@@ -51,14 +51,8 @@ import coil.compose.AsyncImage
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.ui.dev.ChannelUtils
-import com.skylake.skytv.jgorunner.ui.dev.EpgProgram
 import com.skylake.skytv.jgorunner.ui.dev.extractChannelIdFromPlayUrl
 import kotlinx.coroutines.delay
-
-class PlayerWithRetry(
-    val player: ExoPlayer,
-    var retryCount: Int = 0
-)
 
 const val TAG = "ExoJetScreen"
 
@@ -75,26 +69,20 @@ fun ExoPlayJetScreen(
     signatureFallback: String
 ) {
     val context = LocalContext.current
-    val view = LocalView.current
     val activity = context as? Activity
+    val view = LocalView.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    val overlayDisplayTimeMs = 3000
+    val localPORT by remember { mutableIntStateOf(preferenceManager.myPrefs.jtvGoServerPort) }
+    val basefinURL = "http://localhost:$localPORT"
+    val tvNAV = preferenceManager.myPrefs.selectedRemoteNavTV ?: "0"
 
     val focusRequester = remember { FocusRequester() }
     var currentIndex by remember { mutableStateOf(currentChannelIndex) }
-    var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
-    var isKeyRemapActive by remember { mutableStateOf(true) }
+    var currentProgramName by remember { mutableStateOf<String?>(null) }
     var showChannelOverlay by remember { mutableStateOf(false) }
     val retryCountRef = remember { mutableStateOf(0) }
-    var currentProgramName by remember { mutableStateOf<String?>(null) }
-
-    var epgData by remember { mutableStateOf<EpgProgram?>(null) }
-    val localPORT by remember { mutableIntStateOf(preferenceManager.myPrefs.jtvGoServerPort) }
-    val basefinURL = "http://localhost:$localPORT"
-
-
-//    val tvNAV = "0"
-    val tvNAV = preferenceManager.myPrefs.selectedRemoteNavTV
 
     SideEffect {
         activity?.let {
@@ -105,78 +93,47 @@ fun ExoPlayJetScreen(
         }
     }
 
+    val exoPlayer = remember {
+        initializePlayer(
+            getCurrentVideoUrl = { channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl },
+            context = context,
+            retryCountRef = retryCountRef
+        )
+    }
+
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_RESUME -> {
-                    if (exoPlayer == null) {
-                        exoPlayer = initializePlayer(
-                            getCurrentVideoUrl = { channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl },
-                            context = context,
-                            retryCountRef = retryCountRef
-                        )
-                    } else {
-                        exoPlayer?.playWhenReady = true
-                    }
-                }
-                Lifecycle.Event.ON_PAUSE -> {
-                    exoPlayer?.playWhenReady = false
-                }
-                Lifecycle.Event.ON_STOP, Lifecycle.Event.ON_DESTROY -> {
-                    exoPlayer?.release()
-                    exoPlayer = null
-                }
-                else -> {}
+                Lifecycle.Event.ON_RESUME -> exoPlayer.playWhenReady = true
+                Lifecycle.Event.ON_PAUSE -> exoPlayer.playWhenReady = false
+                Lifecycle.Event.ON_DESTROY -> exoPlayer.release()
+                else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            exoPlayer?.release()
-            exoPlayer = null
+            exoPlayer.release()
         }
     }
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
-    DisposableEffect(lifecycleOwner, isKeyRemapActive) {
-        val observer = LifecycleEventObserver { _, event ->
-            isKeyRemapActive = event == Lifecycle.Event.ON_RESUME
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-            isKeyRemapActive = false
-        }
+    LaunchedEffect(currentIndex) {
+        retryCountRef.value = 0
+        exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl)))
+        exoPlayer.prepare()
+        exoPlayer.playWhenReady = true
+
+        showChannelOverlay = true
+        delay(overlayDisplayTimeMs.toLong())
+        showChannelOverlay = false
     }
 
     LaunchedEffect(currentIndex) {
-        exoPlayer?.let { player ->
-            retryCountRef.value = 0
-            showChannelOverlay = true
-            channelList?.getOrNull(currentIndex)?.videoUrl?.let {
-                player.setMediaItem(MediaItem.fromUri(Uri.parse(it)))
-                player.prepare()
-                player.playWhenReady = true
-            }
-            delay(3000)
-            showChannelOverlay = false
-        }
+        val channelId = channelList?.getOrNull(currentIndex)?.videoUrl?.let { extractChannelIdFromPlayUrl(it) }
+        currentProgramName = channelId?.let { fetchCurrentProgram(basefinURL, it) }
     }
-
-    LaunchedEffect(currentIndex) {
-        val channel = channelList?.getOrNull(currentIndex)
-        val channelId = channel?.videoUrl?.let { extractChannelIdFromPlayUrl(it) }
-
-        Log.d("NANOdix0.1", ">>> $channelId")
-
-        currentProgramName = if (channelId != null) {
-            fetchCurrentProgram(basefinURL, channelId)
-        } else {
-            null
-        }
-    }
-
 
     Box(
         modifier = Modifier
@@ -185,38 +142,36 @@ fun ExoPlayJetScreen(
             .focusRequester(focusRequester)
             .focusable()
             .onKeyEvent { event ->
-                if (isKeyRemapActive) {
-                    handleTVRemoteKey(
-                        event = event,
-                        tvNAV = tvNAV,
-                        context = context,
-                        channelList = channelList,
-                        currentIndexState = { currentIndex },
-                        onChannelChange = { currentIndex = it }
-                    )
-                } else false
+                handleTVRemoteKey(
+                    event = event,
+                    tvNAV = tvNAV,
+                    channelList = channelList,
+                    currentIndexState = { currentIndex },
+                    onChannelChange = { currentIndex = it }
+                )
             }
     ) {
-        exoPlayer?.let { player ->
-            AndroidView(
-                factory = {
-                    PlayerView(it).apply {
-                        useController = true
-                        controllerAutoShow = false
-                        setShowNextButton(false)
-                        setShowPreviousButton(false)
-                        setShowBuffering(SHOW_BUFFERING_WHEN_PLAYING)
-                        setResizeMode(RESIZE_MODE_FIT)
-                        this.player = player
-                    }
-                },
-                modifier = Modifier
-                    .aspectRatio(16f / 9f)
-                    .align(Alignment.Center)
-            )
-        }
+        AndroidView(
+            factory = {
+                PlayerView(it).apply {
+                    useController = true
+                    setShowNextButton(false)
+                    setShowPreviousButton(false)
+                    setShowBuffering(SHOW_BUFFERING_WHEN_PLAYING)
+                    setResizeMode(RESIZE_MODE_FIT)
+                    this.player = exoPlayer
+                }
+            },
+            modifier = Modifier
+                .aspectRatio(16f / 9f)
+                .align(Alignment.Center)
+        )
 
-        AnimatedVisibility(visible = showChannelOverlay && channelList != null, enter = fadeIn(), exit = fadeOut()) {
+        AnimatedVisibility(
+            visible = showChannelOverlay && channelList != null,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
             ChannelInfoOverlay(
                 channelList = channelList,
                 currentIndex = currentIndex,
@@ -225,6 +180,7 @@ fun ExoPlayJetScreen(
         }
     }
 }
+
 
 suspend fun fetchCurrentProgram(basefinURL: String, channelId: String): String? {
     val epgURLc = "$basefinURL/epg/${channelId}/0"
@@ -370,7 +326,6 @@ fun initializePlayer(
 fun handleTVRemoteKey(
     event: KeyEvent,
     tvNAV: String?,
-    context: Context,
     channelList: ArrayList<ChannelInfo>?,
     currentIndexState: () -> Int,
     onChannelChange: (Int) -> Unit

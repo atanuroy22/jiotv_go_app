@@ -461,7 +461,7 @@ fun MultiSelectDropdown(
                             onOptionsSelected(mutableSelected)
                         }
                     )
-                    Text(text = option, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text(text = option, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
         }
@@ -494,7 +494,7 @@ fun DropdownSelection2(
             ) {
                 options.forEach { option ->
                     DropdownMenuItem(
-                        text = { Text(text = option,color = MaterialTheme.colorScheme.onPrimaryContainer) },
+                        text = { Text(text = option,color = MaterialTheme.colorScheme.onSurface) },
                         onClick = {
                             onOptionSelected(option)
                             onExpandChange(false)
