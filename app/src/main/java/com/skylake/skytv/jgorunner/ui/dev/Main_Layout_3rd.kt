@@ -1,11 +1,13 @@
 package com.skylake.skytv.jgorunner.ui.dev
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.util.Log
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -27,22 +29,20 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.content.ContextCompat.startActivity
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
-import com.skylake.skytv.jgorunner.activities.ExoplayerActivityPass
 import com.skylake.skytv.jgorunner.data.SkySharedPref
-import androidx.tv.material3.CardDefaults as CardDefaultsTV
-import androidx.tv.material3.ClassicCard
-import androidx.compose.material3.Text
-import androidx.core.content.ContextCompat.startActivity
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
+
+@SuppressLint("NewApi")
 @Composable
-fun TVTabLayoutTV_exp(context: Context) {
+fun Main_Layout_3rd(context: Context) {
     val preferenceManager = remember { SkySharedPref.getInstance(context) }
     var allChannels by remember { mutableStateOf<List<M3UChannelExp>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -114,7 +114,6 @@ fun TVTabLayoutTV_exp(context: Context) {
             AppStartTracker.shouldPlayChannel = true
         }
     }
-
 
 
     if (isLoading) {
@@ -196,21 +195,35 @@ private fun ChannelGrid(context: Context, channels: List<M3UChannelExp>) {
                 label = "scaleAnimation"
             )
 
-            ClassicCard(
+            ElevatedCard(
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
                 modifier = Modifier
                     .height(120.dp)
                     .scale(scale)
                     .focusRequester(focusRequester)
-                    .onFocusChanged { focusState -> isFocused = focusState.isFocused },
-                image = {
+                    .onFocusChanged { focusState -> isFocused = focusState.isFocused }
+                    .clickable {
+                        Log.d("ChannelGrid", "Clicked on: ${channel.name} - ${channel.url}")
+                        val channelInfoList = ArrayList(channels.map {
+                            ChannelInfo(it.url, it.logo ?: "", it.name)
+                        })
+                        val currentIndex = channels.indexOf(channel)
+
+                        val intent = Intent(context, ExoPlayJet::class.java).apply {
+                            putParcelableArrayListExtra("channel_list_data", channelInfoList)
+                            putExtra("current_channel_index", currentIndex)
+                        }
+                        ContextCompat.startActivity(context, intent, null)
+                    },
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            ) {
+                Column {
                     GlideImage(
-                    model = channel.logo,
-                    contentDescription = "${channel.name} logo",
-                    modifier = Modifier.fillMaxWidth().height(80.dp),
-                    contentScale = ContentScale.Fit
+                        model = channel.logo,
+                        contentDescription = "${channel.name} logo",
+                        modifier = Modifier.fillMaxWidth().height(80.dp),
+                        contentScale = ContentScale.Fit
                     )
-                },
-                title = {
                     Text(
                         text = channel.name,
                         style = MaterialTheme.typography.bodyMedium,
@@ -219,24 +232,8 @@ private fun ChannelGrid(context: Context, channels: List<M3UChannelExp>) {
                         fontSize = 12.sp,
                         modifier = Modifier.padding(8.dp)
                     )
-                },
-                onClick = {
-                    Log.d("ChannelGrid", "Clicked on: ${channel.name} - ${channel.url}")
-                    val channelInfoList = ArrayList(channels.map {
-                        ChannelInfo(it.url, it.logo ?: "", it.name)
-                    })
-                    val currentIndex = channels.indexOf(channel)
-
-                    val intent = Intent(context, ExoPlayJet::class.java).apply {
-                        putParcelableArrayListExtra("channel_list_data", channelInfoList)
-                        putExtra("current_channel_index", currentIndex)
-                    }
-                    ContextCompat.startActivity(context, intent, null)
-                },
-                colors = CardDefaultsTV.colors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                )
-            )
+                }
+            }
         }
     }
 }

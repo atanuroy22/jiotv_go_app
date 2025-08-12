@@ -28,7 +28,6 @@ import androidx.core.content.ContextCompat.startActivity
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
-import com.skylake.skytv.jgorunner.activities.ExoplayerActivityPass
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -48,7 +47,7 @@ import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
-fun TVTabLayoutTV(context: Context?) {
+fun Main_LayoutTV(context: Context?) {
     if (context == null) return
     val scope = rememberCoroutineScope()
     val channelsResponse = remember { mutableStateOf<ChannelResponse?>(null) }

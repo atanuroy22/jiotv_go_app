@@ -6,7 +6,6 @@ import android.util.Log
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -35,22 +34,18 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Text as CText
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.skylake.skytv.jgorunner.data.SkySharedPref
-import androidx.tv.material3.ClassicCard
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
-import com.skylake.skytv.jgorunner.activities.ExoplayerActivity
-import com.skylake.skytv.jgorunner.activities.ExoplayerActivityPass
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
-fun RecentTabLayout(context: Context) {
+fun Recent_Layout(context: Context) {
     val preferenceManager = SkySharedPref.getInstance(context)
     val recentChannelsJson = preferenceManager.myPrefs.recentChannels
 

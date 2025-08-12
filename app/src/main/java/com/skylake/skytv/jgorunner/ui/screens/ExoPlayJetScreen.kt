@@ -203,6 +203,8 @@ fun ExoPlayJetScreen(
                     PlayerView(it).apply {
                         useController = true
                         controllerAutoShow = false
+                        setShowNextButton(false)
+                        setShowPreviousButton(false)
                         setShowBuffering(SHOW_BUFFERING_WHEN_PLAYING)
                         setResizeMode(RESIZE_MODE_FIT)
                         this.player = player

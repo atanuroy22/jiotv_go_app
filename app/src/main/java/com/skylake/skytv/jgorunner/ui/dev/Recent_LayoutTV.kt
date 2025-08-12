@@ -30,12 +30,11 @@ import com.google.gson.reflect.TypeToken
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import androidx.tv.material3.ClassicCard
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
-import com.skylake.skytv.jgorunner.activities.ExoplayerActivityPass
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
-fun RecentTabLayoutTV(context: Context) {
+fun Recent_LayoutTV(context: Context) {
     val preferenceManager = SkySharedPref.getInstance(context)
     val recentChannelsJson = preferenceManager.myPrefs.recentChannels
 

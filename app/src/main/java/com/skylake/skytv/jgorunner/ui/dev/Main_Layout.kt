@@ -5,7 +5,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -19,9 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat.startActivity
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
-import kotlinx.coroutines.launch
 import com.bumptech.glide.integration.compose.GlideImage
-import com.skylake.skytv.jgorunner.activities.ExoplayerActivityPass
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -46,7 +43,7 @@ import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 @SuppressLint("MutableCollectionMutableState")
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
-fun TVTabLayout(context: Context?) {
+fun Main_Layout(context: Context?) {
     if (context == null) return
     val scope = rememberCoroutineScope()
     val channelsResponse = remember { mutableStateOf<ChannelResponse?>(null) }
