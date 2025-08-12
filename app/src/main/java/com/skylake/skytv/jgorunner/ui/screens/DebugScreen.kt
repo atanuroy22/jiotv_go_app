@@ -81,12 +81,6 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
     )
     val glowColor = remember { Animatable(glowColors.first()) }
     val preferenceManager = SkySharedPref.getInstance(context)
-    var showNewBadge by remember { mutableStateOf(true) }
-    val scrollState = rememberScrollState()
-
-    var customPlaylistSupport by remember { mutableStateOf(false) }
-    var genericTvIcon by remember { mutableStateOf(false) }
-
 
     fun applySettings() {
         preferenceManager.savePreferences()

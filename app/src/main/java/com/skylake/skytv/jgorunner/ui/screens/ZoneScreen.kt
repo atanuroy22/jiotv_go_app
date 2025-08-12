@@ -102,7 +102,6 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
 
     var selectedTabIndex by remember { mutableIntStateOf(savedTabIndex) }
     val tabFocusRequester = remember { FocusRequester() }
-    var showExitWarning by remember { mutableStateOf(false) }
 
     // Snackbar state
     val snackbarHostState = remember { SnackbarHostState() }
@@ -138,7 +137,7 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
 
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
-    ) { padding ->
+    ) { _ ->
 
     Column(
         modifier = Modifier.fillMaxWidth(),

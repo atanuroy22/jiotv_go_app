@@ -19,6 +19,7 @@ import com.skylake.skytv.jgorunner.ui.screens.ExoPlayJetScreen
 import com.skylake.skytv.jgorunner.ui.theme.JGOTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.core.content.IntentCompat
 
 class ExoPlayJet : ComponentActivity() {
 
@@ -52,9 +53,9 @@ class ExoPlayJet : ComponentActivity() {
                 ExoPlayJetScreen(
                     preferenceManager = prefManager,
                     videoUrl = videoUrlState,
-                    logoUrl = logoUrlState,
-                    channelName = channelNameState,
-                    signatureFallback = signatureFallbackState,
+//                    logoUrl = logoUrlState,
+//                    channelName = channelNameState,
+//                    signatureFallback = signatureFallbackState,
                     channelList = channelListState,
                     currentChannelIndex = currentChannelIndexState
                 )
@@ -76,7 +77,9 @@ class ExoPlayJet : ComponentActivity() {
         val defaultLogoUrl = "https://www.sonypicturesnetworks.com/images/logos/SET%20LOGO.png"
         val defaultChannelName = "HANA4k"
 
-        val channelList = intent.getParcelableArrayListExtra<ChannelInfo>("channel_list_data")
+//        val channelList = intent.getParcelableArrayListExtra<ChannelInfo>("channel_list_data")
+
+        val channelList: ArrayList<ChannelInfo>? = IntentCompat.getParcelableArrayListExtra(intent, "channel_list_data", ChannelInfo::class.java)
         val currentChannelIndex = intent.getIntExtra("current_channel_index", -1)
 
         val signature = intent.getStringExtra("zone")

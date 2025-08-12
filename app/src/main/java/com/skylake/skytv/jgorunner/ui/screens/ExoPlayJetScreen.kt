@@ -62,11 +62,8 @@ const val TAG = "ExoJetScreen"
 fun ExoPlayJetScreen(
     preferenceManager: SkySharedPref,
     videoUrl: String,
-    logoUrl: String,
-    channelName: String,
     channelList: ArrayList<ChannelInfo>?,
-    currentChannelIndex: Int,
-    signatureFallback: String
+    currentChannelIndex: Int
 ) {
     val context = LocalContext.current
     val activity = context as? Activity

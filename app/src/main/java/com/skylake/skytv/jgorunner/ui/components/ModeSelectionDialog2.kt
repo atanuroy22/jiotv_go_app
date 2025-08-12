@@ -43,13 +43,13 @@ fun ModeSelectionDialog2(
     val preferenceManager = SkySharedPref.getInstance(context)
     var showCustomUrlInputDialog by remember { mutableStateOf(false) }
     var customUrl by remember { mutableStateOf(preferenceManager.myPrefs.custURL ?: "") }
-    var startTvAutomatically by remember { mutableStateOf(preferenceManager.myPrefs.startTvAutomatically ?: false) }
+    var startTvAutomatically by remember { mutableStateOf(preferenceManager.myPrefs.startTvAutomatically) }
     var showProcessingDialog by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
     // State for playlist selection
     var showPlaylist by remember {
-        mutableStateOf(preferenceManager.myPrefs.showPLAYLIST ?: false)
+        mutableStateOf(preferenceManager.myPrefs.showPLAYLIST)
     }
 
     Dialog(

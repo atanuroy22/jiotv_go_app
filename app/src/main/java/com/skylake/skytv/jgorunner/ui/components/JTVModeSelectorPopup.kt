@@ -49,10 +49,6 @@ fun JTVModeSelectorPopup(
                         modifier = Modifier.padding(bottom = 8.dp),
                         style = MaterialTheme.typography.bodyLarge
                     )
-                    val options = listOf(
-                        "Simple",
-                        "Expert"
-                    )
 
                     SingleChoiceSegmentedButtonRow(
                         modifier = Modifier.align(Alignment.CenterHorizontally)
