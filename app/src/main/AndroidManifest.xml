@@ -40,6 +40,26 @@
             android:exported="true"
             android:configChanges="orientation|screenSize|screenLayout"
             android:theme="@style/Theme.JGO.Splash">
+<!--            <intent-filter>-->
+<!--                <action android:name="android.intent.action.MAIN" />-->
+<!--                <category android:name="android.intent.category.LAUNCHER" />-->
+<!--            </intent-filter>-->
+<!--            <intent-filter>-->
+<!--                <action android:name="android.intent.action.MAIN" />-->
+<!--                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />-->
+<!--            </intent-filter>-->
+        </activity>
+
+
+        <activity-alias
+            android:name=".Default"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_neo"
+            android:roundIcon="@mipmap/ic_launcher_neo_round"
+            android:banner="@mipmap/ic_banner_neo"
+            android:label="@string/app_name"
+            android:targetActivity=".activities.MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -48,7 +68,29 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
-        </activity>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".TVBanner"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_alias2"
+            android:roundIcon="@mipmap/ic_launcher_alias2_round"
+            android:banner="@mipmap/ic_banner_alias"
+            android:label="TV"
+            android:targetActivity=".activities.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+
+
 
         <activity android:name=".activities.AppListActivity"
             android:exported="true">

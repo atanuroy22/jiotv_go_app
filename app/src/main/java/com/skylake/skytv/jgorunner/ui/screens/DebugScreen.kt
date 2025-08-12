@@ -53,6 +53,7 @@ import com.skylake.skytv.jgorunner.ui.components.ButtonContent
 
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -62,6 +63,9 @@ import com.skylake.skytv.jgorunner.activities.CastActivity
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.activities.ExoplayerActivity
 import com.skylake.skytv.jgorunner.activities.ExoplayerActivityPass
+import com.skylake.skytv.jgorunner.ui.dev.changeIconTOFirst
+import com.skylake.skytv.jgorunner.ui.dev.changeIconToSecond
+import com.skylake.skytv.jgorunner.ui.dev.switchIcon
 
 @Composable
 fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
@@ -80,6 +84,10 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
     var showNewBadge by remember { mutableStateOf(true) }
     val scrollState = rememberScrollState()
 
+    var customPlaylistSupport by remember { mutableStateOf(false) }
+    var genericTvIcon by remember { mutableStateOf(false) }
+
+
     fun applySettings() {
         preferenceManager.savePreferences()
     }
@@ -87,6 +95,14 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
     // Retrieve saved switch states
     var isSwitchForExp by remember {
         mutableStateOf(preferenceManager.myPrefs.expDebug)
+    }
+
+    val isCustomPlaylistEnabled = remember {
+        mutableStateOf(preferenceManager.myPrefs.customPlaylistSupport)
+    }
+
+    val isGenericIcon = remember {
+        mutableStateOf(preferenceManager.myPrefs.genericTvIcon)
     }
 
     // Update shared preference when switch states change
@@ -194,13 +210,70 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
             DebugSwitchItem(
                 icon = Icons.Filled.Api,
                 title = "Experimental Features",
-                subtitle = if (isSwitchForExp) "Enabled experimental features \n- ▶️ Custom Playlist Support" else "Disabled experimental features",
+                subtitle = if (isSwitchForExp) "Enabled experimental features" else "Disabled experimental features",
                 isChecked = isSwitchForExp,
                 onCheckedChange = { isChecked -> isSwitchForExp = isChecked
                     val status = if (isSwitchForExp) "enabled" else "disabled"
+//                    if (isSwitchForExp) {
+//                        changeIconToSecond(context)
+//                    } else {
+//                        changeIconTOFirst(context)
+//                    }
                     Toast.makeText(context, "Experimental features $status", Toast.LENGTH_SHORT).show()
                 })
         }
+
+        if (isSwitchForExp) {
+            item {
+                DebugSwitchItem(
+                    icon = Icons.AutoMirrored.Filled.PlaylistPlay,
+                    title = "Custom Playlist Support",
+                    subtitle = if (isCustomPlaylistEnabled.value)
+                        "Enabled - You can load custom M3U playlists"
+                    else
+                        "Disabled - Using default channel list",
+                    isChecked = isCustomPlaylistEnabled.value,
+                    onCheckedChange = { checked ->
+                        isCustomPlaylistEnabled.value = checked
+                        preferenceManager.myPrefs.customPlaylistSupport = checked
+                        applySettings()
+                        Toast.makeText(
+                            context,
+                            "Custom Playlist Support ${if (checked) "enabled" else "disabled"}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                )
+            }
+
+            item {
+                DebugSwitchItem(
+                    icon = Icons.Default.Tv,
+                    title = "Generic TV Icon",
+                    subtitle = if (isGenericIcon.value)
+                        "Enabled - Shows a generic TV icon"
+                    else
+                        "Disabled - Shows a default JTV-GO icon",
+                    isChecked = isGenericIcon.value,
+                    onCheckedChange = { checked ->
+                        isGenericIcon.value = checked
+                        preferenceManager.myPrefs.genericTvIcon = checked
+                        applySettings()
+                        if (checked) {
+                            changeIconToSecond(context)
+                        } else {
+                            changeIconTOFirst(context)
+                        }
+                        Toast.makeText(
+                            context,
+                            "Generic TV Icon ${if (checked) "enabled" else "disabled"}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                )
+            }
+        }
+
     }
 }
 

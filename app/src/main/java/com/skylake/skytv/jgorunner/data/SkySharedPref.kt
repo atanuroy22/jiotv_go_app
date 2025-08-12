@@ -150,6 +150,8 @@ class SkySharedPref(context: Context) {
         @SharedPrefKey("currChannelLogo") var currChannelLogo: String? = "",
         @SharedPrefKey("currChannelUrl") var currChannelUrl: String? = "",
         @SharedPrefKey("unitHolder") var unitHolder: Int = 0,
+        @SharedPrefKey("customPlaylistSupport") var customPlaylistSupport: Boolean = false,
+        @SharedPrefKey("genericTvIcon") var genericTvIcon: Boolean = false,
 
 
     )

@@ -262,7 +262,7 @@ fun ModeSelectionDialog2(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // --- Experimental/Debug Section ---
-                if (preferenceManager.myPrefs.expDebug) {
+                if (preferenceManager.myPrefs.customPlaylistSupport) {
                     Column {
                         Text("Add Channels", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                         Box(modifier = Modifier.fillMaxWidth()) {
@@ -420,7 +420,7 @@ fun ModeSelectionDialog2(
                                 myPrefs.filterQX = selectedQuality
                                 myPrefs.filterCI = selectedCategoryInts.value.joinToString(",")
                                 myPrefs.filterLI = selectedLanguageInts.value.joinToString(",")
-                                if (myPrefs.expDebug) {
+                                if (myPrefs.customPlaylistSupport) {
                                     myPrefs.showPLAYLIST = showPlaylist
                                 }
                                 myPrefs.startTvAutomatically = startTvAutomatically

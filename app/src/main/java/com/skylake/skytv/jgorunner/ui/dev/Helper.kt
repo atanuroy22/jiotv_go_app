@@ -1,11 +1,13 @@
 package com.skylake.skytv.jgorunner.ui.dev
 
+import android.content.ComponentName
 import android.content.Context
+import android.content.pm.PackageManager
 import android.util.Base64
 import android.util.Log
 import android.widget.Toast
-import androidx.annotation.Keep
 import com.skylake.skytv.jgorunner.data.SkySharedPref
+
 
 object Helper {
     private const val TAG = "[JGO]"
@@ -101,4 +103,53 @@ fun extraLoader(playUrl: String): String {
     return ""
 }
 
+fun changeIconToSecond(context: Context) {
+    val packageManager = context.packageManager
+    packageManager.setComponentEnabledSetting(
+        ComponentName(context, "com.skylake.skytv.jgorunner.Default"),
+        PackageManager.COMPONENT_ENABLED_STATE_DISABLED, // X
+        PackageManager.DONT_KILL_APP
+    )
 
+    packageManager.setComponentEnabledSetting(
+        ComponentName(context, "com.skylake.skytv.jgorunner.TVBanner"),
+        PackageManager.COMPONENT_ENABLED_STATE_ENABLED, // ON
+        PackageManager.DONT_KILL_APP
+    )
+}
+
+fun changeIconTOFirst(context: Context) {
+    val packageManager = context.packageManager
+    packageManager.setComponentEnabledSetting(
+        ComponentName(context, "com.skylake.skytv.jgorunner.Default"),
+        PackageManager.COMPONENT_ENABLED_STATE_ENABLED, // ON
+        PackageManager.DONT_KILL_APP
+    )
+
+    packageManager.setComponentEnabledSetting(
+        ComponentName(context, "com.skylake.skytv.jgorunner.TVBanner"),
+        PackageManager.COMPONENT_ENABLED_STATE_DISABLED, // X
+        PackageManager.DONT_KILL_APP
+    )
+}
+
+
+fun switchIcon(enableAlias: String, disableAlias: String, context: Context) {
+    val pm = context.packageManager
+
+    val enableComponent = ComponentName(context, "com.skylake.skytv.jgorunner.$enableAlias")
+    val disableComponent = ComponentName(context, "com.skylake.skytv.jgorunner.$disableAlias")
+
+    pm.setComponentEnabledSetting(
+        enableComponent,
+        PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+        PackageManager.DONT_KILL_APP
+    )
+
+    pm.setComponentEnabledSetting(
+        disableComponent,
+        PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+        PackageManager.DONT_KILL_APP
+    )
+
+}
