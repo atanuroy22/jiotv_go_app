@@ -377,7 +377,10 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     bottomBar = {
                         if (currentScreen != "Zone") {
-                            BottomNavigationBar(setCurrentScreen = { currentScreen = it })
+                            BottomNavigationBar(
+                                currentScreen = currentScreen,
+                                setCurrentScreen = { currentScreen = it }
+                            )
                         }
                     },
                 ) { innerPadding ->
