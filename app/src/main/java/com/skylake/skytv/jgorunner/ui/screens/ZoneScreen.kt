@@ -135,16 +135,17 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
     val glowColor = remember { Animatable(glowColors[Random.nextInt(glowColors.size)]) }
     val customFontFamily = FontFamily(Font(R.font.chakrapetch_bold))
 
+
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
-    ) { _ ->
+    ) { innerPadding ->
 
-    Column(
-        modifier = Modifier.fillMaxWidth(),
+        Column(
+            modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-
+            Log.d("_", innerPadding.toString())
         // Top Row
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),

@@ -116,6 +116,12 @@ fun ExoPlayJetScreen(
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
+    LaunchedEffect(lifecycleOwner.lifecycle.currentState) {
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            focusRequester.requestFocus()
+        }
+    }
+
     LaunchedEffect(currentIndex) {
         retryCountRef.value = 0
         exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl)))
