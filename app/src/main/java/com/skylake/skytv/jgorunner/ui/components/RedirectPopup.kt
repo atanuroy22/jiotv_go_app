@@ -36,7 +36,7 @@ fun RedirectPopup(
     appIPTVpkg: String?,
     isVisible: Boolean,
     countdownTime: Int,
-    onUserCancel: () -> Unit, 
+    onUserCancel: () -> Unit,
     onTimeOut: () -> Unit,
     context: Context
 ) {
