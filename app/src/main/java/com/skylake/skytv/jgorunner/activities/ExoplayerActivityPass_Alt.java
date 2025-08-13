@@ -44,7 +44,7 @@ import com.skylake.skytv.jgorunner.data.SkySharedPref;
 import java.util.List;
 import java.util.Locale;
 
-public class ExoplayerActivityPass extends ComponentActivity {
+public class ExoplayerActivityPass_Alt extends ComponentActivity {
 
     private static final String TAG = "EPAP-DIX";
     private static final String DEFAULT_VIDEO_URL = "http://localhost:5350/live/143.m3u8";

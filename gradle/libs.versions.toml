@@ -1,7 +1,9 @@
 [versions]
 accompanistSystemuicontroller = "0.30.1"
 agp = "8.7.2"
+coilCompose = "2.4.0"
 compose = "1.0.0-beta01"
+coreSplashscreen = "1.0.1"
 customview = "1.1.0"
 customviewPoolingcontainer = "1.0.0"
 exoplayer = "2.19.1"
@@ -19,6 +21,7 @@ lifecycleRuntimeKtx = "2.8.7"
 activityCompose = "1.9.3"
 composeBom = "2024.11.00"
 media3Datasource = "1.5.1"
+media3DatasourceOkhttp = "1.8.0"
 media3Exoplayer = "1.5.1"
 media3ExoplayerDash = "1.5.1"
 media3Ui = "1.5.1"
@@ -37,10 +40,12 @@ appcompat = "1.7.0"
 [libraries]
 accompanist-systemuicontroller = { module = "com.google.accompanist:accompanist-systemuicontroller", version.ref = "accompanistSystemuicontroller" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "coreSplashscreen" }
 androidx-customview = { group = "androidx.customview", name = "customview", version.ref = "customview" }
 androidx-customview-poolingcontainer = { module = "androidx.customview:customview-poolingcontainer", version.ref = "customviewPoolingcontainer" }
 androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
 androidx-media3-datasource = { module = "androidx.media3:media3-datasource", version.ref = "media3Datasource" }
+androidx-media3-datasource-okhttp = { module = "androidx.media3:media3-datasource-okhttp", version.ref = "media3DatasourceOkhttp" }
 androidx-media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3Exoplayer" }
 androidx-media3-exoplayer-dash = { module = "androidx.media3:media3-exoplayer-dash", version.ref = "media3ExoplayerDash" }
 androidx-media3-ui = { module = "androidx.media3:media3-ui", version.ref = "media3Ui" }
@@ -48,6 +53,7 @@ androidx-mediarouter = { module = "androidx.mediarouter:mediarouter", version.re
 androidx-tv-foundation = { module = "androidx.tv:tv-foundation", version.ref = "tvFoundation" }
 androidx-tv-material = { module = "androidx.tv:tv-material", version.ref = "tvMaterial" }
 arthenica-ffmpeg-kit-full = { module = "com.arthenica:ffmpeg-kit-full" }
+coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coilCompose" }
 compose = { module = "com.github.bumptech.glide:compose", version.ref = "compose" }
 exoplayer = { module = "com.google.android.exoplayer:exoplayer", version.ref = "exoplayer" }
 exoplayer-drm = { module = "com.google.android.exoplayer:exoplayer-drm", version.ref = "exoplayerDrm" }

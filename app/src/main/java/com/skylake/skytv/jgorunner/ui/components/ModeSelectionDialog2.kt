@@ -43,12 +43,13 @@ fun ModeSelectionDialog2(
     val preferenceManager = SkySharedPref.getInstance(context)
     var showCustomUrlInputDialog by remember { mutableStateOf(false) }
     var customUrl by remember { mutableStateOf(preferenceManager.myPrefs.custURL ?: "") }
+    var startTvAutomatically by remember { mutableStateOf(preferenceManager.myPrefs.startTvAutomatically) }
     var showProcessingDialog by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
     // State for playlist selection
     var showPlaylist by remember {
-        mutableStateOf(preferenceManager.myPrefs.showPLAYLIST ?: false)
+        mutableStateOf(preferenceManager.myPrefs.showPLAYLIST)
     }
 
     Dialog(
@@ -113,6 +114,7 @@ fun ModeSelectionDialog2(
                     expanded = screenDropdownExpanded,
                     onExpandChange = { screenDropdownExpanded = it }
                 )
+
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -260,7 +262,7 @@ fun ModeSelectionDialog2(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // --- Experimental/Debug Section ---
-                if (preferenceManager.myPrefs.expDebug) {
+                if (preferenceManager.myPrefs.customPlaylistSupport) {
                     Column {
                         Text("Add Channels", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                         Box(modifier = Modifier.fillMaxWidth()) {
@@ -297,6 +299,27 @@ fun ModeSelectionDialog2(
 
                     Spacer(modifier = Modifier.height(16.dp))
                 }
+
+                //////////////////////////////////////
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Checkbox(
+                        checked = startTvAutomatically,
+                        onCheckedChange = { checked ->
+                            startTvAutomatically = checked
+                        }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "Play channel at start")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                //////////////////////////////////////
+
 
                 if (showCustomUrlInputDialog) {
                     Dialog(onDismissRequest = { showCustomUrlInputDialog = false }) {
@@ -374,6 +397,8 @@ fun ModeSelectionDialog2(
                                 myPrefs.filterLI = ""
                                 myPrefs.selectedRemoteNavTV = "0"
                                 myPrefs.showPLAYLIST = false
+                                myPrefs.startTvAutomatically = false
+
                                 savePreferences()
                             }
                             onReset()
@@ -395,9 +420,10 @@ fun ModeSelectionDialog2(
                                 myPrefs.filterQX = selectedQuality
                                 myPrefs.filterCI = selectedCategoryInts.value.joinToString(",")
                                 myPrefs.filterLI = selectedLanguageInts.value.joinToString(",")
-                                if (myPrefs.expDebug) {
+                                if (myPrefs.customPlaylistSupport) {
                                     myPrefs.showPLAYLIST = showPlaylist
                                 }
+                                myPrefs.startTvAutomatically = startTvAutomatically
                                 savePreferences()
                             }
                             onDismiss()
@@ -435,7 +461,7 @@ fun MultiSelectDropdown(
                             onOptionsSelected(mutableSelected)
                         }
                     )
-                    Text(text = option)
+                    Text(text = option, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
         }
@@ -468,7 +494,7 @@ fun DropdownSelection2(
             ) {
                 options.forEach { option ->
                     DropdownMenuItem(
-                        text = { Text(text = option) },
+                        text = { Text(text = option,color = MaterialTheme.colorScheme.onSurface) },
                         onClick = {
                             onOptionSelected(option)
                             onExpandChange(false)

@@ -138,13 +138,22 @@ class SkySharedPref(context: Context) {
         @SharedPrefKey("recentChannels") var recentChannels: String? = "",
         @SharedPrefKey("operationMODE") var operationMODE: Int = 999,
         @SharedPrefKey("darkMODE") var darkMODE: Boolean = false,
-        @SharedPrefKey("selectedScreenTV") var selectedScreenTV: String? = "",
-        @SharedPrefKey("selectedRemoteNavTV") var selectedRemoteNavTV: String? = "",
+        @SharedPrefKey("selectedScreenTV") var selectedScreenTV: String? = "0",
+        @SharedPrefKey("selectedRemoteNavTV") var selectedRemoteNavTV: String? = "0",
         @SharedPrefKey("custURL") var custURL: String? = "",
         @SharedPrefKey("channelListJson") var channelListJson: String? = "",
         @SharedPrefKey("expDebug") var expDebug: Boolean = false,
         @SharedPrefKey("last_selected_category_exp") var lastSelectedCategoryExp: String? = "All",
         @SharedPrefKey("showPLAYLIST") var showPLAYLIST: Boolean = false,
+        @SharedPrefKey("startTvAutomatically") var startTvAutomatically: Boolean = false,
+        @SharedPrefKey("currChannelName") var currChannelName: String? = "",
+        @SharedPrefKey("currChannelLogo") var currChannelLogo: String? = "",
+        @SharedPrefKey("currChannelUrl") var currChannelUrl: String? = "",
+        @SharedPrefKey("unitHolder") var unitHolder: Int = 0,
+        @SharedPrefKey("customPlaylistSupport") var customPlaylistSupport: Boolean = false,
+        @SharedPrefKey("genericTvIcon") var genericTvIcon: Boolean = false,
+
+
     )
 
 
