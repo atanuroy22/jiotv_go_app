@@ -80,6 +80,7 @@ fun ExoPlayJetScreen(
     var currentProgramName by remember { mutableStateOf<String?>(null) }
     var showChannelOverlay by remember { mutableStateOf(false) }
     val retryCountRef = remember { mutableStateOf(0) }
+    var exoPlayerView: PlayerView? by remember { mutableStateOf(null) }
 
     SideEffect {
         activity?.let {
@@ -114,8 +115,6 @@ fun ExoPlayJetScreen(
         }
     }
 
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
-
     LaunchedEffect(lifecycleOwner.lifecycle.currentState) {
         if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
             focusRequester.requestFocus()
@@ -145,6 +144,13 @@ fun ExoPlayJetScreen(
             .focusRequester(focusRequester)
             .focusable()
             .onKeyEvent { event ->
+                if (event.type == KeyEventType.KeyUp &&
+                    (event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter)
+                ) {
+                    (exoPlayerView)?.showController()
+                    return@onKeyEvent true
+                }
+
                 handleTVRemoteKey(
                     event = event,
                     tvNAV = tvNAV,
@@ -153,6 +159,7 @@ fun ExoPlayJetScreen(
                     onChannelChange = { currentIndex = it }
                 )
             }
+
     ) {
         AndroidView(
             factory = {
@@ -162,7 +169,8 @@ fun ExoPlayJetScreen(
                     setShowPreviousButton(false)
                     setShowBuffering(SHOW_BUFFERING_WHEN_PLAYING)
                     setResizeMode(RESIZE_MODE_FIT)
-                    this.player = exoPlayer
+                    player = exoPlayer
+                    exoPlayerView = this
                 }
             },
             modifier = Modifier
