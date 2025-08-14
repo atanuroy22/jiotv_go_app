@@ -63,6 +63,7 @@ import com.skylake.skytv.jgorunner.activities.CastActivity
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.activities.ExoplayerActivity
 import com.skylake.skytv.jgorunner.activities.ExoplayerActivityPass
+import com.skylake.skytv.jgorunner.services.player.LandingPage
 import com.skylake.skytv.jgorunner.ui.dev.changeIconTOFirst
 import com.skylake.skytv.jgorunner.ui.dev.changeIconToSecond
 import com.skylake.skytv.jgorunner.ui.dev.switchIcon
@@ -611,15 +612,18 @@ fun handleButton5Click(context: Context, onNavigate: (String) -> Unit) {
 }
 
 fun handleButton6Click(context: Context) {
-    Toast.makeText(context, "Demo Stream Playing", Toast.LENGTH_SHORT).show()
-    val intent = Intent(context, ExoplayerActivityPass::class.java)
-    intent.putExtra("video_url", "http://localhost:5350/live/144.m3u8")
-    intent.putExtra("zone", "TV")
-    intent.putExtra("logo_url", "TV")
-    intent.putExtra("ch_name", "Colors TV")
-    intent.putExtra("current_channel_index", 0)
-    context.startActivity(intent)
+//    Toast.makeText(context, "Demo Stream Playing", Toast.LENGTH_SHORT).show()
+//    val intent = Intent(context, ExoplayerActivityPass::class.java)
+//    intent.putExtra("video_url", "http://localhost:5350/live/144.m3u8")
+//    intent.putExtra("zone", "TV")
+//    intent.putExtra("logo_url", "TV")
+//    intent.putExtra("ch_name", "Colors TV")
+//    intent.putExtra("current_channel_index", 0)
+//    context.startActivity(intent)
 
+    val intent = Intent(context, LandingPage::class.java)
+    context.startActivity(intent)
+//
 }
 
 fun handleButton7Click(context: Context, onNavigate: (String) -> Unit) {

@@ -35,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import com.skylake.skytv.jgorunner.core.update.DownloadModelNew
@@ -51,6 +52,7 @@ import com.skylake.skytv.jgorunner.core.update.Status
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.BinaryService
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
+import com.skylake.skytv.jgorunner.services.player.LandingPage
 import com.skylake.skytv.jgorunner.ui.components.BottomNavigationBar
 import com.skylake.skytv.jgorunner.ui.components.CustPopup
 import com.skylake.skytv.jgorunner.ui.components.JTVModeSelectorPopup
@@ -125,7 +127,7 @@ class MainActivity : ComponentActivity() {
 
         // DEL
 /////////////////
-//        val intent = Intent(this, ExoPlayJet::class.java)
+//        val intent = Intent(this, LandingPage::class.java)
 //        this.startActivity(intent)
 ///////////////////
 //        currentScreen = "Debug"
@@ -1295,6 +1297,12 @@ class MainActivity : ComponentActivity() {
                         currentScreen = "Zone"
                     }
 
+                    "sonata" -> {
+//                        toast("Starting Sonata")
+                        Log.d("DIX", "Opening Sonata")
+                        val intent = Intent(this, LandingPage::class.java)
+                        this.startActivity(intent)
+                    }
                     else -> {
                         val launchIntent = packageManager.getLaunchIntentForPackage(appPackageName)
                         runOnUiThread {
@@ -1344,6 +1352,13 @@ class MainActivity : ComponentActivity() {
                     toast("Starting TV")
                     Log.d("DIX", "Opening TVZone")
                     currentScreen = "Zone"
+                }
+
+                "sonata" -> {
+                    toast("Starting Sonata")
+                    Log.d("DIX", "Opening Sonata")
+                    val intent = Intent(this, LandingPage::class.java)
+                    this.startActivity(intent)
                 }
 
                 else -> {

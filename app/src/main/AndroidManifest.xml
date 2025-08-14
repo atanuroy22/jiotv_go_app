@@ -138,6 +138,15 @@
             android:launchMode="singleTask" >
         </activity>
 
+        <activity
+            android:name=".services.player.LandingPage"
+            android:theme="@style/Theme.JGO"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboardHidden"
+            android:resizeableActivity="true"
+            android:supportsPictureInPicture="true"
+            android:launchMode="singleTask" >
+        </activity>
+
         <meta-data
             android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
             android:value="com.skylake.skytv.jgorunner.receivers.CastOptionsProvider" />

@@ -150,6 +150,15 @@ fun getInstalledApps(context: Context): Flow<AppInfo> = flow {
     )
     emit(webOption)
 
+    // Add SONATA
+    val sonata = AppInfo(
+        appName = "Sonata - {ALPHA}",
+        icon = context.getDrawable(R.drawable.exo_loading_blue)!!,
+        packageName = "sonata",
+        launchActivity = ""
+    )
+    emit(sonata)
+
     for (appInfo in apps) {
         val appName = packageManager.getApplicationLabel(appInfo).toString()
         val appIcon = packageManager.getApplicationIcon(appInfo)
