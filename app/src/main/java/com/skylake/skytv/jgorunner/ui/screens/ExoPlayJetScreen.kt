@@ -84,24 +84,6 @@ fun ExoPlayJetScreen(
     val retryCountRef = remember { mutableStateOf(0) }
     var exoPlayerView: PlayerView? by remember { mutableStateOf(null) }
 
-//    SideEffect {
-//        activity?.window?.let { window ->
-//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-//                WindowCompat.setDecorFitsSystemWindows(window, false)
-//                WindowInsetsControllerCompat(window, view).apply {
-//                    systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-//                }
-//            } else {
-//                @Suppress("DEPRECATION")
-//                window.decorView.systemUiVisibility = (
-//                        View.SYSTEM_UI_FLAG_FULLSCREEN
-//                                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-//                                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-//                        )
-//            }
-//        }
-//    }
-
 
     val exoPlayer = remember {
         initializePlayer(
