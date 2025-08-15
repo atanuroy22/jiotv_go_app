@@ -4,7 +4,9 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import android.util.Log
+import android.view.View
 import android.widget.Toast
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
@@ -80,15 +82,8 @@ fun ExoPlayJetScreen(
     var currentProgramName by remember { mutableStateOf<String?>(null) }
     var showChannelOverlay by remember { mutableStateOf(false) }
     val retryCountRef = remember { mutableStateOf(0) }
+    var exoPlayerView: PlayerView? by remember { mutableStateOf(null) }
 
-    SideEffect {
-        activity?.let {
-            WindowCompat.setDecorFitsSystemWindows(it.window, false)
-            WindowInsetsControllerCompat(it.window, view).apply {
-                systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            }
-        }
-    }
 
     val exoPlayer = remember {
         initializePlayer(
@@ -113,8 +108,6 @@ fun ExoPlayJetScreen(
             exoPlayer.release()
         }
     }
-
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
     LaunchedEffect(lifecycleOwner.lifecycle.currentState) {
         if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
@@ -145,6 +138,13 @@ fun ExoPlayJetScreen(
             .focusRequester(focusRequester)
             .focusable()
             .onKeyEvent { event ->
+                if (event.type == KeyEventType.KeyUp &&
+                    (event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter)
+                ) {
+                    (exoPlayerView)?.showController()
+                    return@onKeyEvent true
+                }
+
                 handleTVRemoteKey(
                     event = event,
                     tvNAV = tvNAV,
@@ -153,6 +153,7 @@ fun ExoPlayJetScreen(
                     onChannelChange = { currentIndex = it }
                 )
             }
+
     ) {
         AndroidView(
             factory = {
@@ -162,7 +163,8 @@ fun ExoPlayJetScreen(
                     setShowPreviousButton(false)
                     setShowBuffering(SHOW_BUFFERING_WHEN_PLAYING)
                     setResizeMode(RESIZE_MODE_FIT)
-                    this.player = exoPlayer
+                    player = exoPlayer
+                    exoPlayerView = this
                 }
             },
             modifier = Modifier

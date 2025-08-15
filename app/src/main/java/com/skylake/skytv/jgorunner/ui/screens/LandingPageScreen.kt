@@ -80,15 +80,14 @@ import kotlin.random.Random
 @SuppressLint("NewApi")
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
+fun LandingPageScreen(context: Context, onNavigate: (String) -> Unit, onExit: () -> Unit ) {
 
     data class TabItem(val text: String, val icon: ImageVector)
 
     var showModeDialog by remember { mutableStateOf(false) }
-
     val tabs = listOf(
         TabItem("TV", Icons.Default.Tv),
-        TabItem("Recent", Icons.Default.Star)
+        TabItem("Recent", Icons.Default.Star),
 //        TabItem("Search", Icons.Default.Search)
     )
 
@@ -107,15 +106,14 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
     // Snackbar state
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
-    var exitPressTime by remember { mutableStateOf(0L) }
+    var exitPressTime = remember { 0L }
 
-    var firstLaunch by remember { mutableStateOf(true) }
 
     // Back press handler
     BackHandler {
         val now = System.currentTimeMillis()
         if (now - exitPressTime < 2000) {
-            onNavigate("Home")
+            onExit()
         } else {
             exitPressTime = now
             coroutineScope.launch {
@@ -125,16 +123,18 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
                     duration = SnackbarDuration.Short
                 )
                 if (result == SnackbarResult.ActionPerformed) {
-                    onNavigate("Home")
+                    onExit()
                 }
             }
         }
     }
 
+
     // UI Glow Effect
     val glowColors = listOf(Color.Red, Color.Green, Color.Blue, Color.Yellow, Color.Cyan, Color.Magenta)
     val glowColor = remember { Animatable(glowColors[Random.nextInt(glowColors.size)]) }
     val customFontFamily = FontFamily(Font(R.font.chakrapetch_bold))
+
 
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
@@ -142,97 +142,94 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
 
         Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
             Log.d("_", innerPadding.toString())
+        // Top Row
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            IconButton(onClick = { showModeDialog = true }, modifier = Modifier.size(24.dp)) {
+                Icon(
+                    imageVector = Icons.Default.FilterAlt,
+                    contentDescription = "Filter Icon",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
 
-            // Top Row
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                IconButton(onClick = { showModeDialog = true }, modifier = Modifier.size(24.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.FilterAlt,
-                        contentDescription = "Filter Icon",
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                Text(
-                    text = "JTV-GO",
-                    fontSize = 12.sp,
-                    fontFamily = customFontFamily,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    style = TextStyle(
-                        shadow = Shadow(
-                            color = glowColor.value,
-                            blurRadius = 30f
-                        )
+            Text(
+                text = "JTV-GO",
+                fontSize = 12.sp,
+                fontFamily = customFontFamily,
+                color = MaterialTheme.colorScheme.onBackground,
+                style = TextStyle(
+                    shadow = Shadow(
+                        color = glowColor.value,
+                        blurRadius = 30f
                     )
                 )
+            )
 
-                IconButton(onClick = { onNavigate("SettingsTV") }, modifier = Modifier.size(24.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Settings Icon",
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.primary
+            IconButton(onClick = { onNavigate("SettingsTV") }, modifier = Modifier.size(24.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Settings Icon",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
+        // Tabs
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                .focusRestorer()
+                .focusRequester(tabFocusRequester),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            PrimaryTabRow(selectedTabIndex = selectedTabIndex) {
+                tabs.forEachIndexed { index, tab ->
+                    Tab(
+                        selected = index == selectedTabIndex,
+                        onClick = { selectedTabIndex = index },
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = tab.icon,
+                                    contentDescription = "Tab Icon",
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(text = tab.text)
+                            }
+                        }
                     )
                 }
             }
-
-            // Tabs
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .focusRestorer()
-                    .focusRequester(tabFocusRequester),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                PrimaryTabRow(selectedTabIndex = selectedTabIndex) {
-                    tabs.forEachIndexed { index, tab ->
-                        Tab(
-                            selected = index == selectedTabIndex,
-                            onClick = { selectedTabIndex = index },
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = tab.icon,
-                                        contentDescription = "Tab Icon",
-                                        modifier = Modifier.size(16.dp),
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(text = tab.text)
-                                }
-                            }
-                        )
-                    }
-                }
-            }
-
-            // Tab Content
-            when (selectedTabIndex) {
-                0 -> {
-                    if (preferenceManager.myPrefs.customPlaylistSupport &&
-                        !preferenceManager.myPrefs.showPLAYLIST
-                    ) {
-                        if (isRemoteNavigation) Main_LayoutTV_3rd(context)
-                        else Main_Layout_3rd(context)
-                    } else {
-                        if (isRemoteNavigation) Main_LayoutTV(context)
-                        else Main_Layout(context)
-                    }
-                }
-                1 -> if (isRemoteNavigation) Recent_LayoutTV(context) else Recent_Layout(context)
-//                2 -> if (isRemoteNavigation) SearchTabLayoutTV(context, tabFocusRequester) else SearchTabLayout(context, tabFocusRequester)
-            }
         }
+
+        // Tab Content
+        when (selectedTabIndex) {
+            0 -> {
+                if (preferenceManager.myPrefs.customPlaylistSupport &&
+                    !preferenceManager.myPrefs.showPLAYLIST
+                ) {
+                    if (isRemoteNavigation) Main_LayoutTV_3rd(context)
+                    else Main_Layout_3rd(context)
+                } else {
+                    if (isRemoteNavigation) Main_LayoutTV(context)
+                    else Main_Layout(context)
+                }
+            }
+            1 -> if (isRemoteNavigation) Recent_LayoutTV(context) else Recent_Layout(context)
+//            2 -> if (isRemoteNavigation) SearchTabLayoutTV(context, tabFocusRequester) else SearchTabLayout(context, tabFocusRequester)
+        }
+    }
     }
 
     // Mode Dialog
@@ -254,13 +251,6 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
 
     LaunchedEffect(Unit) {
         tabFocusRequester.requestFocus()
-
-        if (firstLaunch && tabs.size > 1) {
-            firstLaunch = false
-            val originalIndex = selectedTabIndex
-            selectedTabIndex = (originalIndex + 1) % tabs.size
-            kotlinx.coroutines.delay(50)
-            selectedTabIndex = originalIndex
-        }
     }
 }
+

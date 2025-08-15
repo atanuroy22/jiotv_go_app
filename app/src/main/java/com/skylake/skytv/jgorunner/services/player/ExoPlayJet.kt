@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.View
 import android.view.WindowInsets
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -43,8 +44,18 @@ class ExoPlayJet : ComponentActivity() {
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         val controller = WindowInsetsControllerCompat(window, window.decorView)
-        controller.hide(WindowInsets.Type.systemBars())
-        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            controller.hide(WindowInsets.Type.systemBars())
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                    View.SYSTEM_UI_FLAG_FULLSCREEN or
+                            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    )
+        }
+
 
         val prefManager = SkySharedPref.getInstance(this)
 
@@ -77,9 +88,9 @@ class ExoPlayJet : ComponentActivity() {
         val defaultLogoUrl = "https://www.sonypicturesnetworks.com/images/logos/SET%20LOGO.png"
         val defaultChannelName = "HANA4k"
 
-//        val channelList = intent.getParcelableArrayListExtra<ChannelInfo>("channel_list_data")
+        val channelList = intent.getParcelableArrayListExtra<ChannelInfo>("channel_list_data")
 
-        val channelList: ArrayList<ChannelInfo>? = IntentCompat.getParcelableArrayListExtra(intent, "channel_list_data", ChannelInfo::class.java)
+//        val channelList: ArrayList<ChannelInfo>? = IntentCompat.getParcelableArrayListExtra(intent, "channel_list_data", ChannelInfo::class.java)
         val currentChannelIndex = intent.getIntExtra("current_channel_index", -1)
 
         val signature = intent.getStringExtra("zone")
