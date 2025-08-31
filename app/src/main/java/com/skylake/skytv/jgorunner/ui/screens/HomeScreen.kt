@@ -26,14 +26,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.twotone.DirectionsRun
 import androidx.compose.material.icons.automirrored.twotone.ExitToApp
 import androidx.compose.material.icons.twotone.Cast
 import androidx.compose.material.icons.twotone.CastConnected
 import androidx.compose.material.icons.twotone.Deblur
+import androidx.compose.material.icons.twotone.DirectionsRun
 import androidx.compose.material.icons.twotone.Landscape
 import androidx.compose.material.icons.twotone.LiveTv
 import androidx.compose.material.icons.twotone.PlayArrow
+import androidx.compose.material.icons.twotone.PlayCircleFilled
+import androidx.compose.material.icons.twotone.PlayCircleOutline
 import androidx.compose.material.icons.twotone.ResetTv
+import androidx.compose.material.icons.twotone.Start
 import androidx.compose.material.icons.twotone.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -62,6 +67,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.ui.components.ButtonContent
+import com.skylake.skytv.jgorunner.ui.components.ButtonContentCust
 
 private val customFontFamily = FontFamily(
     Font(R.font.chakrapetch_bold)
@@ -176,7 +182,7 @@ fun HomeScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            RunServerButton(enabled = isServerRunning.not()) {
+            RunServerButton(enabled = isServerRunning.not(), titleShouldGlow = titleShouldGlow) {
                 onRunServerButtonClick()
             }
             StopServerButton(isServerRunning = isServerRunning) {
@@ -250,6 +256,7 @@ fun HomeScreen(
 @Composable
 fun RowScope.RunServerButton(
     enabled: Boolean = true,
+    titleShouldGlow: Boolean = true,
     onClick: () -> Unit
 ) {
     val colorPRIME = MaterialTheme.colorScheme.primary
@@ -258,11 +265,9 @@ fun RowScope.RunServerButton(
     val colorBORDER = Color(0xFFFFD700)
     val isFocused = remember { mutableStateOf(false) }
     Button(
-        onClick = {
-            onClick()
-        },
+        onClick = { onClick() },
         modifier = Modifier
-            .weight(1f)
+            .weight(3f)
             .padding(8.dp)
             .onFocusChanged { focusState ->
                 isFocused.value = focusState.isFocused
@@ -274,7 +279,14 @@ fun RowScope.RunServerButton(
         contentPadding = PaddingValues(2.dp),
         enabled = enabled
     ) {
-        ButtonContent("Run Server", Icons.TwoTone.PlayArrow) // Different icon
+        val loginState = if (titleShouldGlow) "Server is Running" else "Server is Running | Login Error"
+        val text = if (enabled) "Run Server" else loginState
+        ButtonContentCust(
+            text = text,
+            icon = if (enabled) Icons.TwoTone.PlayCircleOutline else Icons.AutoMirrored.TwoTone.DirectionsRun,
+            noicon = false,
+            isEnabled = enabled
+        )
     }
 }
 
@@ -287,7 +299,15 @@ fun RowScope.StopServerButton(
     val colorSECOND = MaterialTheme.colorScheme.secondary
     val buttonColor = remember { mutableStateOf(colorPRIME) }
     val colorBORDER = Color(0xFFFFD700)
+    val colorRED = Color(0xFFFF4444)
     val isFocused = remember { mutableStateOf(false) }
+
+    buttonColor.value = when {
+        isServerRunning -> colorRED
+        isFocused.value -> colorSECOND
+        else -> colorPRIME
+    }
+
     Button(
         onClick = {
             onClick()
@@ -305,7 +325,7 @@ fun RowScope.StopServerButton(
         colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
         contentPadding = PaddingValues(2.dp)
     ) {
-        ButtonContent("Stop Server", Icons.TwoTone.Stop) // Different icon
+        ButtonContent("Stop", Icons.TwoTone.Stop) // Different icon
     }
 }
 
