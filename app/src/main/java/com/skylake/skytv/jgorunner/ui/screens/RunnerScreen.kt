@@ -43,6 +43,7 @@ fun RunnerScreen(context: Context) {
     val preferenceManager = SkySharedPref.getInstance(context)
     val focusRequester = remember { FocusRequester() }
     var isChecked by remember { mutableStateOf(preferenceManager.myPrefs.expDebug) }
+    var isCheckedepg by remember { mutableStateOf(preferenceManager.myPrefs.epgDebug) }
 
     // File picker launcher to allow user to select a file
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -129,6 +130,27 @@ fun RunnerScreen(context: Context) {
                     preferenceManager.myPrefs.expDebug = newCheckedState
                     val status = if (newCheckedState) "enabled" else "disabled"
                     Toast.makeText(context, "Experimental features $status", Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("Experimental EPG")
+            Switch(
+                checked = isCheckedepg,
+                onCheckedChange = { newCheckedState ->
+                    isCheckedepg = newCheckedState
+                    preferenceManager.myPrefs.epgDebug = newCheckedState
+                    val status = if (newCheckedState) "enabled" else "disabled"
+                    Toast.makeText(context, "Experimental EPG: $status", Toast.LENGTH_SHORT).show()
                 }
             )
         }
