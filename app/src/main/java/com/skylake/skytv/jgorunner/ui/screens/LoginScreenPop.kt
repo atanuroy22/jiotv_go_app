@@ -49,6 +49,7 @@ import java.util.concurrent.Executors
 import kotlin.random.Random
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.delay
 
 @Composable
 fun LoginScreenPop(
@@ -601,6 +602,8 @@ private fun handleVerifyOtpResponse(context: Context, result: String?, onMessage
             if (status == "success") {
                 onMessageUpdate("OTP Verified Successfully")
                 Toast.makeText(context, "OTP Verified Successfully", Toast.LENGTH_SHORT).show()
+                val intent = Intent(context, MainActivity::class.java)
+                context.startActivity(intent)
             } else {
                 onMessageUpdate("Failed to verify OTP")
                 Toast.makeText(context, "Failed to verify OTP", Toast.LENGTH_SHORT).show()
