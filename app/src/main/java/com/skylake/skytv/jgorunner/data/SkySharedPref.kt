@@ -146,6 +146,8 @@ class SkySharedPref(context: Context) {
         @SharedPrefKey("last_selected_category_exp") var lastSelectedCategoryExp: String? = "All",
         @SharedPrefKey("showPLAYLIST") var showPLAYLIST: Boolean = false,
         @SharedPrefKey("startTvAutomatically") var startTvAutomatically: Boolean = false,
+        @SharedPrefKey("startTvAutoDelay") var startTvAutoDelay: Boolean = false,
+        @SharedPrefKey("startTvAutoDelayTime") var startTvAutoDelayTime: Int = 2,
         @SharedPrefKey("currChannelName") var currChannelName: String? = "",
         @SharedPrefKey("currChannelLogo") var currChannelLogo: String? = "",
         @SharedPrefKey("currChannelUrl") var currChannelUrl: String? = "",

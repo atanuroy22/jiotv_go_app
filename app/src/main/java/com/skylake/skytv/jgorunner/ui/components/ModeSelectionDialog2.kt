@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
@@ -14,6 +15,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.nativeKeyCode
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,6 +50,9 @@ fun ModeSelectionDialog2(
     var showCustomUrlInputDialog by remember { mutableStateOf(false) }
     var customUrl by remember { mutableStateOf(preferenceManager.myPrefs.custURL ?: "") }
     var startTvAutomatically by remember { mutableStateOf(preferenceManager.myPrefs.startTvAutomatically) }
+    var startTvAutoDelay by remember { mutableStateOf(preferenceManager.myPrefs.startTvAutoDelay) }
+    var startTvAutoDelayTime by remember  { mutableIntStateOf(preferenceManager.myPrefs.startTvAutoDelayTime) }
+    val focusRequester = remember { FocusRequester() }
     var showProcessingDialog by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
@@ -350,7 +359,64 @@ fun ModeSelectionDialog2(
                         }
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "Play channel at start")
+                    Text(text = "Auto play channel")
+                }
+
+                if (false) {
+                    if (startTvAutomatically) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Checkbox(
+                                checked = startTvAutoDelay,
+                                onCheckedChange = { checked ->
+                                    startTvAutoDelay = checked
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = "Play everytime /w delay")
+                        }
+                    }
+
+                    if (startTvAutoDelay) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Slider(
+                                value = startTvAutoDelayTime.toFloat(),
+                                onValueChange = { startTvAutoDelayTime = it.toInt() },
+                                valueRange = 2f..10f,
+                                steps = 3,
+                                modifier = Modifier
+                                    .padding(horizontal = 16.dp)
+                                    .focusRequester(focusRequester)
+                                    .focusable()
+                                    .onKeyEvent { event ->
+                                        when (event.nativeKeyEvent.keyCode) {
+                                            Key.DirectionRight.nativeKeyCode -> {
+                                                startTvAutoDelayTime = (startTvAutoDelayTime + 2).coerceAtMost(10)
+                                                true
+                                            }
+
+                                            Key.DirectionLeft.nativeKeyCode -> {
+                                                startTvAutoDelayTime = (startTvAutoDelayTime - 2).coerceAtLeast(2)
+                                                true
+                                            }
+
+                                            else -> false
+                                        }
+                                    }
+                            )
+
+
+                        }
+                        Text(
+                            text = "Delay: $startTvAutoDelayTime seconds",
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -435,6 +501,8 @@ fun ModeSelectionDialog2(
                                 myPrefs.selectedRemoteNavTV = "0"
                                 myPrefs.showPLAYLIST = false
                                 myPrefs.startTvAutomatically = false
+                                myPrefs.startTvAutoDelay = false
+                                myPrefs.startTvAutoDelayTime = 0
 
                                 savePreferences()
                             }
@@ -461,6 +529,8 @@ fun ModeSelectionDialog2(
                                     myPrefs.showPLAYLIST = showPlaylist
                                 }
                                 myPrefs.startTvAutomatically = startTvAutomatically
+                                myPrefs.startTvAutoDelay = startTvAutoDelay
+                                myPrefs.startTvAutoDelayTime = startTvAutoDelayTime
                                 savePreferences()
                             }
                             onDismiss()
