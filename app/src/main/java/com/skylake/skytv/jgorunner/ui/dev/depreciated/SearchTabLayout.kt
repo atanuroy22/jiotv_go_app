@@ -1,4 +1,4 @@
-package com.skylake.skytv.jgorunner.ui.dev
+package com.skylake.skytv.jgorunner.ui.dev.depreciated
 
 import android.content.Context
 import android.content.Intent
@@ -37,7 +37,6 @@ import androidx.compose.ui.layout.ContentScale
 import com.bumptech.glide.integration.compose.GlideImage
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.skylake.skytv.jgorunner.activities.ExoplayerActivity
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import kotlinx.coroutines.delay
 import androidx.compose.ui.draw.scale
@@ -45,6 +44,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.onFocusEvent
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
+import com.skylake.skytv.jgorunner.ui.dev.Channel
+import com.skylake.skytv.jgorunner.ui.dev.ChannelResponse
+import com.skylake.skytv.jgorunner.ui.dev.ChannelUtils
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable

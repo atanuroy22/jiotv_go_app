@@ -2,10 +2,7 @@ package com.skylake.skytv.jgorunner.ui.screens
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Intent
 import android.content.res.Configuration
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -20,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterAlt
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tv
@@ -30,14 +26,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,7 +46,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -61,19 +54,13 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import com.skylake.skytv.jgorunner.R
-import com.skylake.skytv.jgorunner.activities.ExoplayerActivityPass
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.ui.components.ModeSelectionDialog2
-import com.skylake.skytv.jgorunner.ui.dev.Recent_Layout
-import com.skylake.skytv.jgorunner.ui.dev.Recent_LayoutTV
-import com.skylake.skytv.jgorunner.ui.dev.SearchTabLayout
-import com.skylake.skytv.jgorunner.ui.dev.SearchTabLayoutTV
 import com.skylake.skytv.jgorunner.ui.dev.Main_Layout
-import com.skylake.skytv.jgorunner.ui.dev.Main_LayoutTV
-import com.skylake.skytv.jgorunner.ui.dev.Main_LayoutTV_3rd
 import com.skylake.skytv.jgorunner.ui.dev.Main_Layout_3rd
+import com.skylake.skytv.jgorunner.ui.dev.Recent_Layout
+import com.skylake.skytv.jgorunner.ui.dev.depreciated.Recent_LayoutTV
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 
@@ -219,11 +206,9 @@ fun LandingPageScreen(context: Context, onNavigate: (String) -> Unit, onExit: ()
                 if (preferenceManager.myPrefs.customPlaylistSupport &&
                     !preferenceManager.myPrefs.showPLAYLIST
                 ) {
-                    if (isRemoteNavigation) Main_LayoutTV_3rd(context)
-                    else Main_Layout_3rd(context)
+                    Main_Layout_3rd(context)
                 } else {
-                    if (isRemoteNavigation) Main_LayoutTV(context)
-                    else Main_Layout(context)
+                    Main_Layout(context)
                 }
             }
             1 -> if (isRemoteNavigation) Recent_LayoutTV(context) else Recent_Layout(context)
