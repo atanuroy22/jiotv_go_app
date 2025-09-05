@@ -80,18 +80,21 @@ fun ModeSelectionDialog2(
                 val qualityOptions = qualityMap.keys.toList()
                 var qualityDropdownExpanded by remember { mutableStateOf(false) }
                 val selectedQualityLabel = qualityMap.entries.find { it.value == selectedQuality }?.key ?: qualityOptions[0]
-                DropdownSelection2(
-                    title = "Quality",
-                    options = qualityOptions,
-                    selectedOption = selectedQualityLabel,
-                    onOptionSelected = { label ->
-                        selectedQuality = (qualityMap[label] ?: "auto")
-                    },
-                    expanded = qualityDropdownExpanded,
-                    onExpandChange = { qualityDropdownExpanded = it }
-                )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                if (showPlaylist) {
+                    DropdownSelection2(
+                        title = "Quality",
+                        options = qualityOptions,
+                        selectedOption = selectedQualityLabel,
+                        onOptionSelected = { label ->
+                            selectedQuality = (qualityMap[label] ?: "auto")
+                        },
+                        expanded = qualityDropdownExpanded,
+                        onExpandChange = { qualityDropdownExpanded = it }
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
 
                 // --- TV Start Page Selection  ---
                 val startScreenTV = mapOf(
@@ -104,19 +107,19 @@ fun ModeSelectionDialog2(
                 }
                 var screenDropdownExpanded by remember { mutableStateOf(false) }
                 val selectedScreenLabel = startScreenTV.entries.find { it.value == selectedScreenTV }?.key ?: startOptionsTV[0]
-                DropdownSelection2(
-                    title = "Select TV start page",
-                    options = startOptionsTV,
-                    selectedOption = selectedScreenLabel,
-                    onOptionSelected = { label ->
-                        selectedScreenTV = startScreenTV[label] ?: 0
-                    },
-                    expanded = screenDropdownExpanded,
-                    onExpandChange = { screenDropdownExpanded = it }
-                )
-
-
-                Spacer(modifier = Modifier.height(16.dp))
+//                DropdownSelection2(
+//                    title = "Select TV start page",
+//                    options = startOptionsTV,
+//                    selectedOption = selectedScreenLabel,
+//                    onOptionSelected = { label ->
+//                        selectedScreenTV = startScreenTV[label] ?: 0
+//                    },
+//                    expanded = screenDropdownExpanded,
+//                    onExpandChange = { screenDropdownExpanded = it }
+//                )
+//
+//
+//                Spacer(modifier = Modifier.height(16.dp))
 
                 // --- TV Remote Navigation Configuration ---
                 val tvRemoteNavigationOptions = mapOf(
@@ -167,41 +170,58 @@ fun ModeSelectionDialog2(
                     )
                 }
                 var showCategoryCheckboxes by remember { mutableStateOf(false) }
-                Column {
-                    Text(text = "Select Categories", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedButton(
-                            onClick = { showCategoryCheckboxes = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = MaterialTheme.shapes.medium
-                        ) {
-                            Text("Categories")
+
+                if (showPlaylist) {
+                    Column {
+                        Text(
+                            text = "Select Categories",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedButton(
+                                onClick = { showCategoryCheckboxes = true },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = MaterialTheme.shapes.medium
+                            ) {
+                                Text("Categories")
+                            }
                         }
                     }
-                }
-                if (showCategoryCheckboxes) {
-                    Dialog(onDismissRequest = { showCategoryCheckboxes = false }) {
-                        Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
-                            Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
-                                MultiSelectDropdown(
-                                    title = "Category",
-                                    options = categoryOptions,
-                                    selectedOptions = selectedCategories.value,
-                                    onOptionsSelected = { names ->
-                                        selectedCategories.value = names.toMutableList()
-                                        selectedCategoryInts.value = names.mapNotNull { categoryMap[it] }.toMutableList()
+                    if (showCategoryCheckboxes) {
+                        Dialog(onDismissRequest = { showCategoryCheckboxes = false }) {
+                            Surface(
+                                shape = MaterialTheme.shapes.medium,
+                                color = MaterialTheme.colorScheme.surface
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp)
+                                        .verticalScroll(rememberScrollState())
+                                ) {
+                                    MultiSelectDropdown(
+                                        title = "Category",
+                                        options = categoryOptions,
+                                        selectedOptions = selectedCategories.value,
+                                        onOptionsSelected = { names ->
+                                            selectedCategories.value = names.toMutableList()
+                                            selectedCategoryInts.value =
+                                                names.mapNotNull { categoryMap[it] }.toMutableList()
+                                        }
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Button(
+                                        onClick = { showCategoryCheckboxes = false },
+                                        modifier = Modifier.align(Alignment.End)
+                                    ) {
+                                        Text("Done")
                                     }
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Button(onClick = { showCategoryCheckboxes = false }, modifier = Modifier.align(Alignment.End)) {
-                                    Text("Done")
                                 }
                             }
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
 
                 // --- Language Selection ---
                 val languageMap = mapOf(
@@ -225,41 +245,58 @@ fun ModeSelectionDialog2(
                     )
                 }
                 var showLanguageCheckboxes by remember { mutableStateOf(false) }
-                Column {
-                    Text(text = "Select Languages", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedButton(
-                            onClick = { showLanguageCheckboxes = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = MaterialTheme.shapes.medium
-                        ) {
-                            Text("Languages")
+
+                if (showPlaylist) {
+                    Column {
+                        Text(
+                            text = "Select Languages",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedButton(
+                                onClick = { showLanguageCheckboxes = true },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = MaterialTheme.shapes.medium
+                            ) {
+                                Text("Languages")
+                            }
                         }
                     }
-                }
-                if (showLanguageCheckboxes) {
-                    Dialog(onDismissRequest = { showLanguageCheckboxes = false }) {
-                        Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
-                            Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
-                                MultiSelectDropdown(
-                                    title = "Language",
-                                    options = languageOptions,
-                                    selectedOptions = selectedLanguages.value,
-                                    onOptionsSelected = { names ->
-                                        selectedLanguages.value = names.toMutableList()
-                                        selectedLanguageInts.value = names.mapNotNull { languageMap[it] }.toMutableList()
+                    if (showLanguageCheckboxes) {
+                        Dialog(onDismissRequest = { showLanguageCheckboxes = false }) {
+                            Surface(
+                                shape = MaterialTheme.shapes.medium,
+                                color = MaterialTheme.colorScheme.surface
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp)
+                                        .verticalScroll(rememberScrollState())
+                                ) {
+                                    MultiSelectDropdown(
+                                        title = "Language",
+                                        options = languageOptions,
+                                        selectedOptions = selectedLanguages.value,
+                                        onOptionsSelected = { names ->
+                                            selectedLanguages.value = names.toMutableList()
+                                            selectedLanguageInts.value =
+                                                names.mapNotNull { languageMap[it] }.toMutableList()
+                                        }
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Button(
+                                        onClick = { showLanguageCheckboxes = false },
+                                        modifier = Modifier.align(Alignment.End)
+                                    ) {
+                                        Text("Done")
                                     }
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Button(onClick = { showLanguageCheckboxes = false }, modifier = Modifier.align(Alignment.End)) {
-                                    Text("Done")
                                 }
                             }
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
 
                 // --- Experimental/Debug Section ---
                 if (preferenceManager.myPrefs.customPlaylistSupport) {
