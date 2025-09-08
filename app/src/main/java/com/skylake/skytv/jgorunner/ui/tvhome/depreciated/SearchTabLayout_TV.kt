@@ -1,4 +1,4 @@
-package com.skylake.skytv.jgorunner.ui.dev.depreciated
+package com.skylake.skytv.jgorunner.ui.tvhome.depreciated
 
 import android.content.Context
 import android.content.Intent
@@ -25,9 +25,9 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
-import com.skylake.skytv.jgorunner.ui.dev.Channel
-import com.skylake.skytv.jgorunner.ui.dev.ChannelResponse
-import com.skylake.skytv.jgorunner.ui.dev.ChannelUtils
+import com.skylake.skytv.jgorunner.ui.tvhome.Channel
+import com.skylake.skytv.jgorunner.ui.tvhome.ChannelResponse
+import com.skylake.skytv.jgorunner.ui.tvhome.ChannelUtils
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalGlideComposeApi::class)

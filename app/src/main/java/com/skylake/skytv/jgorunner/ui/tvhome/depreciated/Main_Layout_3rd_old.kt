@@ -1,4 +1,4 @@
-package com.skylake.skytv.jgorunner.ui.dev.depreciated
+package com.skylake.skytv.jgorunner.ui.tvhome.depreciated
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -37,7 +37,7 @@ import com.google.gson.reflect.TypeToken
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
-import com.skylake.skytv.jgorunner.ui.dev.M3UChannelExp
+import com.skylake.skytv.jgorunner.ui.tvhome.M3UChannelExp
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
 

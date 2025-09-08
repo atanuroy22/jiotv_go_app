@@ -4,9 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.net.Uri
-import android.os.Build
 import android.util.Log
-import android.view.View
 import android.widget.Toast
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
@@ -33,8 +31,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -52,8 +48,8 @@ import androidx.media3.ui.PlayerView.SHOW_BUFFERING_WHEN_PLAYING
 import coil.compose.AsyncImage
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.data.SkySharedPref
-import com.skylake.skytv.jgorunner.ui.dev.ChannelUtils
-import com.skylake.skytv.jgorunner.ui.dev.extractChannelIdFromPlayUrl
+import com.skylake.skytv.jgorunner.ui.tvhome.ChannelUtils
+import com.skylake.skytv.jgorunner.ui.tvhome.extractChannelIdFromPlayUrl
 import kotlinx.coroutines.delay
 
 const val TAG = "ExoJetScreen"

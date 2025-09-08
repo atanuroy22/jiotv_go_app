@@ -1,4 +1,4 @@
-package com.skylake.skytv.jgorunner.ui.dev.depreciated
+package com.skylake.skytv.jgorunner.ui.tvhome.depreciated
 
 import android.content.Context
 import android.content.Intent
@@ -44,9 +44,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.onFocusEvent
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
-import com.skylake.skytv.jgorunner.ui.dev.Channel
-import com.skylake.skytv.jgorunner.ui.dev.ChannelResponse
-import com.skylake.skytv.jgorunner.ui.dev.ChannelUtils
+import com.skylake.skytv.jgorunner.ui.tvhome.Channel
+import com.skylake.skytv.jgorunner.ui.tvhome.ChannelResponse
+import com.skylake.skytv.jgorunner.ui.tvhome.ChannelUtils
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable

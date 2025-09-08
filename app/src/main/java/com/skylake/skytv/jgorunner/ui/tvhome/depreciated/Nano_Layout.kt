@@ -1,4 +1,4 @@
-package com.skylake.skytv.jgorunner.ui.dev.depreciated
+package com.skylake.skytv.jgorunner.ui.tvhome.depreciated
 
 import android.content.Context
 import android.content.Intent
@@ -46,10 +46,10 @@ import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.layout.ContentScale
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.skylake.skytv.jgorunner.ui.dev.Channel
-import com.skylake.skytv.jgorunner.ui.dev.ChannelResponse
-import com.skylake.skytv.jgorunner.ui.dev.ChannelUtils
-import com.skylake.skytv.jgorunner.ui.dev.EpgProgram
+import com.skylake.skytv.jgorunner.ui.tvhome.Channel
+import com.skylake.skytv.jgorunner.ui.tvhome.ChannelResponse
+import com.skylake.skytv.jgorunner.ui.tvhome.ChannelUtils
+import com.skylake.skytv.jgorunner.ui.tvhome.EpgProgram
 
 
 @OptIn(ExperimentalGlideComposeApi::class)

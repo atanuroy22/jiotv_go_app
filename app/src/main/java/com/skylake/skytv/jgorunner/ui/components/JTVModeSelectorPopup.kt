@@ -12,9 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.skylake.skytv.jgorunner.data.SkySharedPref
-import androidx.compose.ui.platform.LocalContext
-import com.skylake.skytv.jgorunner.activities.MainActivity
-import com.skylake.skytv.jgorunner.ui.dev.Helper
+import com.skylake.skytv.jgorunner.ui.tvhome.Helper
 
 
 @Composable

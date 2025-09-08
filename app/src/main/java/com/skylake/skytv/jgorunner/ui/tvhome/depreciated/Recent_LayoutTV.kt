@@ -1,4 +1,4 @@
-package com.skylake.skytv.jgorunner.ui.dev.depreciated
+package com.skylake.skytv.jgorunner.ui.tvhome.depreciated
 
 import android.content.Context
 import android.content.Intent
@@ -31,7 +31,7 @@ import com.skylake.skytv.jgorunner.data.SkySharedPref
 import androidx.tv.material3.ClassicCard
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
-import com.skylake.skytv.jgorunner.ui.dev.Channel
+import com.skylake.skytv.jgorunner.ui.tvhome.Channel
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable

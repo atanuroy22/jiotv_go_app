@@ -1,4 +1,4 @@
-package com.skylake.skytv.jgorunner.ui.dev.depreciated
+package com.skylake.skytv.jgorunner.ui.tvhome.depreciated
 
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -38,10 +38,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
-import com.skylake.skytv.jgorunner.ui.dev.Channel
-import com.skylake.skytv.jgorunner.ui.dev.ChannelResponse
-import com.skylake.skytv.jgorunner.ui.dev.ChannelUtils
-import com.skylake.skytv.jgorunner.ui.dev.EpgProgram
+import com.skylake.skytv.jgorunner.ui.tvhome.Channel
+import com.skylake.skytv.jgorunner.ui.tvhome.ChannelResponse
+import com.skylake.skytv.jgorunner.ui.tvhome.ChannelUtils
+import com.skylake.skytv.jgorunner.ui.tvhome.EpgProgram
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
 @SuppressLint("MutableCollectionMutableState")

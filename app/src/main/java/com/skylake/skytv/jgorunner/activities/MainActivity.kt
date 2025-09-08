@@ -35,9 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.lifecycle.lifecycleScope
 import com.skylake.skytv.jgorunner.core.update.DownloadModelNew
 import com.skylake.skytv.jgorunner.BuildConfig
 import com.skylake.skytv.jgorunner.core.checkServerStatus
@@ -51,7 +49,6 @@ import com.skylake.skytv.jgorunner.core.update.SemanticVersionNew
 import com.skylake.skytv.jgorunner.core.update.Status
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.BinaryService
-import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.services.player.LandingPage
 import com.skylake.skytv.jgorunner.ui.components.BottomNavigationBar
 import com.skylake.skytv.jgorunner.ui.components.CustPopup
@@ -59,10 +56,8 @@ import com.skylake.skytv.jgorunner.ui.components.JTVModeSelectorPopup
 import com.skylake.skytv.jgorunner.ui.components.LoginPopup
 import com.skylake.skytv.jgorunner.ui.components.ProgressPopup
 import com.skylake.skytv.jgorunner.ui.components.RedirectPopup
-import com.skylake.skytv.jgorunner.ui.dev.ChannelUtils
 import com.skylake.skytv.jgorunner.ui.screens.CastScreen
 import com.skylake.skytv.jgorunner.ui.screens.DebugScreen
-import com.skylake.skytv.jgorunner.ui.screens.ExoPlayJetScreen
 import com.skylake.skytv.jgorunner.ui.screens.HomeScreen
 import com.skylake.skytv.jgorunner.ui.screens.InfoScreen
 import com.skylake.skytv.jgorunner.ui.screens.LoginScreen

@@ -57,10 +57,10 @@ import androidx.compose.ui.unit.sp
 import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.ui.components.ModeSelectionDialog2
-import com.skylake.skytv.jgorunner.ui.dev.Main_Layout
-import com.skylake.skytv.jgorunner.ui.dev.Main_Layout_3rd
-import com.skylake.skytv.jgorunner.ui.dev.Recent_Layout
-import com.skylake.skytv.jgorunner.ui.dev.depreciated.Recent_LayoutTV
+import com.skylake.skytv.jgorunner.ui.tvhome.Main_Layout
+import com.skylake.skytv.jgorunner.ui.tvhome.Main_Layout_3rd
+import com.skylake.skytv.jgorunner.ui.tvhome.Recent_Layout
+import com.skylake.skytv.jgorunner.ui.tvhome.depreciated.Recent_LayoutTV
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 
