@@ -1,4 +1,4 @@
-package com.skylake.skytv.jgorunner.ui.components
+package com.skylake.skytv.jgorunner.ui.tvhome.components
 
 import android.content.Context
 import android.util.Log
@@ -12,16 +12,19 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.google.gson.Gson
 import com.skylake.skytv.jgorunner.data.SkySharedPref
+import com.skylake.skytv.jgorunner.ui.tvhome.M3UChannelExp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
+
+
 @Composable
-fun ProcessingDialog(
+fun ProcessingDialogExp(
     context: Context,
-    onComplete: (List<M3UChannel>) -> Unit,
+    onComplete: (List<M3UChannelExp>) -> Unit,
     onError: (String) -> Unit
 ) {
     val preferenceManager = SkySharedPref.getInstance(context)
@@ -42,14 +45,14 @@ fun ProcessingDialog(
             }
             try {
                 // Fetch the M3U file
-                    val (body, response) = withContext(Dispatchers.IO) {
+                val response = withContext(Dispatchers.IO) {
                     val client = OkHttpClient()
                     val request = Request.Builder().url(m3uUrl).build()
                     Log.d("ProcessingDialog", "Fetching M3U file from URL...")
-                    val response = client.newCall(request).execute()
-                    val body = response.body?.string()
-                    Pair(body, response)
+                    client.newCall(request).execute()
                 }
+
+                val body = response.body?.string()
 
                 if (!response.isSuccessful || body == null) {
                     message = "Failed to fetch M3U file. HTTP error: ${response.code}"
@@ -66,10 +69,8 @@ fun ProcessingDialog(
                     return@launch
                 }
                 Log.d("ProcessingDialog", "M3U file fetched successfully. Parsing...")
-                // Parse the M3U data
-                val channels = parseM3U(body)
+                val channels = parseM3Uexp(body)
                 Log.d("ProcessingDialog", "Parsed ${channels.size} channels from M3U.")
-                // Save as JSON for later use
                 val gson = Gson()
                 val json = gson.toJson(channels)
                 preferenceManager.myPrefs.channelListJson = json
@@ -107,31 +108,30 @@ fun ProcessingDialog(
     }
 }
 
-// Data class for parsed channels
-data class M3UChannel(
-    val name: String,
-    val url: String,
-    val logo: String?
-)
-
-// M3U parsing function with logs
-fun parseM3U(m3uContent: String): List<M3UChannel> {
+fun parseM3Uexp(m3uContent: String): List<M3UChannelExp> {
     val lines = m3uContent.lines()
-    val channels = mutableListOf<M3UChannel>()
+    val channels = mutableListOf<M3UChannelExp>()
     var i = 0
     while (i < lines.size) {
         val line = lines[i]
         if (line.startsWith("#EXTINF")) {
-            val name = Regex(",\\s*(.+)$").find(line)?.groupValues?.get(1) ?: ""
+            // Regex to extract key-value attributes
+            val name = Regex(",\\s*(.+)$").find(line)?.groupValues?.get(1)?.trim() ?: ""
             val logo = Regex("""tvg-logo="([^"]*)"""").find(line)?.groupValues?.get(1)
+            // New regex to extract group-title
+            val category = Regex("""group-title="([^"]*)"""").find(line)?.groupValues?.get(1)
+
             val url = lines.getOrNull(i + 1)?.trim() ?: ""
-            Log.d("parseM3U", "Parsed channel: name=$name, url=$url, logo=$logo")
-            channels.add(M3UChannel(name, url, logo))
+
+            if (name.isNotEmpty() && url.isNotEmpty()) {
+                Log.d("parseM3Uexp", "Parsed channel: name=$name, url=$url, logo=$logo, category=$category")
+                channels.add(M3UChannelExp(name, url, logo, category))
+            }
             i += 2
         } else {
             i++
         }
     }
-    Log.d("parseM3U", "Total channels parsed: ${channels.size}")
+    Log.d("parseM3Uexp", "Total channels parsed: ${channels.size}")
     return channels
 }

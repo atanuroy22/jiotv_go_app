@@ -1,4 +1,4 @@
-package com.skylake.skytv.jgorunner.ui.components
+package com.skylake.skytv.jgorunner.ui.tvhome.components
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -31,7 +31,7 @@ import kotlinx.coroutines.launch
 
 @SuppressLint("MutableCollectionMutableState")
 @Composable
-fun ModeSelectionDialog2(
+fun TvScreenMenu(
     showDialog: Boolean,
     context: Context,
     onDismiss: () -> Unit,

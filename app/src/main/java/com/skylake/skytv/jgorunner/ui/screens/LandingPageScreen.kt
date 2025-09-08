@@ -56,7 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.data.SkySharedPref
-import com.skylake.skytv.jgorunner.ui.components.ModeSelectionDialog2
+import com.skylake.skytv.jgorunner.ui.tvhome.components.TvScreenMenu
 import com.skylake.skytv.jgorunner.ui.tvhome.Main_Layout
 import com.skylake.skytv.jgorunner.ui.tvhome.Main_Layout_3rd
 import com.skylake.skytv.jgorunner.ui.tvhome.Recent_Layout
@@ -218,7 +218,7 @@ fun LandingPageScreen(context: Context, onNavigate: (String) -> Unit, onExit: ()
     }
 
     // Mode Dialog
-    ModeSelectionDialog2(
+    TvScreenMenu(
         showDialog = showModeDialog,
         onDismiss = { showModeDialog = false },
         onReset = {
