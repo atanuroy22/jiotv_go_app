@@ -46,7 +46,7 @@ import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
-fun Main_Layout_3rd(context: Context) {
+fun Main_Layout_3rd(context: Context, reloadTrigger: Int ) {
     val preferenceManager = remember { SkySharedPref.getInstance(context) }
     var allChannels by remember { mutableStateOf<List<M3UChannelExp>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -58,7 +58,7 @@ fun Main_Layout_3rd(context: Context) {
     val basefinURL = "http://localhost:$localPORT"
     var selectedChannel by remember { mutableStateOf<M3UChannelExp?>(null) }
     var epgData by remember { mutableStateOf<EpgProgram?>(null) }
-    var epgDebugVar by remember { mutableStateOf(preferenceManager.myPrefs.epgDebug) }
+    val epgDebugVar by remember { mutableStateOf(preferenceManager.myPrefs.epgDebug) }
 
     val categories = remember(allChannels) {
         listOf("All") + allChannels.mapNotNull { it.category }.distinct().sorted()
@@ -72,7 +72,8 @@ fun Main_Layout_3rd(context: Context) {
         }
     }
 
-    LaunchedEffect(Unit) {
+
+    LaunchedEffect(reloadTrigger) {
         isLoading = true
         try {
             val json = preferenceManager.myPrefs.channelListJson
@@ -99,6 +100,7 @@ fun Main_Layout_3rd(context: Context) {
         }
         isLoading = false
     }
+
 
     LaunchedEffect(filteredChannels) {
         if (preferenceManager.myPrefs.startTvAutomatically &&

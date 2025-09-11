@@ -206,9 +206,9 @@ fun LandingPageScreen(context: Context, onNavigate: (String) -> Unit, onExit: ()
                 if (preferenceManager.myPrefs.customPlaylistSupport &&
                     !preferenceManager.myPrefs.showPLAYLIST
                 ) {
-                    Main_Layout_3rd(context)
+                    Main_Layout_3rd(context, reloadTrigger = 0)
                 } else {
-                    Main_Layout(context)
+                    Main_Layout(context, reloadTrigger = 0)
                 }
             }
             1 -> if (isRemoteNavigation) Recent_LayoutTV(context) else Recent_Layout(context)

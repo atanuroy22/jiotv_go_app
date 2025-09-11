@@ -41,8 +41,7 @@ import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
-fun Main_Layout(context: Context?) {
-    if (context == null) return
+fun Main_Layout(context: Context, reloadTrigger: Int ) {
     val scope = rememberCoroutineScope()
     val channelsResponse = remember { mutableStateOf<ChannelResponse?>(null) }
     val filteredChannels = remember { mutableStateOf<List<Channel>>(emptyList()) }
@@ -90,7 +89,7 @@ fun Main_Layout(context: Context?) {
     }
 
     // Fetch and filter channels (cache/network)
-    LaunchedEffect(Unit) {
+    LaunchedEffect(reloadTrigger) {
         val sharedPref = context.getSharedPreferences("channel_cache", Context.MODE_PRIVATE)
         var useCache = true
         var cachedChannels: ChannelResponse? = null

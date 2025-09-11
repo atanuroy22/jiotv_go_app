@@ -37,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -75,6 +76,9 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
 
     var showModeDialog by remember { mutableStateOf(false) }
 
+    var reloadChannelsTrigger by remember { mutableStateOf(0) }
+
+
     val tabs = listOf(
         TabItem("TV", Icons.Default.Tv),
         TabItem("Recent", Icons.Default.Star)
@@ -96,7 +100,7 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
     // Snackbar state
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
-    var exitPressTime by remember { mutableStateOf(0L) }
+    var exitPressTime by remember { mutableLongStateOf(0L) }
 
     var firstLaunch by remember { mutableStateOf(true) }
 
@@ -174,52 +178,62 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
                 }
             }
 
-            // Tabs
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .focusRestorer()
-                    .focusRequester(tabFocusRequester)
-                    .focusable(),
-            verticalAlignment = Alignment.CenterVertically
-            ) {
-                PrimaryTabRow(selectedTabIndex = selectedTabIndex) {
-                    tabs.forEachIndexed { index, tab ->
-                        Tab(
-                            selected = index == selectedTabIndex,
-                            onClick = { selectedTabIndex = index },
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = tab.icon,
-                                        contentDescription = "Tab Icon",
-                                        modifier = Modifier.size(16.dp),
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(text = tab.text)
-                                }
+            if (preferenceManager.myPrefs.customPlaylistSupport &&
+                !preferenceManager.myPrefs.showPLAYLIST) {
+
+                Main_Layout_3rd(context, reloadTrigger = reloadChannelsTrigger)
+
+            } else if (!preferenceManager.myPrefs.showRecentTab) {
+
+                Main_Layout(context, reloadTrigger = reloadChannelsTrigger)
+
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Tabs Row
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .focusRestorer()
+                            .focusRequester(tabFocusRequester)
+                            .focusable(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        PrimaryTabRow(selectedTabIndex = selectedTabIndex) {
+                            tabs.forEachIndexed { index, tab ->
+                                Tab(
+                                    selected = index == selectedTabIndex,
+                                    onClick = { selectedTabIndex = index },
+                                    text = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = tab.icon,
+                                                contentDescription = "Tab Icon",
+                                                modifier = Modifier.size(16.dp),
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(text = tab.text)
+                                        }
+                                    }
+                                )
                             }
-                        )
+                        }
+                    }
+
+                    // Tab Content
+                    when (selectedTabIndex) {
+                        0 -> Main_Layout(context, reloadTrigger = reloadChannelsTrigger)
+                        1 -> Recent_Layout(context)
+                        2 -> if (isRemoteNavigation) SearchTabLayoutTV(context, tabFocusRequester) else SearchTabLayout(context, tabFocusRequester)
                     }
                 }
             }
 
-            // Tab Content
-            when (selectedTabIndex) {
-                0 -> {
-                    if (preferenceManager.myPrefs.customPlaylistSupport &&
-                        !preferenceManager.myPrefs.showPLAYLIST
-                    ) {
-                        Main_Layout_3rd(context)
-                    } else {
-                        Main_Layout(context)
-                    }
-                }
-                1 -> Recent_Layout(context)
-                2 -> if (isRemoteNavigation) SearchTabLayoutTV(context, tabFocusRequester) else SearchTabLayout(context, tabFocusRequester)
-            }
         }
     }
 
@@ -236,20 +250,15 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
             Log.d("ZoneScreen", "Qualities: $selectedQualities, Categories: $selectedCategories, Languages: $selectedLanguages")
             Toast.makeText(context, "Refreshing Channels", Toast.LENGTH_LONG).show()
             selectedTabIndex = savedTabIndex
+
+            reloadChannelsTrigger++
         },
         context = context
     )
 
-    LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(100)
-        tabFocusRequester.requestFocus()
-
-        if (firstLaunch && tabs.size > 1) {
-            firstLaunch = false
-            val originalIndex = selectedTabIndex
-            selectedTabIndex = (originalIndex + 1) % tabs.size
-            kotlinx.coroutines.delay(50)
-            selectedTabIndex = originalIndex
-        }
+    if (firstLaunch) {
+        firstLaunch = false
+        reloadChannelsTrigger++
     }
+
 }
