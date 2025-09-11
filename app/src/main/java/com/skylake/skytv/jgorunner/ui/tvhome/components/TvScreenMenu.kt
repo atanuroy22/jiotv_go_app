@@ -49,6 +49,7 @@ fun TvScreenMenu(
     val preferenceManager = SkySharedPref.getInstance(context)
     var showCustomUrlInputDialog by remember { mutableStateOf(false) }
     var customUrl by remember { mutableStateOf(preferenceManager.myPrefs.custURL ?: "") }
+    var showRecentTab by remember { mutableStateOf(preferenceManager.myPrefs.showRecentTab) }
     var startTvAutomatically by remember { mutableStateOf(preferenceManager.myPrefs.startTvAutomatically) }
     var startTvAutoDelay by remember { mutableStateOf(preferenceManager.myPrefs.startTvAutoDelay) }
     var startTvAutoDelayTime by remember  { mutableIntStateOf(preferenceManager.myPrefs.startTvAutoDelayTime) }
@@ -102,7 +103,7 @@ fun TvScreenMenu(
                         onExpandChange = { qualityDropdownExpanded = it }
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
                 // --- TV Start Page Selection  ---
@@ -116,19 +117,21 @@ fun TvScreenMenu(
                 }
                 var screenDropdownExpanded by remember { mutableStateOf(false) }
                 val selectedScreenLabel = startScreenTV.entries.find { it.value == selectedScreenTV }?.key ?: startOptionsTV[0]
-//                DropdownSelection2(
-//                    title = "Select TV start page",
-//                    options = startOptionsTV,
-//                    selectedOption = selectedScreenLabel,
-//                    onOptionSelected = { label ->
-//                        selectedScreenTV = startScreenTV[label] ?: 0
-//                    },
-//                    expanded = screenDropdownExpanded,
-//                    onExpandChange = { screenDropdownExpanded = it }
-//                )
-//
-//
-//                Spacer(modifier = Modifier.height(16.dp))
+                if (showRecentTab) {
+                    DropdownSelection2(
+                        title = "Select TV start page",
+                        options = startOptionsTV,
+                        selectedOption = selectedScreenLabel,
+                        onOptionSelected = { label ->
+                            selectedScreenTV = startScreenTV[label] ?: 0
+                        },
+                        expanded = screenDropdownExpanded,
+                        onExpandChange = { screenDropdownExpanded = it }
+                    )
+
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
 
                 // --- TV Remote Navigation Configuration ---
                 val tvRemoteNavigationOptions = mapOf(
@@ -155,7 +158,7 @@ fun TvScreenMenu(
                     onExpandChange = { isExpanded -> isTvRemoteNavDropdownExpanded = isExpanded }
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // --- Category Selection ---
                 val categoryMap = mapOf(
@@ -229,7 +232,7 @@ fun TvScreenMenu(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
                 // --- Language Selection ---
@@ -304,7 +307,7 @@ fun TvScreenMenu(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
                 // --- Experimental/Debug Section ---
@@ -322,7 +325,7 @@ fun TvScreenMenu(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     // --- Playlist Selection Dropdown ---
                     var playlistDropdownExpanded by remember { mutableStateOf(false) }
@@ -343,10 +346,26 @@ fun TvScreenMenu(
                         onExpandChange = { playlistDropdownExpanded = it }
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+///////////////////////////////
+                if (showPlaylist) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Checkbox(
+                        checked = showRecentTab,
+                        onCheckedChange = { checked ->
+                            showRecentTab = checked
+                        }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "Show Recent Channels")
+                    }
                 }
 
-                //////////////////////////////////////
+///////////////////////////////
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -362,7 +381,7 @@ fun TvScreenMenu(
                     Text(text = "Auto play channel")
                 }
 
-                if (false) {
+                if (true) {
                     if (startTvAutomatically) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(
@@ -419,7 +438,7 @@ fun TvScreenMenu(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 //////////////////////////////////////
 
@@ -500,6 +519,7 @@ fun TvScreenMenu(
                                 myPrefs.filterLI = ""
                                 myPrefs.selectedRemoteNavTV = "0"
                                 myPrefs.showPLAYLIST = false
+                                myPrefs.showRecentTab = false
                                 myPrefs.startTvAutomatically = false
                                 myPrefs.startTvAutoDelay = false
                                 myPrefs.startTvAutoDelayTime = 0
@@ -528,6 +548,7 @@ fun TvScreenMenu(
                                 if (myPrefs.customPlaylistSupport) {
                                     myPrefs.showPLAYLIST = showPlaylist
                                 }
+                                myPrefs.showRecentTab = showRecentTab
                                 myPrefs.startTvAutomatically = startTvAutomatically
                                 myPrefs.startTvAutoDelay = startTvAutoDelay
                                 myPrefs.startTvAutoDelayTime = startTvAutoDelayTime
