@@ -381,7 +381,7 @@ fun TvScreenMenu(
                     Text(text = "Auto play channel")
                 }
 
-                if (true) {
+                if (false) {
                     if (startTvAutomatically) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(
