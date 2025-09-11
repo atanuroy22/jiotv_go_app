@@ -7,6 +7,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Animatable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -179,8 +180,9 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
                     .focusRestorer()
-                    .focusRequester(tabFocusRequester),
-                verticalAlignment = Alignment.CenterVertically
+                    .focusRequester(tabFocusRequester)
+                    .focusable(),
+            verticalAlignment = Alignment.CenterVertically
             ) {
                 PrimaryTabRow(selectedTabIndex = selectedTabIndex) {
                     tabs.forEachIndexed { index, tab ->
@@ -239,6 +241,7 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
     )
 
     LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(100)
         tabFocusRequester.requestFocus()
 
         if (firstLaunch && tabs.size > 1) {
