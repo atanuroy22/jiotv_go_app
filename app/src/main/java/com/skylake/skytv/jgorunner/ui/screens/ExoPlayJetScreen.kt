@@ -3,6 +3,7 @@ package com.skylake.skytv.jgorunner.ui.screens
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
+import android.content.res.Configuration
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
@@ -25,6 +26,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
@@ -179,6 +181,7 @@ fun ExoPlayJetScreen(
                 currentProgramName = currentProgramName
             )
         }
+        CurrentTimeOverlay(visible = showChannelOverlay && channelList != null)
     }
 }
 
@@ -278,6 +281,55 @@ fun ChannelInfoOverlay(
         }
     }
 }
+
+@Composable
+fun CurrentTimeOverlay(visible: Boolean) {
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    AnimatedVisibility(
+        visible = visible && isLandscape,
+        enter = fadeIn(),
+        exit = fadeOut()
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(20.dp),
+            contentAlignment = Alignment.TopEnd
+        ) {
+            Box(
+                modifier = Modifier
+                    .background(Color.Black.copy(alpha = 0.50f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                var currentTime by remember { mutableStateOf(getCurrentFormattedTime()) }
+                LaunchedEffect(Unit) {
+                    while (true) {
+                        currentTime = getCurrentFormattedTime()
+                        delay(60000L)
+                    }
+                }
+                Text(
+                    text = currentTime,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 20.sp
+                )
+            }
+        }
+    }
+}
+
+@SuppressLint("DefaultLocale")
+fun getCurrentFormattedTime(): String {
+    val cal = java.util.Calendar.getInstance()
+    val hour = cal.get(java.util.Calendar.HOUR)
+    val minute = cal.get(java.util.Calendar.MINUTE)
+    val amPm = if (cal.get(java.util.Calendar.AM_PM) == java.util.Calendar.AM) "AM" else "PM"
+    return String.format("%02d:%02d %s", if (hour == 0) 12 else hour, minute, amPm)
+}
+
 
 
 @UnstableApi
