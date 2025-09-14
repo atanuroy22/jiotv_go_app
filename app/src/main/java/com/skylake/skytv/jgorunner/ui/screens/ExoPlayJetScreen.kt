@@ -5,13 +5,16 @@ import android.app.Activity
 import android.content.Context
 import android.content.res.Configuration
 import android.net.Uri
+import android.os.Build
 import android.util.Log
+import android.view.View
 import android.widget.Toast
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,6 +36,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -53,6 +62,8 @@ import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.ui.tvhome.ChannelUtils
 import com.skylake.skytv.jgorunner.ui.tvhome.extractChannelIdFromPlayUrl
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 const val TAG = "ExoJetScreen"
 
@@ -77,10 +88,26 @@ fun ExoPlayJetScreen(
 
     val focusRequester = remember { FocusRequester() }
     var currentIndex by remember { mutableStateOf(currentChannelIndex) }
+    var showChannelPanel by remember { mutableStateOf(false) }
+    var panelSelectedIndex by remember { mutableStateOf(currentChannelIndex.coerceAtLeast(0)) }
     var currentProgramName by remember { mutableStateOf<String?>(null) }
     var showChannelOverlay by remember { mutableStateOf(false) }
     val retryCountRef = remember { mutableStateOf(0) }
     var exoPlayerView: PlayerView? by remember { mutableStateOf(null) }
+    var numericBuffer by remember { mutableStateOf("") }
+    var showNumericOverlay by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    var numericJob: Job? by remember { mutableStateOf(null) }
+
+    fun commitNumericEntryLocal(list: ArrayList<ChannelInfo>?) {
+        val num = numericBuffer.toIntOrNull()
+        if (num != null && list != null && list.isNotEmpty()) {
+            val idx = (num - 1).coerceIn(0, list.size - 1)
+            currentIndex = idx
+        }
+        numericBuffer = ""
+        showNumericOverlay = false
+    }
 
 
     val exoPlayer = remember {
@@ -136,20 +163,114 @@ fun ExoPlayJetScreen(
             .focusRequester(focusRequester)
             .focusable()
             .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp &&
-                    (event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter)
-                ) {
-                    (exoPlayerView)?.showController()
+                // if (event.type == KeyEventType.KeyUp &&
+                //     (event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter)
+                // ) {
+                //     (exoPlayerView)?.showController()
+                    
+                // Prevent PlayerView's default 5s seek on LEFT by consuming KeyDown LEFT and opening the panel
+                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft) {
+                    panelSelectedIndex = currentIndex
+                    showChannelPanel = channelList?.isNotEmpty() == true
                     return@onKeyEvent true
                 }
+                // handleTVRemoteKey(
+                //     event = event,
+                //     tvNAV = tvNAV,
+                //     channelList = channelList,
+                //     currentIndexState = { currentIndex },
+                //     onChannelChange = { currentIndex = it }
+                // )
 
-                handleTVRemoteKey(
-                    event = event,
-                    tvNAV = tvNAV,
-                    channelList = channelList,
-                    currentIndexState = { currentIndex },
-                    onChannelChange = { currentIndex = it }
-                )
+                // Numeric channel entry (KeyDown to collect digits)
+                if (event.type == KeyEventType.KeyDown) {
+                    val digit = when (event.key) {
+                        Key.Zero -> 0
+                        Key.One -> 1
+                        Key.Two -> 2
+                        Key.Three -> 3
+                        Key.Four -> 4
+                        Key.Five -> 5
+                        Key.Six -> 6
+                        Key.Seven -> 7
+                        Key.Eight -> 8
+                        Key.Nine -> 9
+                        else -> null
+                    }
+                    if (digit != null) {
+                        if (!(numericBuffer.isEmpty() && digit == 0)) { // avoid leading zero
+                            if (numericBuffer.length < 4) {
+                                numericBuffer += digit.toString()
+                                showNumericOverlay = true
+                                // restart commit timer
+                                numericJob?.cancel()
+                                numericJob = scope.launch {
+                                    delay(1200)
+                                    commitNumericEntryLocal(channelList)
+                                }
+                            }
+                        }
+                        return@onKeyEvent true
+                    }
+                }
+                // Global ENTER shows controller if panel isn't open
+                if (event.type == KeyEventType.KeyUp) {
+                    // Commit numeric entry immediately on ENTER
+                    if (numericBuffer.isNotEmpty() && (event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter)) {
+                        numericJob?.cancel()
+                        commitNumericEntryLocal(channelList)
+                        return@onKeyEvent true
+                    }
+                    if (!showChannelPanel && (event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter)) {
+                        (exoPlayerView)?.showController()
+                        return@onKeyEvent true
+                    }
+                    // Toggle panel
+                    if (event.key == Key.Menu || event.key == Key.DirectionLeft) {
+                        panelSelectedIndex = currentIndex
+                        showChannelPanel = channelList?.isNotEmpty() == true
+                        return@onKeyEvent true
+                    }
+                    if (showChannelPanel && (event.key == Key.DirectionRight || event.key == Key.Back)) {
+                        showChannelPanel = false
+                        return@onKeyEvent true
+                    }
+                    if (showChannelPanel) {
+                        when (event.key) {
+                            Key.DirectionUp -> {
+                                if (channelList != null && channelList.isNotEmpty()) {
+                                    panelSelectedIndex = (panelSelectedIndex - 1 + channelList.size) % channelList.size
+                                }
+                                return@onKeyEvent true
+                            }
+                            Key.DirectionDown -> {
+                                if (channelList != null && channelList.isNotEmpty()) {
+                                    panelSelectedIndex = (panelSelectedIndex + 1) % channelList.size
+                                }
+                                return@onKeyEvent true
+                            }
+                            Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
+                                if (channelList != null && channelList.isNotEmpty()) {
+                                    currentIndex = panelSelectedIndex.coerceIn(0, channelList.size - 1)
+                                    showChannelPanel = false
+                                }
+                                return@onKeyEvent true
+                            }
+                            else -> {}
+                        }
+                    }
+                
+
+                    // Normal channel navigation when panel is closed
+                    return@onKeyEvent handleTVRemoteKey(
+                        event = event,
+                        tvNAV = tvNAV,
+                        channelList = channelList,
+                        currentIndexState = { currentIndex },
+                        onChannelChange = { currentIndex = it }
+                    )
+                }
+                false
             }
 
     ) {
@@ -182,6 +303,99 @@ fun ExoPlayJetScreen(
             )
         }
         CurrentTimeOverlay(visible = showChannelOverlay && channelList != null)
+
+
+        // Numeric overlay display while typing channel number
+        if (showNumericOverlay && numericBuffer.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = numericBuffer,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp
+                )
+            }
+        }
+
+        // Three-dots menu button (top-right)
+        IconButton(
+            onClick = {
+                panelSelectedIndex = currentIndex
+                showChannelPanel = channelList?.isNotEmpty() == true && !showChannelPanel
+            },
+            modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.MoreVert,
+                contentDescription = "Toggle channel list",
+                tint = Color.White
+            )
+        }
+
+        // Left-side channel panel
+        if (showChannelPanel && channelList != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .align(Alignment.CenterStart)
+                    .width(280.dp)
+                    .background(Color.Black.copy(alpha = 0.8f))
+            ) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(vertical = 12.dp)
+                ) {
+                    itemsIndexed(channelList) { idx, ch ->
+                        val isSelected = idx == panelSelectedIndex
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(if (isSelected) Color(0x33FFFFFF) else Color.Transparent)
+                                .padding(horizontal = 16.dp, vertical = 10.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color.Transparent)
+                                .clickable {
+                                    panelSelectedIndex = idx
+                                    currentIndex = idx
+                                    showChannelPanel = false
+                                },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Logo thumbnail
+                            AsyncImage(
+                                model = ch.logoUrl,
+                                contentDescription = "Logo",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = String.format("%02d", idx + 1),
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.width(40.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = ch.channelName,
+                                color = Color.White,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -402,4 +616,12 @@ fun handleTVRemoteKey(
 
     onChannelChange(newIndex)
     return true
+}
+
+private fun commitNumericEntry(
+    channelList: ArrayList<ChannelInfo>?,
+    onChannelSelected: (Int) -> Unit
+) {
+    // Access composition-local states via globals not possible; this function expects numericBuffer/showNumericOverlay managed by caller
+    // Implementation is provided in the composable scope below using helper that references current state
 }
