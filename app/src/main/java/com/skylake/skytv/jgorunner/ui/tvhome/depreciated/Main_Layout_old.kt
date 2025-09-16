@@ -45,7 +45,7 @@ import com.skylake.skytv.jgorunner.ui.tvhome.EpgProgram
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
 @SuppressLint("MutableCollectionMutableState")
-@OptIn(ExperimentalGlideComposeApi::class)
+@OptIn(ExperimentalGlideComposeApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun Main_Layout_old(context: Context?) {
     if (context == null) return
@@ -311,7 +311,7 @@ fun Main_Layout_old(context: Context?) {
             contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxSize()
         ) {
-            CircularProgressIndicator(modifier = Modifier.size(60.dp))
+            CircularWavyProgressIndicator(modifier = Modifier.size(60.dp))
         }
     } else if (filteredChannels.value.isNullOrEmpty()) {
         Box(

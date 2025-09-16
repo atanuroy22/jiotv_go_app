@@ -1,5 +1,6 @@
 package com.skylake.skytv.jgorunner.ui.tvhome
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.util.Log
@@ -14,7 +15,9 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddLink
 import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,11 +43,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.core.content.ContextCompat.startActivity
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
-@OptIn(ExperimentalGlideComposeApi::class)
+@OptIn(ExperimentalGlideComposeApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun Main_Layout_3rd(context: Context, reloadTrigger: Int ) {
     val preferenceManager = remember { SkySharedPref.getInstance(context) }
@@ -145,12 +149,54 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int ) {
 
     if (isLoading) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-            CircularProgressIndicator()
+            CircularWavyProgressIndicator()
         }
     } else if (allChannels.isEmpty()) {
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-            Text("No channels found. Please add an M3U list.")
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Text(
+                    text = "No channels found",
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = Color.Red
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Please add an M3U playlist to get started.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
+//                Spacer(modifier = Modifier.height(24.dp))
+//                Button(
+//                    onClick = {
+//                        (context as? Activity)?.let { activity ->
+//                            val intent = activity.intent
+//                            activity.finish()
+//                            activity.startActivity(intent)
+//                        }
+//                    },
+//                    modifier = Modifier.padding(horizontal = 24.dp)
+//                ) {
+//                    Icon(
+//                        imageVector = Icons.Filled.AddLink,
+//                        contentDescription = "Add Playlist",
+//                        modifier = Modifier.size(18.dp)
+//                    )
+//                    Spacer(modifier = Modifier.width(8.dp))
+//                    Text("Add M3U Playlist")
+//                }
+            }
         }
+
     } else {
         selectedCategory?.let { currentSelection ->
             Column(modifier = Modifier.fillMaxSize()) {

@@ -144,7 +144,7 @@ fun Main_LayoutTV_3rd(context: Context) {
 
     if (isLoading) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-            CircularProgressIndicator()
+            CircularWavyProgressIndicator()
         }
     } else if (allChannels.isEmpty()) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {

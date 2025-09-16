@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 
+@SuppressLint("UseCompatLoadingForDrawables")
 fun getDrawableOrFallback(context: Context, resId: Int, fallbackResId: Int): Drawable {
     return try {
         context.getDrawable(resId) ?: context.getDrawable(fallbackResId)!!

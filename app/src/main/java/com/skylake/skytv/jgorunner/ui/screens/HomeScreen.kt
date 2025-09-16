@@ -1,5 +1,6 @@
 package com.skylake.skytv.jgorunner.ui.screens
 
+import android.content.ClipData
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -49,12 +50,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -68,6 +72,7 @@ import androidx.compose.ui.unit.sp
 import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.ui.components.ButtonContent
 import com.skylake.skytv.jgorunner.ui.components.ButtonContentCust
+import kotlinx.coroutines.launch
 
 private val customFontFamily = FontFamily(
     Font(R.font.chakrapetch_bold)
@@ -162,7 +167,8 @@ fun HomeScreen(
                 )
                 .padding(5.dp)
         ) {
-            val clipboardManager = LocalClipboardManager.current
+            val coroutineScope = rememberCoroutineScope()
+            val clipboardManager = LocalClipboard.current
 
             Text(
                 text = publicJTVServerURL,
@@ -171,7 +177,10 @@ fun HomeScreen(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .clickable {
-                        clipboardManager.setText(AnnotatedString(publicJTVServerURL))
+                        coroutineScope.launch {
+                            val clipData = ClipData.newPlainText("label", publicJTVServerURL)
+                            clipboardManager.setClipEntry(ClipEntry(clipData))
+                        }
                     }
             )
         }

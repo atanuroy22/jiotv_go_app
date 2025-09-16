@@ -41,6 +41,7 @@ import com.skylake.skytv.jgorunner.ui.tvhome.M3UChannelExp
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @SuppressLint("NewApi")
 @Composable
 fun Main_Layout_3rd_old(context: Context) {
@@ -119,7 +120,7 @@ fun Main_Layout_3rd_old(context: Context) {
 
     if (isLoading) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-            CircularProgressIndicator()
+            CircularWavyProgressIndicator()
         }
     } else if (allChannels.isEmpty()) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {

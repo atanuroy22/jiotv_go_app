@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.View
 import android.view.WindowInsets
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -21,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.core.content.IntentCompat
 import com.skylake.skytv.jgorunner.ui.screens.LandingPageScreen
+import com.skylake.skytv.jgorunner.ui.screens.LandingPageScreen2
 
 class LandingPage : ComponentActivity() {
 
@@ -37,17 +39,30 @@ class LandingPage : ComponentActivity() {
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         val controller = WindowInsetsControllerCompat(window, window.decorView)
-        controller.hide(WindowInsets.Type.systemBars())
-        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            controller.hide(WindowInsets.Type.systemBars())
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                    View.SYSTEM_UI_FLAG_FULLSCREEN or
+                            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    )
+        }
+
 
         val prefManager = SkySharedPref.getInstance(this)
 
         setContent {
             JGOTheme(themeOverride = prefManager.myPrefs.darkMODE) {
-                LandingPageScreen(
-                    context = this@LandingPage,
-                    onNavigate = { title -> currentScreen = title },
-                    onExit
+//                LandingPageScreen(
+//                    context = this@LandingPage,
+//                    onNavigate = { title -> currentScreen = title },
+//                    onExit
+//                )
+
+                LandingPageScreen2(
                 )
             }
         }
