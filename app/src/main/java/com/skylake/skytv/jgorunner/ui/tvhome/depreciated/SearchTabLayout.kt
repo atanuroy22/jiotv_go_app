@@ -48,7 +48,7 @@ import com.skylake.skytv.jgorunner.ui.tvhome.Channel
 import com.skylake.skytv.jgorunner.ui.tvhome.ChannelResponse
 import com.skylake.skytv.jgorunner.ui.tvhome.ChannelUtils
 
-@OptIn(ExperimentalGlideComposeApi::class)
+@OptIn(ExperimentalGlideComposeApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SearchTabLayout(context: Context, focusRequester: FocusRequester) {
     val scope = rememberCoroutineScope()
@@ -106,7 +106,7 @@ fun SearchTabLayout(context: Context, focusRequester: FocusRequester) {
             contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxSize()
         ) {
-            CircularProgressIndicator(
+            CircularWavyProgressIndicator(
                 modifier = Modifier.size(60.dp)
             )
         }

@@ -415,7 +415,7 @@ fun RowScope.Button5(context: Context, onNavigate: (String) -> Unit) {
         colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
         contentPadding = PaddingValues(2.dp)
     ) {
-        ButtonContent("Login Exp.", Icons.Default.Verified)
+        ButtonContent("Login", Icons.Default.Verified)
     }
 }
 
@@ -443,7 +443,7 @@ fun RowScope.Button6(context: Context) {
         colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
         contentPadding = PaddingValues(2.dp)
     ) {
-        ButtonContent("Exoplayer Debug", Icons.Default.PlayCircleOutline)
+        ButtonContent("Sonata UI", Icons.Default.PlayCircleOutline)
     }
 }
 
@@ -471,13 +471,13 @@ fun RowScope.Button7(context: Context, onNavigate: (String) -> Unit) {
         colors = ButtonDefaults.buttonColors(containerColor = buttonColor.value),
         contentPadding = PaddingValues(2.dp)
     ) {
-        ButtonContent("---", Icons.Default.Terrain)
+        ButtonContent("TV UI beta", Icons.Default.Terrain)
     }
 }
 
 @Composable
 fun RowScope.Button8(context: Context) {
-    val colorPRIME = MaterialTheme.colorScheme.primary
+    val colorPRIME = Color(0xFFA5D6A7)
     val colorSECOND = colorPRIME.copy(alpha = 0.5f)
     val buttonColor = remember { mutableStateOf(colorPRIME) }
 

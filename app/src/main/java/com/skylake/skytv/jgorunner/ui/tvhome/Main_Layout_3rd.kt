@@ -48,7 +48,7 @@ import androidx.core.content.ContextCompat.startActivity
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
-@OptIn(ExperimentalGlideComposeApi::class)
+@OptIn(ExperimentalGlideComposeApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun Main_Layout_3rd(context: Context, reloadTrigger: Int ) {
     val preferenceManager = remember { SkySharedPref.getInstance(context) }
@@ -149,7 +149,7 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int ) {
 
     if (isLoading) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-            CircularProgressIndicator()
+            CircularWavyProgressIndicator()
         }
     } else if (allChannels.isEmpty()) {
         Box(

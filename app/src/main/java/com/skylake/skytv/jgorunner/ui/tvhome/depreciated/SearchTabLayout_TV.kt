@@ -30,7 +30,7 @@ import com.skylake.skytv.jgorunner.ui.tvhome.ChannelResponse
 import com.skylake.skytv.jgorunner.ui.tvhome.ChannelUtils
 import kotlinx.coroutines.delay
 
-@OptIn(ExperimentalGlideComposeApi::class)
+@OptIn(ExperimentalGlideComposeApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SearchTabLayoutTV(context: Context, focusRequester: FocusRequester) {
     val scope = rememberCoroutineScope()
@@ -88,7 +88,7 @@ fun SearchTabLayoutTV(context: Context, focusRequester: FocusRequester) {
             contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxSize()
         ) {
-            CircularProgressIndicator(
+            CircularWavyProgressIndicator(
                 modifier = Modifier.size(60.dp)
             )
         }

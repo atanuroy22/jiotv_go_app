@@ -19,6 +19,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ProcessingDialogExp(
     context: Context,
@@ -97,7 +98,7 @@ fun ProcessingDialogExp(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    CircularWavyProgressIndicator(modifier = Modifier.size(24.dp))
                     Spacer(modifier = Modifier.width(16.dp))
                 }
                 Text(message, fontSize = 16.sp)
