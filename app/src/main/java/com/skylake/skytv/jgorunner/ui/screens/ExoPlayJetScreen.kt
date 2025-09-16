@@ -2,6 +2,7 @@ package com.skylake.skytv.jgorunner.ui.screens
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import android.content.Context
 import android.content.res.Configuration
 import android.net.Uri
@@ -38,8 +39,18 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
@@ -49,11 +60,20 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
+import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH
+import android.widget.ImageButton
+import android.view.Gravity
+import android.widget.LinearLayout
+import android.widget.FrameLayout
+import android.view.ViewGroup
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.PlayerView.SHOW_BUFFERING_WHEN_PLAYING
 import coil.compose.AsyncImage
@@ -100,6 +120,23 @@ fun ExoPlayJetScreen(
     var showNumericOverlay by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     var numericJob: Job? by remember { mutableStateOf(null) }
+    // Resize modes: Fit, Zoom (Crop), Wide (Fixed Width), Stretch (Fill)
+    val resizeModes = remember {
+        listOf(
+            // 'Default' provided as an alias to the standard FIT behavior so user can always return to baseline quickly.
+            Triple(RESIZE_MODE_FIT, "Default", "DEF"),
+            Triple(RESIZE_MODE_FIT, "Fit", "FIT"),
+            Triple(RESIZE_MODE_ZOOM, "Zoom", "ZOOM"),
+            Triple(RESIZE_MODE_FIXED_WIDTH, "Wide", "WIDE"),
+            Triple(RESIZE_MODE_FILL, "Stretch", "STRETCH")
+        )
+    }
+    var resizeModeIndex by remember { mutableIntStateOf(0) }
+    var showResizeOverlay by remember { mutableStateOf(false) }
+    var resizeOverlayLabel by remember { mutableStateOf(resizeModes.first().second) }
+    var resizeOverlayJob by remember { mutableStateOf<Job?>(null) }
+    // Track real video aspect ratio reported by decoder (fallback 16:9)
+    var videoAspect by remember { mutableFloatStateOf(16f / 9f) }
 
     fun commitNumericEntryLocal(list: ArrayList<ChannelInfo>?) {
         val num = numericBuffer.toIntOrNull()
@@ -118,6 +155,23 @@ fun ExoPlayJetScreen(
             context = context,
             retryCountRef = retryCountRef
         )
+    }
+
+    // Listen for video size changes to adjust aspect ratio dynamically (except for Stretch / Fill)
+    DisposableEffect(exoPlayer) {
+        val listener = object : Player.Listener {
+            override fun onVideoSizeChanged(videoSize: VideoSize) {
+                if (videoSize.height != 0) {
+                    val ar = videoSize.width.toFloat() / videoSize.height.toFloat()
+                    // Guard against extreme values
+                    if (ar.isFinite() && ar > 0.1f && ar < 10f) {
+                        videoAspect = ar
+                    }
+                }
+            }
+        }
+        exoPlayer.addListener(listener)
+        onDispose { exoPlayer.removeListener(listener) }
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -164,7 +218,7 @@ fun ExoPlayJetScreen(
             .background(Color.Black)
             .focusRequester(focusRequester)
             .focusable()
-            .onKeyEvent { event ->
+            .onPreviewKeyEvent { event ->
                 // if (event.type == KeyEventType.KeyUp &&
                 //     (event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter)
                 // ) {
@@ -174,7 +228,7 @@ fun ExoPlayJetScreen(
                 if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft) {
                     panelSelectedIndex = currentIndex
                     showChannelPanel = channelList?.isNotEmpty() == true
-                    return@onKeyEvent true
+                    return@onPreviewKeyEvent true
                 }
                 // handleTVRemoteKey(
                 //     event = event,
@@ -212,7 +266,7 @@ fun ExoPlayJetScreen(
                                 }
                             }
                         }
-                        return@onKeyEvent true
+                        return@onPreviewKeyEvent true
                     }
                 }
                 // Global ENTER shows controller if panel isn't open
@@ -221,21 +275,21 @@ fun ExoPlayJetScreen(
                     if (numericBuffer.isNotEmpty() && (event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter)) {
                         numericJob?.cancel()
                         commitNumericEntryLocal(channelList)
-                        return@onKeyEvent true
+                        return@onPreviewKeyEvent true
                     }
                     if (!showChannelPanel && (event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter)) {
                         (exoPlayerView)?.showController()
-                        return@onKeyEvent true
+                        return@onPreviewKeyEvent true
                     }
                     // Toggle panel
                     if (event.key == Key.Menu || event.key == Key.DirectionLeft) {
                         panelSelectedIndex = currentIndex
                         showChannelPanel = channelList?.isNotEmpty() == true
-                        return@onKeyEvent true
+                        return@onPreviewKeyEvent true
                     }
                     if (showChannelPanel && (event.key == Key.DirectionRight || event.key == Key.Back)) {
                         showChannelPanel = false
-                        return@onKeyEvent true
+                        return@onPreviewKeyEvent true
                     }
                     if (showChannelPanel) {
                         when (event.key) {
@@ -243,20 +297,20 @@ fun ExoPlayJetScreen(
                                 if (channelList != null && channelList.isNotEmpty()) {
                                     panelSelectedIndex = (panelSelectedIndex - 1 + channelList.size) % channelList.size
                                 }
-                                return@onKeyEvent true
+                                return@onPreviewKeyEvent true
                             }
                             Key.DirectionDown -> {
                                 if (channelList != null && channelList.isNotEmpty()) {
                                     panelSelectedIndex = (panelSelectedIndex + 1) % channelList.size
                                 }
-                                return@onKeyEvent true
+                                return@onPreviewKeyEvent true
                             }
                             Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
                                 if (channelList != null && channelList.isNotEmpty()) {
                                     currentIndex = panelSelectedIndex.coerceIn(0, channelList.size - 1)
                                     showChannelPanel = false
                                 }
-                                return@onKeyEvent true
+                                return@onPreviewKeyEvent true
                             }
                             else -> {}
                         }
@@ -264,7 +318,7 @@ fun ExoPlayJetScreen(
                 
 
                     // Normal channel navigation when panel is closed
-                    return@onKeyEvent handleTVRemoteKey(
+                    return@onPreviewKeyEvent handleTVRemoteKey(
                         event = event,
                         tvNAV = tvNAV,
                         channelList = channelList,
@@ -276,6 +330,16 @@ fun ExoPlayJetScreen(
             }
 
     ) {
+        // Determine layout modifier based on selected resize mode
+        val currentResizeMode = resizeModes[resizeModeIndex].first
+        val isDefaultMode = resizeModeIndex == 0 // Our injected 'Default' entry
+        val aspectForModifier = when {
+            isDefaultMode -> 16f / 9f
+            currentResizeMode == RESIZE_MODE_FIXED_WIDTH -> 16f / 9f // force a wide cinematic frame
+            currentResizeMode == RESIZE_MODE_FILL -> videoAspect
+            else -> videoAspect
+        }
+
         AndroidView(
             factory = {
                 PlayerView(it).apply {
@@ -283,15 +347,92 @@ fun ExoPlayJetScreen(
                     setShowNextButton(false)
                     setShowPreviousButton(false)
                     setShowBuffering(SHOW_BUFFERING_WHEN_PLAYING)
-                    setResizeMode(RESIZE_MODE_FIT)
+                    setResizeMode(resizeModes[resizeModeIndex].first)
                     player = exoPlayer
                     exoPlayerView = this
+
+                    // Inject a resize button into the controller (to the left of overflow/settings area if possible)
+                    // We search for the controller layout after it's inflated.
+                    post {
+                        try {
+                            val controller = findViewById<View>(androidx.media3.ui.R.id.exo_controller) as? ViewGroup ?: return@post
+                            // Attempt to locate an action bar row (common id exo_basic_controls / exo_bottom_bar variations)
+                            var targetBar: ViewGroup? = null
+                            val candidateIds = listOf(
+                                androidx.media3.ui.R.id.exo_basic_controls,
+                                androidx.media3.ui.R.id.exo_bottom_bar,
+                                androidx.media3.ui.R.id.exo_controls_background
+                            )
+                            for (cid in candidateIds) {
+                                val v = controller.findViewById<View>(cid)
+                                if (v is ViewGroup) { targetBar = v; break }
+                            }
+                            if (targetBar == null) {
+                                // fallback: deepest child with most children
+                                fun deepest(group: ViewGroup): ViewGroup {
+                                    var best = group
+                                    (0 until group.childCount).forEach { i ->
+                                        val c = group.getChildAt(i)
+                                        if (c is ViewGroup) {
+                                            val d = deepest(c)
+                                            if (d.childCount > best.childCount) best = d
+                                        }
+                                    }
+                                    return best
+                                }
+                                targetBar = deepest(controller)
+                            }
+
+                            val resizeButton = ImageButton(context).apply {
+                                setBackgroundResource(android.R.color.transparent)
+                                setImageResource(android.R.drawable.ic_menu_crop)
+                                contentDescription = "Resize mode"
+                                imageAlpha = 220
+                                val pad = (4 * resources.displayMetrics.density).toInt()
+                                setPadding(pad, pad, pad, pad)
+                                setOnClickListener {
+                                    resizeModeIndex = (resizeModeIndex + 1) % resizeModes.size
+                                    val mode = resizeModes[resizeModeIndex]
+                                    exoPlayerView?.setResizeMode(mode.first)
+                                    // Force a layout pass so visual change applies immediately
+                                    exoPlayerView?.requestLayout()
+                                    resizeOverlayLabel = mode.second
+                                    showResizeOverlay = true
+                                    resizeOverlayJob?.cancel()
+                                    resizeOverlayJob = scope.launch {
+                                        delay(1200)
+                                        showResizeOverlay = false
+                                    }
+                                }
+                            }
+
+                            // Insert before the last element (typically overflow/settings) if possible
+                            val count = targetBar.childCount
+                            val insertIndex = if (count > 0) count - 1 else count
+                            try {
+                                targetBar.addView(resizeButton, insertIndex)
+                            } catch (_: Exception) {
+                                targetBar.addView(resizeButton)
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed to position resize button: ${e.message}")
+                        }
+                    }
                 }
             },
-            modifier = Modifier
-                .aspectRatio(16f / 9f)
-                .align(Alignment.Center)
+            modifier = when {
+                currentResizeMode == RESIZE_MODE_FILL -> Modifier.fillMaxSize().align(Alignment.Center)
+                isDefaultMode -> Modifier.aspectRatio(16f / 9f).align(Alignment.Center)
+                else -> Modifier.fillMaxWidth().aspectRatio(aspectForModifier).align(Alignment.Center)
+            }
         )
+
+        // Ensure root regains focus when channel panel opens for continued remote navigation
+        LaunchedEffect(showChannelPanel) {
+            if (showChannelPanel) {
+                focusRequester.requestFocus()
+            }
+        }
 
         AnimatedVisibility(
             visible = showChannelOverlay && channelList != null,
@@ -326,7 +467,7 @@ fun ExoPlayJetScreen(
             }
         }
 
-        // Three-dots menu button (top-right)
+        // Keep only the menu (three dots) icon overlay for channel list toggle
         IconButton(
             onClick = {
                 panelSelectedIndex = currentIndex
@@ -341,8 +482,38 @@ fun ExoPlayJetScreen(
             )
         }
 
+        if (showResizeOverlay) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 90.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .padding(horizontal = 18.dp, vertical = 10.dp)
+            ) {
+                Text(
+                    text = resizeOverlayLabel,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 16.sp
+                )
+            }
+        }
+
         // Left-side channel panel
         if (showChannelPanel && channelList != null) {
+            // LazyListState to allow programmatic scrolling with remote navigation
+            val channelListState = rememberLazyListState()
+
+            // Ensure selected item is always visible when it changes
+            LaunchedEffect(panelSelectedIndex, showChannelPanel) {
+                if (showChannelPanel && channelList.isNotEmpty()) {
+                    val safeIndex = panelSelectedIndex.coerceIn(0, channelList.lastIndex)
+                    // Use animate for smoother UX; fallback to scroll if already close
+                    runCatching { channelListState.animateScrollToItem(safeIndex) }
+                        .onFailure { channelListState.scrollToItem(safeIndex) }
+                }
+            }
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
@@ -353,7 +524,9 @@ fun ExoPlayJetScreen(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(vertical = 12.dp)
+                        // Add extra start padding to avoid overlap with scrollbar + arrow buttons
+                        .padding(start = 28.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+                    state = channelListState
                 ) {
                     itemsIndexed(channelList) { idx, ch ->
                         val isSelected = idx == panelSelectedIndex
@@ -392,6 +565,119 @@ fun ExoPlayJetScreen(
                                 text = ch.channelName,
                                 color = Color.White,
                                 maxLines = 1
+                            )
+                        }
+                    }
+                }
+
+                // Custom vertical scrollbar (visual + draggable) aligned to the LEFT edge of the panel now with arrow buttons
+                val totalItems = channelList.size
+                if (totalItems > 0) {
+                    val visibleItems = channelListState.layoutInfo.visibleItemsInfo.size.coerceAtLeast(1)
+                    val firstVisible = channelListState.firstVisibleItemIndex
+                    // Track dimensions
+                    var trackHeightPx by remember { mutableStateOf(0) }
+                    val scrollRange = (totalItems - visibleItems).coerceAtLeast(1)
+                    val scrollFraction = (firstVisible / scrollRange.toFloat()).coerceIn(0f, 1f)
+                    val thumbFraction = (visibleItems / totalItems.toFloat()).coerceIn(0.08f, 1f)
+
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .fillMaxHeight()
+                            .width(20.dp) // widened to host arrows + bar
+                            .padding(vertical = 12.dp)
+                            .onGloballyPositioned { trackHeightPx = it.size.height }
+                    ) {
+                        val coroutineScope = rememberCoroutineScope()
+                        // Up Arrow
+                        IconButton(
+                            onClick = {
+                                if (firstVisible > 0) {
+                                    val target = (firstVisible - visibleItems).coerceAtLeast(0)
+                                    coroutineScope.launch { channelListState.animateScrollToItem(target) }
+                                }
+                            },
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .size(20.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.KeyboardArrowUp,
+                                contentDescription = "Scroll Up",
+                                tint = Color.White.copy(alpha = if (firstVisible > 0) 0.9f else 0.3f)
+                            )
+                        }
+
+                        // Down Arrow
+                        IconButton(
+                            onClick = {
+                                val maxFirst = (totalItems - visibleItems).coerceAtLeast(0)
+                                if (firstVisible < maxFirst) {
+                                    val target = (firstVisible + visibleItems).coerceAtMost(maxFirst)
+                                    coroutineScope.launch { channelListState.animateScrollToItem(target) }
+                                }
+                            },
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .size(20.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.KeyboardArrowDown,
+                                contentDescription = "Scroll Down",
+                                tint = Color.White.copy(alpha = if (firstVisible < (totalItems - visibleItems)) 0.9f else 0.3f)
+                            )
+                        }
+
+                        // Scrollbar track with thumb centered between arrows
+                        val arrowReservedSpacePx = 40 // approx (two 20dp buttons) not including padding
+                        // Track
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .fillMaxHeight(fraction = 1f)
+                                .padding(top = 20.dp, bottom = 20.dp)
+                                .width(8.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color.White.copy(alpha = 0.12f))
+                        )
+                        if (trackHeightPx > 0) {
+                            // Recalculate track effective height minus arrow zones
+                            val effectiveTrackHeightPx = trackHeightPx - arrowReservedSpacePx
+                            val thumbHeightPx = (effectiveTrackHeightPx * thumbFraction).roundToInt()
+                            val maxOffset = (effectiveTrackHeightPx - thumbHeightPx).coerceAtLeast(0)
+                            val offsetY = (maxOffset * scrollFraction).roundToInt()
+                            var dragging by remember { mutableStateOf(false) }
+                            val density = LocalDensity.current
+                            Box(
+                                modifier = Modifier
+                                    .width(8.dp)
+                                    .offset { IntOffset(0, 20.dp.roundToPx() + offsetY) }
+                                    .height(with(density) { thumbHeightPx.toDp() })
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(
+                                        if (dragging) Color.White.copy(alpha = 0.85f)
+                                        else Color.White.copy(alpha = 0.55f)
+                                    )
+                                    .pointerInput(totalItems, effectiveTrackHeightPx, thumbHeightPx) {
+                                        if (effectiveTrackHeightPx <= 0) return@pointerInput
+                                        detectDragGestures(
+                                            onDragStart = { dragging = true },
+                                            onDragEnd = { dragging = false },
+                                            onDragCancel = { dragging = false },
+                                            onDrag = { change, dragAmount ->
+                                                val maxOffsetLocal = (effectiveTrackHeightPx - thumbHeightPx).coerceAtLeast(0)
+                                                val itemsScrollable = (totalItems - visibleItems).coerceAtLeast(1)
+                                                val itemsPerPixel = if (maxOffsetLocal > 0) itemsScrollable.toFloat() / maxOffsetLocal.toFloat() else 0f
+                                                val newPixelOffset = (offsetY + dragAmount.y).roundToInt().coerceIn(0, maxOffsetLocal)
+                                                val targetFirstVisible = (newPixelOffset * itemsPerPixel).roundToInt().coerceIn(0, itemsScrollable)
+                                                coroutineScope.launch {
+                                                    channelListState.scrollToItem(targetFirstVisible)
+                                                }
+                                                change.consume()
+                                            }
+                                        )
+                                    }
                             )
                         }
                     }
