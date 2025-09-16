@@ -53,6 +53,7 @@ import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.ui.tvhome.ChannelUtils
 import com.skylake.skytv.jgorunner.ui.tvhome.extractChannelIdFromPlayUrl
 import kotlinx.coroutines.delay
+import androidx.lifecycle.compose.currentStateAsState
 
 const val TAG = "ExoJetScreen"
 
@@ -107,7 +108,7 @@ fun ExoPlayJetScreen(
         }
     }
 
-    LaunchedEffect(lifecycleOwner.lifecycle.currentState) {
+    LaunchedEffect(lifecycleOwner.lifecycle.currentStateAsState().value) {
         if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
             focusRequester.requestFocus()
         }

@@ -1,5 +1,6 @@
 package com.skylake.skytv.jgorunner.ui.tvhome
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -39,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
+@SuppressLint("MutableCollectionMutableState")
 @OptIn(ExperimentalGlideComposeApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun Main_Layout(context: Context, reloadTrigger: Int ) {
@@ -269,7 +271,8 @@ fun Main_Layout(context: Context, reloadTrigger: Int ) {
             contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxSize()
         ) {
-            CircularWavyProgressIndicator(modifier = Modifier.size(60.dp))
+//            CircularWavyProgressIndicator(modifier = Modifier.size(60.dp))
+            ContainedLoadingIndicator(modifier = Modifier.size(100.dp))
         }
     }
     // UI: Empty state

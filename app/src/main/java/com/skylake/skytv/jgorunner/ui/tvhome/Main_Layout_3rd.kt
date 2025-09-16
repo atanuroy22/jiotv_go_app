@@ -149,7 +149,8 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int ) {
 
     if (isLoading) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-            CircularWavyProgressIndicator()
+//            CircularWavyProgressIndicator()
+            ContainedLoadingIndicator(modifier = Modifier.size(100.dp))
         }
     } else if (allChannels.isEmpty()) {
         Box(
