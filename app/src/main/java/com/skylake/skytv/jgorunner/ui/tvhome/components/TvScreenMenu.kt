@@ -77,6 +77,11 @@ fun TvScreenMenu(
                     .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                
+                if (!preferenceManager.myPrefs.customPlaylistSupport && !preferenceManager.myPrefs.showPLAYLIST) {
+                    showPlaylist =true
+                }
+
                 // --- Quality Selection ---
                 var selectedQuality by remember {
                     mutableStateOf(preferenceManager.myPrefs.filterQX ?: "auto")
