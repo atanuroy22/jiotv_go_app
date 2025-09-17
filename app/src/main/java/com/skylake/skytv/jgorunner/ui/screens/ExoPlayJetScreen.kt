@@ -66,9 +66,9 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
-import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+// import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
 import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
-import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH
+// import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH
 import android.widget.ImageButton
 import android.view.Gravity
 import android.widget.LinearLayout
@@ -123,11 +123,11 @@ fun ExoPlayJetScreen(
     // Resize modes: Fit, Zoom (Crop), Wide (Fixed Width), Stretch (Fill)
     val resizeModes = remember {
         listOf(
-            // 'Default' provided as an alias to the standard FIT behavior so user can always return to baseline quickly.
+            // Keep only Default (FIT) and Stretch (FILL). Other modes commented out per user request.
             Triple(RESIZE_MODE_FIT, "Default", "DEF"),
-            Triple(RESIZE_MODE_FIT, "Fit", "FIT"),
-            Triple(RESIZE_MODE_ZOOM, "Zoom", "ZOOM"),
-            Triple(RESIZE_MODE_FIXED_WIDTH, "Wide", "WIDE"),
+            // Triple(RESIZE_MODE_FIT, "Fit", "FIT"), // removed duplicate option
+            // Triple(RESIZE_MODE_ZOOM, "Zoom", "ZOOM"), // removed per request
+            // Triple(RESIZE_MODE_FIXED_WIDTH, "Wide", "WIDE"), // removed per request
             Triple(RESIZE_MODE_FILL, "Stretch", "STRETCH")
         )
     }
@@ -335,7 +335,7 @@ fun ExoPlayJetScreen(
         val isDefaultMode = resizeModeIndex == 0 // Our injected 'Default' entry
         val aspectForModifier = when {
             isDefaultMode -> 16f / 9f
-            currentResizeMode == RESIZE_MODE_FIXED_WIDTH -> 16f / 9f // force a wide cinematic frame
+            // currentResizeMode == RESIZE_MODE_FIXED_WIDTH -> 16f / 9f // removed wide mode
             currentResizeMode == RESIZE_MODE_FILL -> videoAspect
             else -> videoAspect
         }
