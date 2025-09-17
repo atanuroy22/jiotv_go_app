@@ -15,6 +15,7 @@ import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.annotation.Keep
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -22,6 +23,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -62,6 +64,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -104,6 +107,7 @@ import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
 import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.data.SkySharedPref
@@ -148,22 +152,28 @@ fun ExoPlayJetScreen(
     var isControllerVisible by remember { mutableStateOf(false) }
 
     // --- Epg fetch ---
-    val epgMap = remember { mutableStateMapOf<String, String?>() }
+    val epgCache = remember { mutableStateMapOf<String, Pair<Long, String?>>() }
     LaunchedEffect(channelList) {
-        channelList?.let { list ->
-            kotlinx.coroutines.coroutineScope {
-                list.mapNotNull { channel ->
-                    val channelId = extractChannelIdFromPlayUrl(channel.videoUrl)
-                    if (channelId != null && epgMap[channelId] == null) {
-                        async {
-                            val epgName = fetchCurrentProgram(basefinURL, channelId)
-                            epgMap[channelId] = epgName
-                        }
-                    } else {
-                        null
-                    }
-                }.awaitAll()
+        while (true) {
+            channelList?.let { list ->
+                kotlinx.coroutines.coroutineScope {
+                    list.mapNotNull { channel ->
+                        val channelId = extractChannelIdFromPlayUrl(channel.videoUrl)
+                        if (channelId != null) {
+                            async {
+                                val now = System.currentTimeMillis()
+                                val cached = epgCache[channelId]
+                                if (cached == null || now - cached.first > 900_000) {
+                                    val epgName = fetchCurrentProgram(basefinURL, channelId)
+                                    Log.d(TAG, "EPG fetched!")
+                                    epgCache[channelId] = now to epgName
+                                }
+                            }
+                        } else null
+                    }.awaitAll()
+                }
             }
+            delay(900_000)
         }
     }
 
@@ -183,7 +193,7 @@ fun ExoPlayJetScreen(
     // --- Key Num Entry ---
     fun commitNumericEntryLocal(list: ArrayList<ChannelInfo>?) {
         val num = numericBuffer.toIntOrNull()
-        if (num != null && list != null && list.isNotEmpty()) {
+        if (num != null && !list.isNullOrEmpty()) {
             val idx = (num - 1).coerceIn(0, list.size - 1)
             currentIndex = idx
         }
@@ -241,7 +251,6 @@ fun ExoPlayJetScreen(
                 if (state == Player.STATE_READY) {
                     isBuffering = false
                 }
-                Log.d(TAG, "Playback state changed: $state, isBuffering=$isBuffering")
             }
         }
         exoPlayer.addListener(listener)
@@ -268,14 +277,15 @@ fun ExoPlayJetScreen(
 
     LaunchedEffect(currentIndex) {
         val channelId = channelList?.getOrNull(currentIndex)?.videoUrl?.let { extractChannelIdFromPlayUrl(it) }
-        currentProgramName = channelId?.let { fetchCurrentProgram(basefinURL, it) }
+        currentProgramName = channelId?.let { epgCache[it]?.second }
     }
 
     val listState = rememberLazyListState()
 
     LaunchedEffect(panelSelectedIndex, showChannelPanel) {
         if (showChannelPanel) {
-            listState.animateScrollToItem(panelSelectedIndex)
+            val safeIndex = panelSelectedIndex.coerceIn(0, (channelList?.size ?: 1) - 1)
+            listState.animateScrollToItem(safeIndex)
         }
     }
 
@@ -604,9 +614,13 @@ fun ExoPlayJetScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(vertical = 12.dp),
-                    state = listState
+                    state = listState,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    itemsIndexed(channelList) { idx, ch ->
+                    itemsIndexed(
+                        items = channelList,
+                        key = { idx, _ -> idx }
+                    ) { idx, ch ->
                         val isSelected = idx == panelSelectedIndex
                         Row(
                             modifier = Modifier
@@ -623,13 +637,18 @@ fun ExoPlayJetScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             AsyncImage(
-                                model = ch.logoUrl,
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(ch.logoUrl)
+                                    .size(80)
+                                    .crossfade(true)
+                                    .build(),
                                 contentDescription = "Logo",
                                 contentScale = ContentScale.Fit,
                                 modifier = Modifier
                                     .size(40.dp)
                                     .clip(RoundedCornerShape(8.dp))
                             )
+
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
                                 text = String.format("%02d", idx + 1),
@@ -640,7 +659,6 @@ fun ExoPlayJetScreen(
                             Spacer(modifier = Modifier.width(8.dp))
 
                             val channelId = extractChannelIdFromPlayUrl(ch.videoUrl)
-                            val currentProgram = epgMap[channelId]
                             Column {
                                 Text(
                                     text = ch.channelName,
@@ -649,14 +667,7 @@ fun ExoPlayJetScreen(
                                     fontSize = 18.sp,
                                     maxLines = 1
                                 )
-                                if (!currentProgram.isNullOrBlank()) {
-                                    Text(
-                                        text = currentProgram,
-                                        color = Color.White.copy(alpha = 0.7f),
-                                        fontSize = 13.sp,
-                                        maxLines = 1
-                                    )
-                                }
+                                EpgText(channelId, epgCache)
                             }
                         }
                     }
@@ -668,6 +679,26 @@ fun ExoPlayJetScreen(
 
 @Composable
 fun Dp.toPx(): Float = with(LocalDensity.current) { this@toPx.toPx() }
+
+@Composable
+fun EpgText(
+    channelId: String?,
+    epgCache: Map<String, Pair<Long, String?>>
+) {
+    val epg = channelId?.let { epgCache[it]?.second }
+    if (!epg.isNullOrBlank()) {
+        Text(
+            text = epg ?: "",
+            color = Color.White.copy(alpha = 0.7f),
+            fontSize = 13.sp,
+            maxLines = 1
+        )
+    }
+}
+
+
+
+
 
 suspend fun fetchCurrentProgram(basefinURL: String, channelId: String): String? {
     val epgURLc = "$basefinURL/epg/${channelId}/0"
