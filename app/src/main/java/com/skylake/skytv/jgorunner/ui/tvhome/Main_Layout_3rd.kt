@@ -67,6 +67,19 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int ) {
     val categories = remember(allChannels) {
         listOf("All") + allChannels.mapNotNull { it.category }.distinct().sorted()
     }
+    // Reorder for display: keep "All" first, then currently selected categories, then the rest
+    val categoriesDisplay = remember(categories, selectedCategory) {
+        val selectedSet = selectedCategory
+            ?.split(',')
+            ?.map { it.trim() }
+            ?.filter { it.isNotEmpty() && it != "All" }
+            ?.toSet()
+            ?: emptySet()
+        val withoutAll = categories.filter { it != "All" }
+        val selectedFirst = withoutAll.filter { it in selectedSet }
+        val unselectedLater = withoutAll.filter { it !in selectedSet }
+        listOf("All") + selectedFirst + unselectedLater
+    }
 
     val filteredChannels = remember(selectedCategory, allChannels) {
         val sels = selectedCategory
@@ -210,7 +223,7 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int ) {
         run {
             Column(modifier = Modifier.fillMaxSize()) {
                 CategoryFilterRow(
-                    categories = categories,
+                    categories = categoriesDisplay,
                     selectedCategory = selectedCategory ?: "All",
                     onCategorySelected = { category ->
                         selectedCategory = if (category == "All") {
