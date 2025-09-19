@@ -90,8 +90,18 @@ fun Main_Layout(context: Context, reloadTrigger: Int ) {
         listOf(resetCategoryName) + selectedOtherCategories + unselectedOtherCategories
     }
 
-    // Fetch and filter channels (cache/network)
+    // Autoplay session guard flags
+    val autoplayAttemptedSession = remember { mutableStateOf(false) }
+    val autoplayInProgress = remember { mutableStateOf(false) }
+
+    // Cache autoplay setting locally (parity with TvScreenMenu & 3rd layout)
+    var startTvAutomatically by remember { mutableStateOf(preferenceManager.myPrefs.startTvAutomatically) }
     LaunchedEffect(reloadTrigger) {
+        startTvAutomatically = preferenceManager.myPrefs.startTvAutomatically
+    }
+
+    // Fetch and filter channels (cache/network)
+    LaunchedEffect(reloadTrigger, startTvAutomatically) {
         val sharedPref = context.getSharedPreferences("channel_cache", Context.MODE_PRIVATE)
         var useCache = true
         var cachedChannels: ChannelResponse? = null
@@ -184,57 +194,109 @@ fun Main_Layout(context: Context, reloadTrigger: Int ) {
             fetched = true
         }
 
-        if (preferenceManager.myPrefs.startTvAutomatically) {
-            if (!AppStartTracker.shouldPlayChannel &&
-                filteredChannels.value.isNotEmpty()) {
-
-                val firstChannel = filteredChannels.value.first()
-                val intent = Intent(context, ExoPlayJet::class.java).apply {
-                    putExtra("zone", "TV")
-                    putParcelableArrayListExtra("channel_list_data", ArrayList(
-                        filteredChannels.value.map { ch ->
-                            ChannelInfo(
-                                ch.channel_url ?: "",
-                                "http://localhost:$localPORT/jtvimage/${ch.logoUrl ?: ""}",
-                                ch.channel_name ?: ""
-                            )
-                        }
-                    ))
-                    putExtra("current_channel_index", 0) // Index 0 for the first channel
-                    putExtra("video_url", firstChannel.channel_url ?: "")
-                    putExtra(
-                        "logo_url",
-                        "http://localhost:$localPORT/jtvimage/${firstChannel.logoUrl ?: ""}"
-                    )
-                    putExtra("ch_name", firstChannel.channel_name ?: "")
-                }
-                kotlinx.coroutines.delay(1000)
-                startActivity(context, intent, null)
-
-                //Recent Channels
-                val recentChannelsJson = preferenceManager.myPrefs.recentChannels
-                val type = object : TypeToken<List<Channel>>() {}.type
-                val recentChannels: MutableList<Channel> =
-                    Gson().fromJson(recentChannelsJson, type) ?: mutableListOf()
-
-                val existingIndex =
-                    recentChannels.indexOfFirst { it.channel_id == firstChannel.channel_id }
-
-                if (existingIndex != -1) {
-                    val existingChannel = recentChannels[existingIndex]
-                    recentChannels.removeAt(existingIndex)
-                    recentChannels.add(0, existingChannel)
-                } else {
-                    recentChannels.add(0, firstChannel)
-                    if (recentChannels.size > 25) {
-                        recentChannels.removeAt(recentChannels.size - 1)
+    // ---------- Autoplay Logic (Immediate + Watchdog) ----------
+    if (startTvAutomatically && !autoplayAttemptedSession.value) {
+            val haveChannels = filteredChannels.value.isNotEmpty()
+            val noChannelPlaying = preferenceManager.myPrefs.currChannelUrl.isNullOrEmpty()
+            var launched = false
+            // Immediate first attempt (legacy behavior respecting AppStartTracker gate)
+            if (!AppStartTracker.shouldPlayChannel && haveChannels && noChannelPlaying) {
+                try {
+                    val firstChannel = filteredChannels.value.first()
+                    val intent = Intent(context, ExoPlayJet::class.java).apply {
+                        putExtra("zone", "TV")
+                        putParcelableArrayListExtra("channel_list_data", ArrayList(
+                            filteredChannels.value.map { ch ->
+                                ChannelInfo(
+                                    ch.channel_url ?: "",
+                                    "http://localhost:$localPORT/jtvimage/${ch.logoUrl ?: ""}",
+                                    ch.channel_name ?: ""
+                                )
+                            }
+                        ))
+                        putExtra("current_channel_index", 0) // Index 0 for the first channel
+                        putExtra("video_url", firstChannel.channel_url ?: "")
+                        putExtra(
+                            "logo_url",
+                             "http://localhost:$localPORT/jtvimage/${firstChannel.logoUrl ?: ""}"
+                             )
+                        putExtra("ch_name", firstChannel.channel_name ?: "")
                     }
-                }
-                preferenceManager.myPrefs.recentChannels = Gson().toJson(recentChannels)
-                preferenceManager.savePreferences()
-            }
+                    kotlinx.coroutines.delay(1000)
+                    startActivity(context, intent, null)
 
-            AppStartTracker.shouldPlayChannel = true
+                    //Recent Channels
+                    try {
+                        val recentChannelsJson = preferenceManager.myPrefs.recentChannels
+                        val type = object : TypeToken<List<Channel>>() {}.type
+                        val recentChannels: MutableList<Channel> =
+                            Gson().fromJson(recentChannelsJson, type) ?: mutableListOf()
+
+                        val existingIndex =
+                         recentChannels.indexOfFirst { it.channel_id == firstChannel.channel_id }
+                         
+                        if (existingIndex != -1) {
+                            val existingChannel = recentChannels[existingIndex]
+                            recentChannels.removeAt(existingIndex)
+                            recentChannels.add(0, existingChannel)
+                        } else {
+                            recentChannels.add(0, firstChannel)
+                            if (recentChannels.size > 25) {
+                                recentChannels.removeAt(recentChannels.size - 1)
+                            }
+                        }
+                        preferenceManager.myPrefs.recentChannels = Gson().toJson(recentChannels)
+                        preferenceManager.savePreferences()
+                    }
+                     
+                    catch (_: Exception) {}
+                    launched = true
+                    AppStartTracker.shouldPlayChannel = true
+                } catch (_: Exception) { launched = false }
+            }
+            if (launched) {
+                autoplayAttemptedSession.value = true
+            } else {
+                // Reliability watchdog (2s, max 5 loops)
+                var loops = 0
+                while (loops < 5 && !autoplayAttemptedSession.value && startTvAutomatically) {
+                    loops++
+                    val stillNoChannel = preferenceManager.myPrefs.currChannelUrl.isNullOrEmpty()
+                    if (!stillNoChannel) {
+                        autoplayAttemptedSession.value = true
+                        break
+                    }
+                    if (!autoplayInProgress.value && filteredChannels.value.isNotEmpty()) {
+                        try {
+                            autoplayInProgress.value = true
+                            val firstChannel = filteredChannels.value.first()
+                            val intent = Intent(context, ExoPlayJet::class.java).apply {
+                                putExtra("zone", "TV")
+                                putParcelableArrayListExtra("channel_list_data", ArrayList(
+                                    filteredChannels.value.map { ch ->
+                                        ChannelInfo(
+                                            ch.channel_url ?: "",
+                                            "http://localhost:$localPORT/jtvimage/${ch.logoUrl ?: ""}",
+                                            ch.channel_name ?: ""
+                                        )
+                                    }
+                                ))
+                                putExtra("current_channel_index", 0)
+                                putExtra("video_url", firstChannel.channel_url ?: "")
+                                putExtra("logo_url", "http://localhost:$localPORT/jtvimage/${firstChannel.logoUrl ?: ""}")
+                                putExtra("ch_name", firstChannel.channel_name ?: "")
+                            }
+                            startActivity(context, intent, null)
+                            autoplayAttemptedSession.value = true
+                            autoplayInProgress.value = false
+                            break
+                        } catch (_: Exception) {
+                            autoplayInProgress.value = false
+                        }
+                    }
+                    kotlinx.coroutines.delay(2_000)
+                }
+            }
         }
 
     }

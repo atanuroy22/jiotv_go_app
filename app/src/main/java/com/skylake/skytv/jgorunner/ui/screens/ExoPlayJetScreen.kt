@@ -146,6 +146,9 @@ fun ExoPlayJetScreen(
     var numericJob: Job? by remember { mutableStateOf(null) }
     var isControllerVisible by remember { mutableStateOf(false) }
 
+    // Cache of last persisted channel URL to avoid redundant SharedPreferences writes
+    var lastPersistedChannelUrl by remember { mutableStateOf<String?>(null) }
+
     // --- Epg fetch ---
     val epgCache = remember { mutableStateMapOf<String, Pair<Long, String?>>() }
     LaunchedEffect(channelList) {
@@ -264,6 +267,23 @@ fun ExoPlayJetScreen(
         exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl)))
         exoPlayer.prepare()
         exoPlayer.playWhenReady = true
+
+        // Persist currently playing channel details only if changed so autoplay watchdog in layouts can detect active playback
+        val selected = channelList?.getOrNull(currentIndex)
+        val newUrl = selected?.videoUrl ?: videoUrl
+        if (newUrl != lastPersistedChannelUrl) {
+            try {
+                preferenceManager.myPrefs.currChannelUrl = newUrl
+                if (selected != null) {
+                    preferenceManager.myPrefs.currChannelName = selected.channelName
+                    preferenceManager.myPrefs.currChannelLogo = selected.logoUrl
+                }
+                preferenceManager.savePreferences()
+                lastPersistedChannelUrl = newUrl
+            } catch (_: Exception) {
+                // Ignore persistence failures
+            }
+        }
 
         showChannelOverlay = true
         delay(overlayDisplayTimeMs.toLong())
@@ -668,6 +688,16 @@ fun ExoPlayJetScreen(
                     }
                 }
             }
+        }
+    }
+
+    // Clear sentinel on leaving the player so future autoplay sessions can trigger again
+    DisposableEffect(Unit) {
+        onDispose {
+            try {
+                preferenceManager.myPrefs.currChannelUrl = ""
+                preferenceManager.savePreferences()
+            } catch (_: Exception) { }
         }
     }
 }
