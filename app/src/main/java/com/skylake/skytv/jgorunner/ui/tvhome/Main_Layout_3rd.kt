@@ -81,13 +81,6 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int ) {
         listOf("All") + selectedFirst + unselectedLater
     }
 
-    // Cache startTvAutomatically locally (like TvScreenMenu) so recomposition & state observation are consistent
-    var startTvAutomatically by remember { mutableStateOf(preferenceManager.myPrefs.startTvAutomatically) }
-    // Sync when reloadTrigger changes (cheap refresh point); could be expanded to snapshotFlow if needed
-    LaunchedEffect(reloadTrigger) {
-        startTvAutomatically = preferenceManager.myPrefs.startTvAutomatically
-    }
-
     val filteredChannels = remember(selectedCategory, allChannels) {
         val sels = selectedCategory
             ?.split(',')
@@ -103,12 +96,7 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int ) {
     }
 
 
-    // Autoplay session guard flags (mirrors Main_Layout)
-    val autoplayAttemptedSession = remember { mutableStateOf(false) }
-    val autoplayInProgress = remember { mutableStateOf(false) }
-
-    // Include allChannels in the key so autoplay logic can fire AFTER channels are actually loaded
-    LaunchedEffect(reloadTrigger, startTvAutomatically, allChannels) {
+    LaunchedEffect(reloadTrigger) {
         isLoading = true
         try {
             val json = preferenceManager.myPrefs.channelListJson
@@ -136,84 +124,33 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int ) {
             selectedCategory = "All"
         }
         isLoading = false
+    }
 
-        // Recompute filtered list explicitly here to avoid stale closure during autoplay when categories first resolved
-        val snapshotFiltered = if (selectedCategory == null || selectedCategory == "All") allChannels else allChannels.filter { it.category == selectedCategory }
 
-    // ---------- Autoplay (Immediate + Watchdog) ----------
-    if (startTvAutomatically &&
-        !autoplayAttemptedSession.value) {
-            val haveChannels = snapshotFiltered.isNotEmpty()
-            val noChannelPlaying = preferenceManager.myPrefs.currChannelUrl.isNullOrEmpty()
-            // Safety: if user added playlist after previous run and no playback, allow autoplay again
-            if (!haveChannels) {
-                // Nothing to autoplay
-            }
-            var launched = false
-            // If gate was previously set but no channel is actually playing (URL empty), reset gate
-            if (AppStartTracker.shouldPlayChannel && noChannelPlaying) {
-                AppStartTracker.shouldPlayChannel = false
-            }
-            if (!AppStartTracker.shouldPlayChannel && haveChannels && noChannelPlaying) {
-                try {
-                    val firstChannel = snapshotFiltered.first()
+    LaunchedEffect(filteredChannels) {
+        if (preferenceManager.myPrefs.startTvAutomatically &&
+            !AppStartTracker.shouldPlayChannel &&
+            filteredChannels.isNotEmpty()
+        ) {
+            val firstChannel = filteredChannels.first()
 
-                    val intent = Intent(context, ExoPlayJet::class.java).apply {
-                        putExtra("zone", "TV")
-                        putParcelableArrayListExtra("channel_list_data", ArrayList(
-                            filteredChannels.map { ch ->
-                             ChannelInfo(ch.url, ch.logo ?: "", ch.name)
-                              }
-                        ))
-                        putExtra("current_channel_index", 0)
-                        putExtra("video_url", firstChannel.url)
-                        putExtra("logo_url", firstChannel.logo ?: "")
-                        putExtra("ch_name", firstChannel.name)
+            val intent = Intent(context, ExoPlayJet::class.java).apply {
+                putExtra("zone", "TV")
+                putParcelableArrayListExtra("channel_list_data", ArrayList(
+                    filteredChannels.map { ch ->
+                        ChannelInfo(ch.url, ch.logo ?: "", ch.name)
                     }
+                ))
+                putExtra("current_channel_index", 0)
+                putExtra("video_url", firstChannel.url)
+                putExtra("logo_url", firstChannel.logo ?: "")
+                putExtra("ch_name", firstChannel.name)
+            }
 
-                    kotlinx.coroutines.delay(1000)
-                    startActivity(context, intent, null)
-                    
-                    launched = true
-                    AppStartTracker.shouldPlayChannel = true
-                } catch (_: Exception) { launched = false }
-            }
-            if (launched) {
-                autoplayAttemptedSession.value = true
-            } else {
-                var loops = 0
-                while (loops < 5 && !autoplayAttemptedSession.value && startTvAutomatically) {
-                    loops++
-                    val stillNoChannel = preferenceManager.myPrefs.currChannelUrl.isNullOrEmpty()
-                    if (!stillNoChannel) {
-                        autoplayAttemptedSession.value = true
-                        break
-                    }
-                    if (!autoplayInProgress.value && snapshotFiltered.isNotEmpty()) {
-                        try {
-                            autoplayInProgress.value = true
-                            val firstChannel = snapshotFiltered.first()
-                            val intent = Intent(context, ExoPlayJet::class.java).apply {
-                                putExtra("zone", "TV")
-                                putParcelableArrayListExtra("channel_list_data", ArrayList(
-                                    snapshotFiltered.map { ch -> ChannelInfo(ch.url, ch.logo ?: "", ch.name) }
-                                ))
-                                putExtra("current_channel_index", 0)
-                                putExtra("video_url", firstChannel.url)
-                                putExtra("logo_url", firstChannel.logo ?: "")
-                                putExtra("ch_name", firstChannel.name)
-                            }
-                            startActivity(context, intent, null)
-                            autoplayAttemptedSession.value = true
-                            autoplayInProgress.value = false
-                            break
-                        } catch (_: Exception) {
-                            autoplayInProgress.value = false
-                        }
-                    }
-                    kotlinx.coroutines.delay(2_000)
-                }
-            }
+            kotlinx.coroutines.delay(1000)
+            startActivity(context, intent, null)
+
+            AppStartTracker.shouldPlayChannel = true
         }
     }
 
