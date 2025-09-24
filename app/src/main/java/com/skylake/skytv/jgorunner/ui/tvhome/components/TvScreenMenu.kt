@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.nativeKeyCode
 import androidx.compose.ui.input.key.onKeyEvent
@@ -685,10 +686,12 @@ fun MultiSelectDropdown(
         ) {
             items(options, key = { it }) { option ->
                 val isChecked = selectedOptions.contains(option)
+                var isFocused by remember { mutableStateOf(false) }
+                
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .focusable(),
+                        .padding(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Checkbox(
@@ -701,9 +704,18 @@ fun MultiSelectDropdown(
                                 mutableSelected.remove(option)
                             }
                             onOptionsSelected(mutableSelected)
-                        }
+                        },
+                        modifier = Modifier
+                            .onFocusChanged { focusState ->
+                                isFocused = focusState.isFocused
+                            }
                     )
-                    Text(text = option, color = MaterialTheme.colorScheme.onSurface)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = option, 
+                        color = if (isFocused) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurface,
+                        fontSize = 14.sp
+                    )
                 }
             }
         }
