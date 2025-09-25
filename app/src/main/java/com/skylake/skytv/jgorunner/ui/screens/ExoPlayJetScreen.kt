@@ -855,19 +855,29 @@ fun initializePlayer(
 
     prepareAndPlay()
 
+//    player.addListener(object : Player.Listener {
+//        override fun onPlayerError(error: PlaybackException) {
+//            if (retryCountRef.value < maxRetries) {
+//                retryCountRef.value++
+//                Log.d(TAG, "Retrying playback: attempt ${retryCountRef.value}")
+//                player.stop()
+//                prepareAndPlay()
+//            } else {
+//                Toast.makeText(context, "Playback failed after $maxRetries attempts", Toast.LENGTH_SHORT).show()
+//                Log.e(TAG, "Playback permanently failed.")
+//            }
+//        }
+//    })
+
+    // Always Retry
     player.addListener(object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
-            if (retryCountRef.value < maxRetries) {
-                retryCountRef.value++
-                Log.d(TAG, "Retrying playback: attempt ${retryCountRef.value}")
-                player.stop()
-                prepareAndPlay()
-            } else {
-                Toast.makeText(context, "Playback failed after $maxRetries attempts", Toast.LENGTH_SHORT).show()
-                Log.e(TAG, "Playback permanently failed.")
-            }
+            Log.d(TAG, "Retrying playback infinitely")
+            player.stop()
+            prepareAndPlay()
         }
     })
+
 
     return player
 }
