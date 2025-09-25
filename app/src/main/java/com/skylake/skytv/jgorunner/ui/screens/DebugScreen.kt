@@ -372,7 +372,7 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
         AlertDialog(
             onDismissRequest = { showRestartDialog = false },
             title = { Text("Restart Required") },
-            text = { Text("Stable binary will be installed after restart. Restart now?") },
+            text = { Text("A binary change has been detected. Restart the app now to apply the update?") },
             confirmButton = {
                 Button(onClick = {
                     showRestartDialog = false
@@ -382,7 +382,10 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
                 }
             },
             dismissButton = {
-                Button(onClick = { showRestartDialog = false }) {
+                Button(onClick = {
+                    showRestartDialog = false
+                    showPreReleaseBinaryDialog = false
+                }) {
                     Text("Later")
                 }
             }
