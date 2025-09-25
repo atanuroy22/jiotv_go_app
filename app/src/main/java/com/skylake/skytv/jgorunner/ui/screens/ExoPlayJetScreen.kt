@@ -108,11 +108,13 @@ import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.ui.tvhome.ChannelUtils
 import com.skylake.skytv.jgorunner.ui.tvhome.extractChannelIdFromPlayUrl
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 const val TAG = "ExoJetScreen"
 
@@ -148,11 +150,12 @@ fun ExoPlayJetScreen(
 
     // --- Epg fetch ---
     val epgCache = remember { mutableStateMapOf<String, Pair<Long, String?>>() }
-    LaunchedEffect(channelList) {
-        while (true) {
-            channelList?.let { list ->
-                kotlinx.coroutines.coroutineScope {
-                    list.mapNotNull { channel ->
+    LaunchedEffect(showChannelPanel, channelList) {
+        if (showChannelPanel && channelList != null) {
+            while (showChannelPanel) {
+                val visibleChannels = channelList
+                withContext(Dispatchers.IO) {
+                    visibleChannels.mapNotNull { channel ->
                         val channelId = extractChannelIdFromPlayUrl(channel.videoUrl)
                         if (channelId != null) {
                             async {
@@ -160,15 +163,14 @@ fun ExoPlayJetScreen(
                                 val cached = epgCache[channelId]
                                 if (cached == null || now - cached.first > 900_000) {
                                     val epgName = fetchCurrentProgram(basefinURL, channelId)
-                                    Log.d(TAG, "EPG fetched!")
                                     epgCache[channelId] = now to epgName
                                 }
                             }
                         } else null
                     }.awaitAll()
                 }
+                delay(900_000)
             }
-            delay(900_000)
         }
     }
 
@@ -573,7 +575,7 @@ fun ExoPlayJetScreen(
                 Icon(
                     imageVector = Icons.Filled.AutoAwesomeMotion,
                     contentDescription = "Toggle channel list",
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    tint = Color.White.copy(alpha = 0.5f)
                 )
             }
         }
@@ -697,7 +699,7 @@ fun EpgText(
 
 suspend fun fetchCurrentProgram(basefinURL: String, channelId: String): String? {
     val epgURLc = "$basefinURL/epg/${channelId}/0"
-    Log.d("NANOdix1", epgURLc)
+//    Log.d("NANOdix1", epgURLc)
     val epgData = ChannelUtils.fetchEpg(epgURLc)
 //    Log.d(TAG, "Now playing: ${epgData?.showname}")
     return epgData?.showname
