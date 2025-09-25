@@ -1,9 +1,10 @@
-package com.skylake.skytv.jgorunner.ui.components
+package com.skylake.skytv.jgorunner.ui.tvhome.components
 
 import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
@@ -14,6 +15,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.nativeKeyCode
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -25,7 +31,7 @@ import kotlinx.coroutines.launch
 
 @SuppressLint("MutableCollectionMutableState")
 @Composable
-fun ModeSelectionDialog2(
+fun TvScreenMenu(
     showDialog: Boolean,
     context: Context,
     onDismiss: () -> Unit,
@@ -43,7 +49,11 @@ fun ModeSelectionDialog2(
     val preferenceManager = SkySharedPref.getInstance(context)
     var showCustomUrlInputDialog by remember { mutableStateOf(false) }
     var customUrl by remember { mutableStateOf(preferenceManager.myPrefs.custURL ?: "") }
+    var showRecentTab by remember { mutableStateOf(preferenceManager.myPrefs.showRecentTab) }
     var startTvAutomatically by remember { mutableStateOf(preferenceManager.myPrefs.startTvAutomatically) }
+    var startTvAutoDelay by remember { mutableStateOf(preferenceManager.myPrefs.startTvAutoDelay) }
+    var startTvAutoDelayTime by remember  { mutableIntStateOf(preferenceManager.myPrefs.startTvAutoDelayTime) }
+    val focusRequester = remember { FocusRequester() }
     var showProcessingDialog by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
@@ -67,6 +77,11 @@ fun ModeSelectionDialog2(
                     .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                
+                if (!preferenceManager.myPrefs.customPlaylistSupport && !preferenceManager.myPrefs.showPLAYLIST) {
+                    showPlaylist =true
+                }
+
                 // --- Quality Selection ---
                 var selectedQuality by remember {
                     mutableStateOf(preferenceManager.myPrefs.filterQX ?: "auto")
@@ -80,18 +95,21 @@ fun ModeSelectionDialog2(
                 val qualityOptions = qualityMap.keys.toList()
                 var qualityDropdownExpanded by remember { mutableStateOf(false) }
                 val selectedQualityLabel = qualityMap.entries.find { it.value == selectedQuality }?.key ?: qualityOptions[0]
-                DropdownSelection2(
-                    title = "Quality",
-                    options = qualityOptions,
-                    selectedOption = selectedQualityLabel,
-                    onOptionSelected = { label ->
-                        selectedQuality = (qualityMap[label] ?: "auto")
-                    },
-                    expanded = qualityDropdownExpanded,
-                    onExpandChange = { qualityDropdownExpanded = it }
-                )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                if (showPlaylist) {
+                    DropdownSelection2(
+                        title = "Quality",
+                        options = qualityOptions,
+                        selectedOption = selectedQualityLabel,
+                        onOptionSelected = { label ->
+                            selectedQuality = (qualityMap[label] ?: "auto")
+                        },
+                        expanded = qualityDropdownExpanded,
+                        onExpandChange = { qualityDropdownExpanded = it }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
 
                 // --- TV Start Page Selection  ---
                 val startScreenTV = mapOf(
@@ -104,19 +122,21 @@ fun ModeSelectionDialog2(
                 }
                 var screenDropdownExpanded by remember { mutableStateOf(false) }
                 val selectedScreenLabel = startScreenTV.entries.find { it.value == selectedScreenTV }?.key ?: startOptionsTV[0]
-                DropdownSelection2(
-                    title = "Select TV start page",
-                    options = startOptionsTV,
-                    selectedOption = selectedScreenLabel,
-                    onOptionSelected = { label ->
-                        selectedScreenTV = startScreenTV[label] ?: 0
-                    },
-                    expanded = screenDropdownExpanded,
-                    onExpandChange = { screenDropdownExpanded = it }
-                )
+                if (showRecentTab) {
+                    DropdownSelection2(
+                        title = "Select TV start page",
+                        options = startOptionsTV,
+                        selectedOption = selectedScreenLabel,
+                        onOptionSelected = { label ->
+                            selectedScreenTV = startScreenTV[label] ?: 0
+                        },
+                        expanded = screenDropdownExpanded,
+                        onExpandChange = { screenDropdownExpanded = it }
+                    )
 
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
 
                 // --- TV Remote Navigation Configuration ---
                 val tvRemoteNavigationOptions = mapOf(
@@ -143,7 +163,7 @@ fun ModeSelectionDialog2(
                     onExpandChange = { isExpanded -> isTvRemoteNavDropdownExpanded = isExpanded }
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // --- Category Selection ---
                 val categoryMap = mapOf(
@@ -167,41 +187,58 @@ fun ModeSelectionDialog2(
                     )
                 }
                 var showCategoryCheckboxes by remember { mutableStateOf(false) }
-                Column {
-                    Text(text = "Select Categories", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedButton(
-                            onClick = { showCategoryCheckboxes = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = MaterialTheme.shapes.medium
-                        ) {
-                            Text("Categories")
+
+                if (showPlaylist) {
+                    Column {
+                        Text(
+                            text = "Select Categories",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedButton(
+                                onClick = { showCategoryCheckboxes = true },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = MaterialTheme.shapes.medium
+                            ) {
+                                Text("Categories")
+                            }
                         }
                     }
-                }
-                if (showCategoryCheckboxes) {
-                    Dialog(onDismissRequest = { showCategoryCheckboxes = false }) {
-                        Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
-                            Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
-                                MultiSelectDropdown(
-                                    title = "Category",
-                                    options = categoryOptions,
-                                    selectedOptions = selectedCategories.value,
-                                    onOptionsSelected = { names ->
-                                        selectedCategories.value = names.toMutableList()
-                                        selectedCategoryInts.value = names.mapNotNull { categoryMap[it] }.toMutableList()
+                    if (showCategoryCheckboxes) {
+                        Dialog(onDismissRequest = { showCategoryCheckboxes = false }) {
+                            Surface(
+                                shape = MaterialTheme.shapes.medium,
+                                color = MaterialTheme.colorScheme.surface
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp)
+                                        .verticalScroll(rememberScrollState())
+                                ) {
+                                    MultiSelectDropdown(
+                                        title = "Category",
+                                        options = categoryOptions,
+                                        selectedOptions = selectedCategories.value,
+                                        onOptionsSelected = { names ->
+                                            selectedCategories.value = names.toMutableList()
+                                            selectedCategoryInts.value =
+                                                names.mapNotNull { categoryMap[it] }.toMutableList()
+                                        }
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Button(
+                                        onClick = { showCategoryCheckboxes = false },
+                                        modifier = Modifier.align(Alignment.End)
+                                    ) {
+                                        Text("Done")
                                     }
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Button(onClick = { showCategoryCheckboxes = false }, modifier = Modifier.align(Alignment.End)) {
-                                    Text("Done")
                                 }
                             }
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
 
                 // --- Language Selection ---
                 val languageMap = mapOf(
@@ -225,41 +262,58 @@ fun ModeSelectionDialog2(
                     )
                 }
                 var showLanguageCheckboxes by remember { mutableStateOf(false) }
-                Column {
-                    Text(text = "Select Languages", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedButton(
-                            onClick = { showLanguageCheckboxes = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = MaterialTheme.shapes.medium
-                        ) {
-                            Text("Languages")
+
+                if (showPlaylist) {
+                    Column {
+                        Text(
+                            text = "Select Languages",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedButton(
+                                onClick = { showLanguageCheckboxes = true },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = MaterialTheme.shapes.medium
+                            ) {
+                                Text("Languages")
+                            }
                         }
                     }
-                }
-                if (showLanguageCheckboxes) {
-                    Dialog(onDismissRequest = { showLanguageCheckboxes = false }) {
-                        Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
-                            Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
-                                MultiSelectDropdown(
-                                    title = "Language",
-                                    options = languageOptions,
-                                    selectedOptions = selectedLanguages.value,
-                                    onOptionsSelected = { names ->
-                                        selectedLanguages.value = names.toMutableList()
-                                        selectedLanguageInts.value = names.mapNotNull { languageMap[it] }.toMutableList()
+                    if (showLanguageCheckboxes) {
+                        Dialog(onDismissRequest = { showLanguageCheckboxes = false }) {
+                            Surface(
+                                shape = MaterialTheme.shapes.medium,
+                                color = MaterialTheme.colorScheme.surface
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp)
+                                        .verticalScroll(rememberScrollState())
+                                ) {
+                                    MultiSelectDropdown(
+                                        title = "Language",
+                                        options = languageOptions,
+                                        selectedOptions = selectedLanguages.value,
+                                        onOptionsSelected = { names ->
+                                            selectedLanguages.value = names.toMutableList()
+                                            selectedLanguageInts.value =
+                                                names.mapNotNull { languageMap[it] }.toMutableList()
+                                        }
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Button(
+                                        onClick = { showLanguageCheckboxes = false },
+                                        modifier = Modifier.align(Alignment.End)
+                                    ) {
+                                        Text("Done")
                                     }
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Button(onClick = { showLanguageCheckboxes = false }, modifier = Modifier.align(Alignment.End)) {
-                                    Text("Done")
                                 }
                             }
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
 
                 // --- Experimental/Debug Section ---
                 if (preferenceManager.myPrefs.customPlaylistSupport) {
@@ -276,7 +330,7 @@ fun ModeSelectionDialog2(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     // --- Playlist Selection Dropdown ---
                     var playlistDropdownExpanded by remember { mutableStateOf(false) }
@@ -297,10 +351,26 @@ fun ModeSelectionDialog2(
                         onExpandChange = { playlistDropdownExpanded = it }
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+///////////////////////////////
+                if (showPlaylist) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Checkbox(
+                        checked = showRecentTab,
+                        onCheckedChange = { checked ->
+                            showRecentTab = checked
+                        }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "Show Recent Channels")
+                    }
                 }
 
-                //////////////////////////////////////
+///////////////////////////////
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -313,10 +383,67 @@ fun ModeSelectionDialog2(
                         }
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "Play channel at start")
+                    Text(text = "Auto play channel")
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                if (false) {
+                    if (startTvAutomatically) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Checkbox(
+                                checked = startTvAutoDelay,
+                                onCheckedChange = { checked ->
+                                    startTvAutoDelay = checked
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = "Play everytime /w delay")
+                        }
+                    }
+
+                    if (startTvAutoDelay) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Slider(
+                                value = startTvAutoDelayTime.toFloat(),
+                                onValueChange = { startTvAutoDelayTime = it.toInt() },
+                                valueRange = 2f..10f,
+                                steps = 3,
+                                modifier = Modifier
+                                    .padding(horizontal = 16.dp)
+                                    .focusRequester(focusRequester)
+                                    .focusable()
+                                    .onKeyEvent { event ->
+                                        when (event.nativeKeyEvent.keyCode) {
+                                            Key.DirectionRight.nativeKeyCode -> {
+                                                startTvAutoDelayTime = (startTvAutoDelayTime + 2).coerceAtMost(10)
+                                                true
+                                            }
+
+                                            Key.DirectionLeft.nativeKeyCode -> {
+                                                startTvAutoDelayTime = (startTvAutoDelayTime - 2).coerceAtLeast(2)
+                                                true
+                                            }
+
+                                            else -> false
+                                        }
+                                    }
+                            )
+
+
+                        }
+                        Text(
+                            text = "Delay: $startTvAutoDelayTime seconds",
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
 
                 //////////////////////////////////////
 
@@ -397,7 +524,10 @@ fun ModeSelectionDialog2(
                                 myPrefs.filterLI = ""
                                 myPrefs.selectedRemoteNavTV = "0"
                                 myPrefs.showPLAYLIST = false
+                                myPrefs.showRecentTab = false
                                 myPrefs.startTvAutomatically = false
+                                myPrefs.startTvAutoDelay = false
+                                myPrefs.startTvAutoDelayTime = 0
 
                                 savePreferences()
                             }
@@ -423,7 +553,10 @@ fun ModeSelectionDialog2(
                                 if (myPrefs.customPlaylistSupport) {
                                     myPrefs.showPLAYLIST = showPlaylist
                                 }
+                                myPrefs.showRecentTab = showRecentTab
                                 myPrefs.startTvAutomatically = startTvAutomatically
+                                myPrefs.startTvAutoDelay = startTvAutoDelay
+                                myPrefs.startTvAutoDelayTime = startTvAutoDelayTime
                                 savePreferences()
                             }
                             onDismiss()

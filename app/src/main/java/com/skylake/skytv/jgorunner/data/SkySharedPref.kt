@@ -145,7 +145,10 @@ class SkySharedPref(context: Context) {
         @SharedPrefKey("expDebug") var expDebug: Boolean = false,
         @SharedPrefKey("last_selected_category_exp") var lastSelectedCategoryExp: String? = "All",
         @SharedPrefKey("showPLAYLIST") var showPLAYLIST: Boolean = false,
+        @SharedPrefKey("showRecentTab") var showRecentTab: Boolean = false,
         @SharedPrefKey("startTvAutomatically") var startTvAutomatically: Boolean = false,
+        @SharedPrefKey("startTvAutoDelay") var startTvAutoDelay: Boolean = false,
+        @SharedPrefKey("startTvAutoDelayTime") var startTvAutoDelayTime: Int = 2,
         @SharedPrefKey("currChannelName") var currChannelName: String? = "",
         @SharedPrefKey("currChannelLogo") var currChannelLogo: String? = "",
         @SharedPrefKey("currChannelUrl") var currChannelUrl: String? = "",
@@ -153,6 +156,8 @@ class SkySharedPref(context: Context) {
         @SharedPrefKey("customPlaylistSupport") var customPlaylistSupport: Boolean = false,
         @SharedPrefKey("genericTvIcon") var genericTvIcon: Boolean = false,
         @SharedPrefKey("preRelease") var preRelease: Boolean = false,
+        @SharedPrefKey("epgDebug") var epgDebug: Boolean = false,
+
 
 
     )

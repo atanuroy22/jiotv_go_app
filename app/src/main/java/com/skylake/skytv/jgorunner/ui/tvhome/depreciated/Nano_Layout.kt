@@ -1,4 +1,4 @@
-package com.skylake.skytv.jgorunner.ui.dev
+package com.skylake.skytv.jgorunner.ui.tvhome.depreciated
 
 import android.content.Context
 import android.content.Intent
@@ -46,7 +46,10 @@ import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.layout.ContentScale
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-
+import com.skylake.skytv.jgorunner.ui.tvhome.Channel
+import com.skylake.skytv.jgorunner.ui.tvhome.ChannelResponse
+import com.skylake.skytv.jgorunner.ui.tvhome.ChannelUtils
+import com.skylake.skytv.jgorunner.ui.tvhome.EpgProgram
 
 
 @OptIn(ExperimentalGlideComposeApi::class)
@@ -83,19 +86,25 @@ fun Nano_Layout(context: Context) {
                     Log.d("DIX#2", "CAT:$categories, Lang:$languages")
 
                     val filtered = when {
-                        categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(response)
+                        categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
+                            response
+                        )
                         categories.isNullOrEmpty() -> ChannelUtils.filterChannels(
                             response,
-                            languageIds = languages?.mapNotNull { it.toIntOrNull() }.takeIf { it!!.isNotEmpty() }
+                            languageIds = languages?.mapNotNull { it.toIntOrNull() }
+                                .takeIf { it!!.isNotEmpty() }
                         )
                         languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
                             response,
-                            categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
+                            categoryIds = categories.mapNotNull { it.toIntOrNull() }
+                                .takeIf { it.isNotEmpty() }
                         )
                         else -> ChannelUtils.filterChannels(
                             response,
-                            categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() },
-                            languageIds = languages.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
+                            categoryIds = categories.mapNotNull { it.toIntOrNull() }
+                                .takeIf { it.isNotEmpty() },
+                            languageIds = languages.mapNotNull { it.toIntOrNull() }
+                                .takeIf { it.isNotEmpty() }
                         )
                     }
 

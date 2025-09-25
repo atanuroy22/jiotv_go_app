@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 
+@SuppressLint("UseCompatLoadingForDrawables")
 fun getDrawableOrFallback(context: Context, resId: Int, fallbackResId: Int): Drawable {
     return try {
         context.getDrawable(resId) ?: context.getDrawable(fallbackResId)!!
@@ -135,13 +136,13 @@ fun getInstalledApps(context: Context): Flow<AppInfo> = flow {
         launchActivity = ""
     ))
 
-    // Add "Sonata - {ALPHA}" option
-    emit(AppInfo(
-        appName = "Sonata - {ALPHA}",
-        icon = getDrawableOrFallback(context, R.drawable.exo_loading_blue, fallbackIconResId),
-        packageName = "sonata",
-        launchActivity = ""
-    ))
+//    // Add "Sonata - {ALPHA}" option
+//    emit(AppInfo(
+//        appName = "Sonata - {ALPHA}",
+//        icon = getDrawableOrFallback(context, R.drawable.exo_loading_blue, fallbackIconResId),
+//        packageName = "sonata",
+//        launchActivity = ""
+//    ))
 
     
     for (appInfo in apps) {

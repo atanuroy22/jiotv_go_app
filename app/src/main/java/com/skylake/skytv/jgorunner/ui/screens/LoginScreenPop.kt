@@ -49,6 +49,7 @@ import java.util.concurrent.Executors
 import kotlin.random.Random
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.delay
 
 @Composable
 fun LoginScreenPop(
@@ -75,6 +76,7 @@ fun LoginScreenPop(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun LoginDialogContent(
     context: Context,
@@ -194,35 +196,35 @@ private fun LoginDialogContent(
             }
         }
 
-        var selectedTabIndex by remember { mutableStateOf(0) }
-        TabRow(
-            selectedTabIndex = selectedTabIndex,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Tab(
-                selected = selectedTabIndex == 0,
-                onClick = {
-                    selectedTabIndex = 0
-                    isUsingOtp = true
-                    phoneNumberFocusRequester.requestFocus()
-                    updateUiStatusMessage(null)
-                },
-                text = { Text("OTP", modifier = Modifier.padding(10.dp)) }
-            )
-            Tab(
-                selected = selectedTabIndex == 1,
-                onClick = {
-                    selectedTabIndex = 1
-                    isUsingOtp = false
-                    phoneNumberFocusRequester.requestFocus()
-                    updateUiStatusMessage(null)
-                },
-                text = { Text("Password", modifier = Modifier.padding(10.dp)) }
-            )
-        }
+//        var selectedTabIndex by remember { mutableStateOf(0) }
+//        TabRow(
+//            selectedTabIndex = selectedTabIndex,
+//            modifier = Modifier.fillMaxWidth()
+//        ) {
+//            Tab(
+//                selected = selectedTabIndex == 0,
+//                onClick = {
+//                    selectedTabIndex = 0
+//                    isUsingOtp = true
+//                    phoneNumberFocusRequester.requestFocus()
+//                    updateUiStatusMessage(null)
+//                },
+//                text = { Text("OTP", modifier = Modifier.padding(10.dp)) }
+//            )
+//            Tab(
+//                selected = selectedTabIndex == 1,
+//                onClick = {
+//                    selectedTabIndex = 1
+//                    isUsingOtp = false
+//                    phoneNumberFocusRequester.requestFocus()
+//                    updateUiStatusMessage(null)
+//                },
+//                text = { Text("Password", modifier = Modifier.padding(10.dp)) }
+//            )
+//        }
         Spacer(modifier = Modifier.height(24.dp))
 
-        if (isUsingOtp) {
+        if (true) {
             OutlinedTextField(
                 value = phoneNumber,
                 onValueChange = { newValue ->
@@ -277,7 +279,7 @@ private fun LoginDialogContent(
                 border = if (isSendOtpButtonFocused) BorderStroke(2.dp, colorBORDER) else null,
             ) {
                 if (isLoadingOtpSend) {
-                    CircularProgressIndicator(
+                    CircularWavyProgressIndicator(
                         modifier = Modifier.size(24.dp),
                         color = MaterialTheme.colorScheme.onPrimary
                     )
@@ -343,7 +345,7 @@ private fun LoginDialogContent(
                 border = if (isVerifyOtpButtonFocused) BorderStroke(2.dp, colorBORDER) else null,
             ) {
                 if (isLoadingOtpVerify) {
-                    CircularProgressIndicator(
+                    CircularWavyProgressIndicator(
                         modifier = Modifier.size(24.dp),
                         color = MaterialTheme.colorScheme.onPrimary
                     )
@@ -433,7 +435,7 @@ private fun LoginDialogContent(
                 border = if (isLoginButtonFocused) BorderStroke(2.dp, colorBORDER) else null,
             ) {
                 if (isLoadingLogin) {
-                    CircularProgressIndicator(
+                    CircularWavyProgressIndicator(
                         modifier = Modifier.size(24.dp),
                         color = MaterialTheme.colorScheme.onPrimary
                     )
@@ -601,6 +603,8 @@ private fun handleVerifyOtpResponse(context: Context, result: String?, onMessage
             if (status == "success") {
                 onMessageUpdate("OTP Verified Successfully")
                 Toast.makeText(context, "OTP Verified Successfully", Toast.LENGTH_SHORT).show()
+                val intent = Intent(context, MainActivity::class.java)
+                context.startActivity(intent)
             } else {
                 onMessageUpdate("Failed to verify OTP")
                 Toast.makeText(context, "Failed to verify OTP", Toast.LENGTH_SHORT).show()

@@ -34,19 +34,19 @@
 
 
 # Keep the no-args constructor of the deserialized class
--keepclassmembers class com.skylake.skytv.jgorunner.ui.dev.Channel {
+-keepclassmembers class com.skylake.skytv.jgorunner.ui.tvhome.Channel {
   <init>(...);
 }
 
--keepclassmembers class com.skylake.skytv.jgorunner.ui.dev.ChannelResponse {
+-keepclassmembers class com.skylake.skytv.jgorunner.ui.tvhome.ChannelResponse {
   <init>(...);
 }
 
--keepclassmembers class com.skylake.skytv.jgorunner.ui.dev.EpgProgram {
+-keepclassmembers class com.skylake.skytv.jgorunner.ui.tvhome.EpgProgram {
   <init>(...);
 }
 
--keepclassmembers class com.skylake.skytv.jgorunner.ui.dev.EpgResponse {
+-keepclassmembers class com.skylake.skytv.jgorunner.ui.tvhome.EpgResponse {
   <init>(...);
 }
 
@@ -54,10 +54,10 @@
   <init>(...);
 }
 
--keep class com.skylake.skytv.jgorunner.ui.dev.Channel
--keep class com.skylake.skytv.jgorunner.ui.dev.ChannelResponse
--keep class com.skylake.skytv.jgorunner.ui.dev.EpgProgram
--keep class com.skylake.skytv.jgorunner.ui.dev.EpgResponse
+-keep class com.skylake.skytv.jgorunner.ui.tvhome.Channel
+-keep class com.skylake.skytv.jgorunner.ui.tvhome.ChannelResponse
+-keep class com.skylake.skytv.jgorunner.ui.tvhome.EpgProgram
+-keep class com.skylake.skytv.jgorunner.ui.tvhome.EpgResponse
 -keep class com.skylake.skytv.jgorunner.activities.ChannelInfo
 
 

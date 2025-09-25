@@ -126,6 +126,7 @@
 
         <activity
             android:name=".activities.InitModeSelectorActivity"
+            android:screenOrientation="sensor"
             android:theme="@style/Theme.JGO">
         </activity>
 
@@ -133,6 +134,7 @@
             android:name=".services.player.ExoPlayJet"
             android:theme="@style/Theme.JGO"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboardHidden"
+            android:screenOrientation="sensor"
             android:resizeableActivity="true"
             android:supportsPictureInPicture="true"
             android:launchMode="singleTask" >

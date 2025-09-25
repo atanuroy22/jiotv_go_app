@@ -1,4 +1,4 @@
-package com.skylake.skytv.jgorunner.ui.dev
+package com.skylake.skytv.jgorunner.ui.tvhome.depreciated
 
 import android.content.Context
 import android.content.Intent
@@ -23,12 +23,14 @@ import androidx.tv.material3.ClassicCard
 import com.bumptech.glide.integration.compose.GlideImage
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.skylake.skytv.jgorunner.activities.ExoplayerActivity
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
+import com.skylake.skytv.jgorunner.ui.tvhome.Channel
+import com.skylake.skytv.jgorunner.ui.tvhome.ChannelResponse
+import com.skylake.skytv.jgorunner.ui.tvhome.ChannelUtils
 import kotlinx.coroutines.delay
 
-@OptIn(ExperimentalGlideComposeApi::class)
+@OptIn(ExperimentalGlideComposeApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SearchTabLayoutTV(context: Context, focusRequester: FocusRequester) {
     val scope = rememberCoroutineScope()
@@ -86,7 +88,7 @@ fun SearchTabLayoutTV(context: Context, focusRequester: FocusRequester) {
             contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxSize()
         ) {
-            CircularProgressIndicator(
+            CircularWavyProgressIndicator(
                 modifier = Modifier.size(60.dp)
             )
         }

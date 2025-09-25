@@ -10,7 +10,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.skylake.skytv.jgorunner.data.SkySharedPref
-import com.skylake.skytv.jgorunner.ui.dev.Helper
+import com.skylake.skytv.jgorunner.ui.tvhome.Helper
 import com.skylake.skytv.jgorunner.activities.MainActivity
 import android.content.Intent
 

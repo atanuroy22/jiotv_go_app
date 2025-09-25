@@ -1,21 +1,18 @@
-package com.skylake.skytv.jgorunner.ui.dev
+package com.skylake.skytv.jgorunner.ui.tvhome
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
-import androidx.tv.material3.ClassicCard
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,18 +34,16 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
-@OptIn(ExperimentalGlideComposeApi::class)
+@SuppressLint("MutableCollectionMutableState")
+@OptIn(ExperimentalGlideComposeApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun Main_LayoutTV(context: Context?) {
-    if (context == null) return
+fun Main_Layout(context: Context, reloadTrigger: Int ) {
     val scope = rememberCoroutineScope()
     val channelsResponse = remember { mutableStateOf<ChannelResponse?>(null) }
     val filteredChannels = remember { mutableStateOf<List<Channel>>(emptyList()) }
@@ -96,7 +91,7 @@ fun Main_LayoutTV(context: Context?) {
     }
 
     // Fetch and filter channels (cache/network)
-    LaunchedEffect(Unit) {
+    LaunchedEffect(reloadTrigger) {
         val sharedPref = context.getSharedPreferences("channel_cache", Context.MODE_PRIVATE)
         var useCache = true
         var cachedChannels: ChannelResponse? = null
@@ -276,7 +271,8 @@ fun Main_LayoutTV(context: Context?) {
             contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxSize()
         ) {
-            CircularProgressIndicator(modifier = Modifier.size(60.dp))
+//            CircularWavyProgressIndicator(modifier = Modifier.size(60.dp))
+            ContainedLoadingIndicator(modifier = Modifier.size(100.dp))
         }
     }
     // UI: Empty state
@@ -439,92 +435,14 @@ fun Main_LayoutTV(context: Context?) {
             }
         }
 
-        // CHANNEL GRID
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 100.dp),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(filteredChannels.value ?: emptyList()) { channel ->
-                if (channel == null) return@items // Defensive: skip nulls
-                ClassicCard(
-                    modifier = Modifier
-                        .height(120.dp)
-                        .focusRequester(focusRequester)
-                        .onFocusEvent { focusState ->
-                            if (focusState.isFocused) {
-                                selectedChannel = channel
-                            }
-                        },
-                    image = {
-                        val logoUrl = channel.logoUrl ?: ""
-                        val imageUrl = "$basefinURL/jtvimage/$logoUrl"
-                        GlideImage(
-                            model = imageUrl,
-                            contentDescription = channel.channel_name ?: "Channel",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(80.dp)
-                        )
-                    },
-                    title = {
-                        Text(
-                            text = channel.channel_name ?: "Channel",
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(8.dp)
-                        )
-                    },
-                    onClick = {
-                        val intent = Intent(context, ExoPlayJet::class.java).apply {
-                            putExtra("video_url", channel.channel_url ?: "")
-                            putExtra("zone", "TV")
-                            // Prepare channel list for ExoPlayJet
-                            val allChannelsData = ArrayList((filteredChannels.value ?: emptyList()).mapNotNull { ch ->
-                                if (ch == null) return@mapNotNull null
-                                ChannelInfo(
-                                    ch.channel_url ?: "",
-                                    "http://localhost:$localPORT/jtvimage/${ch.logoUrl ?: ""}",
-                                    ch.channel_name ?: ""
-                                )
-                            })
-                            putParcelableArrayListExtra("channel_list_data", allChannelsData)
-                            val currentChannelIndex = (filteredChannels.value ?: emptyList()).indexOf(channel)
-                            putExtra("current_channel_index", currentChannelIndex)
-                            putExtra("logo_url", "http://localhost:$localPORT/jtvimage/${channel.logoUrl ?: ""}")
-                            putExtra("ch_name", channel.channel_name ?: "")
-                        }
-                        startActivity(context, intent, null)
+        ChannelGridMain(
+            context = context,
+            filteredChannels = filteredChannels.value ?: emptyList(),
+            selectedChannelSetter = { selectedChannel = it },
+            localPORT = localPORT,
+            preferenceManager = preferenceManager
+        )
 
-                        // Update recent channels
-                        val recentChannelsJson = preferenceManager.myPrefs.recentChannels
-                        val type = object : TypeToken<List<Channel>>() {}.type
-                        val recentChannels: MutableList<Channel> =
-                            if (!recentChannelsJson.isNullOrEmpty())
-                                Gson().fromJson(recentChannelsJson, type) ?: mutableListOf()
-                            else
-                                mutableListOf()
 
-                        val existingIndex = recentChannels.indexOfFirst { it.channel_id == channel.channel_id }
-                        if (existingIndex != -1) {
-                            val existingChannel = recentChannels[existingIndex]
-                            recentChannels.removeAt(existingIndex)
-                            recentChannels.add(0, existingChannel)
-                        } else {
-                            recentChannels.add(0, channel)
-                            if (recentChannels.size > 25) {
-                                recentChannels.removeAt(recentChannels.size - 1)
-                            }
-                        }
-
-                        preferenceManager.myPrefs.recentChannels = Gson().toJson(recentChannels)
-                        preferenceManager.savePreferences()
-                    },
-                    colors = androidx.tv.material3.CardDefaults.colors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    )
-                )
-            }
-        }
     }
 }

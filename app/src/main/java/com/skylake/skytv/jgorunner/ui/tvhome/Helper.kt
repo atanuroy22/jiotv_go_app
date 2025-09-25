@@ -1,12 +1,16 @@
-package com.skylake.skytv.jgorunner.ui.dev
+package com.skylake.skytv.jgorunner.ui.tvhome
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.util.Base64
 import android.util.Log
 import android.widget.Toast
+import androidx.core.content.ContextCompat.startActivity
+import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.data.SkySharedPref
+import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 
 
 object Helper {
@@ -152,4 +156,24 @@ fun switchIcon(enableAlias: String, disableAlias: String, context: Context) {
         PackageManager.DONT_KILL_APP
     )
 
+}
+
+fun startChannel(context: Context, firstChannel: Channel, localPORT: Int, channels: List<Channel>) {
+    val intent = Intent(context, ExoPlayJet::class.java).apply {
+        putExtra("zone", "TV")
+        putParcelableArrayListExtra("channel_list_data", ArrayList(
+            channels.map { ch ->
+                ChannelInfo(
+                    ch.channel_url ?: "",
+                    "http://localhost:$localPORT/jtvimage/${ch.logoUrl ?: ""}",
+                    ch.channel_name ?: ""
+                )
+            }
+        ))
+        putExtra("current_channel_index", 0)
+        putExtra("video_url", firstChannel.channel_url ?: "")
+        putExtra("logo_url", "http://localhost:$localPORT/jtvimage/${firstChannel.logoUrl ?: ""}")
+        putExtra("ch_name", firstChannel.channel_name ?: "")
+    }
+    startActivity(context, intent, null)
 }

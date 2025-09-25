@@ -88,9 +88,10 @@ class ExoPlayJet : ComponentActivity() {
         val defaultLogoUrl = "https://www.sonypicturesnetworks.com/images/logos/SET%20LOGO.png"
         val defaultChannelName = "HANA4k"
 
-        val channelList = intent.getParcelableArrayListExtra<ChannelInfo>("channel_list_data")
+//        val channelList = intent.getParcelableArrayListExtra<ChannelInfo>("channel_list_data")
 
-//        val channelList: ArrayList<ChannelInfo>? = IntentCompat.getParcelableArrayListExtra(intent, "channel_list_data", ChannelInfo::class.java)
+        val channelList: ArrayList<ChannelInfo>? = IntentCompat.getParcelableArrayListExtra(intent, "channel_list_data", ChannelInfo::class.java)
+
         val currentChannelIndex = intent.getIntExtra("current_channel_index", -1)
 
         val signature = intent.getStringExtra("zone")

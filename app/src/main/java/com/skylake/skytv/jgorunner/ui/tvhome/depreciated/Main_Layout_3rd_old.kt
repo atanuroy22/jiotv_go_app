@@ -1,4 +1,4 @@
-package com.skylake.skytv.jgorunner.ui.dev
+package com.skylake.skytv.jgorunner.ui.tvhome.depreciated
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -37,12 +37,14 @@ import com.google.gson.reflect.TypeToken
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
+import com.skylake.skytv.jgorunner.ui.tvhome.M3UChannelExp
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @SuppressLint("NewApi")
 @Composable
-fun Main_Layout_3rd(context: Context) {
+fun Main_Layout_3rd_old(context: Context) {
     val preferenceManager = remember { SkySharedPref.getInstance(context) }
     var allChannels by remember { mutableStateOf<List<M3UChannelExp>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -118,7 +120,7 @@ fun Main_Layout_3rd(context: Context) {
 
     if (isLoading) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-            CircularProgressIndicator()
+            CircularWavyProgressIndicator()
         }
     } else if (allChannels.isEmpty()) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {

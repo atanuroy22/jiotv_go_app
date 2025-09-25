@@ -1,4 +1,4 @@
-package com.skylake.skytv.jgorunner.ui.dev
+package com.skylake.skytv.jgorunner.ui.tvhome.depreciated
 
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -38,12 +38,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
+import com.skylake.skytv.jgorunner.ui.tvhome.Channel
+import com.skylake.skytv.jgorunner.ui.tvhome.ChannelResponse
+import com.skylake.skytv.jgorunner.ui.tvhome.ChannelUtils
+import com.skylake.skytv.jgorunner.ui.tvhome.EpgProgram
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
 @SuppressLint("MutableCollectionMutableState")
-@OptIn(ExperimentalGlideComposeApi::class)
+@OptIn(ExperimentalGlideComposeApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun Main_Layout(context: Context?) {
+fun Main_Layout_old(context: Context?) {
     if (context == null) return
     val scope = rememberCoroutineScope()
     val channelsResponse = remember { mutableStateOf<ChannelResponse?>(null) }
@@ -307,7 +311,7 @@ fun Main_Layout(context: Context?) {
             contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxSize()
         ) {
-            CircularProgressIndicator(modifier = Modifier.size(60.dp))
+            CircularWavyProgressIndicator(modifier = Modifier.size(60.dp))
         }
     } else if (filteredChannels.value.isNullOrEmpty()) {
         Box(

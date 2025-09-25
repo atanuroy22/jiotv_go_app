@@ -2,14 +2,12 @@ package com.skylake.skytv.jgorunner.ui.screens
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Intent
 import android.content.res.Configuration
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Animatable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterAlt
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tv
@@ -30,18 +27,17 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -52,7 +48,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -61,19 +56,14 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import com.skylake.skytv.jgorunner.R
-import com.skylake.skytv.jgorunner.activities.ExoplayerActivityPass
 import com.skylake.skytv.jgorunner.data.SkySharedPref
-import com.skylake.skytv.jgorunner.ui.components.ModeSelectionDialog2
-import com.skylake.skytv.jgorunner.ui.dev.Recent_Layout
-import com.skylake.skytv.jgorunner.ui.dev.Recent_LayoutTV
-import com.skylake.skytv.jgorunner.ui.dev.SearchTabLayout
-import com.skylake.skytv.jgorunner.ui.dev.SearchTabLayoutTV
-import com.skylake.skytv.jgorunner.ui.dev.Main_Layout
-import com.skylake.skytv.jgorunner.ui.dev.Main_LayoutTV
-import com.skylake.skytv.jgorunner.ui.dev.Main_LayoutTV_3rd
-import com.skylake.skytv.jgorunner.ui.dev.Main_Layout_3rd
+import com.skylake.skytv.jgorunner.ui.tvhome.components.TvScreenMenu
+import com.skylake.skytv.jgorunner.ui.tvhome.Main_Layout
+import com.skylake.skytv.jgorunner.ui.tvhome.Recent_Layout
+import com.skylake.skytv.jgorunner.ui.tvhome.Main_Layout_3rd
+import com.skylake.skytv.jgorunner.ui.tvhome.depreciated.SearchTabLayout
+import com.skylake.skytv.jgorunner.ui.tvhome.depreciated.SearchTabLayoutTV
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 
@@ -85,6 +75,9 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
     data class TabItem(val text: String, val icon: ImageVector)
 
     var showModeDialog by remember { mutableStateOf(false) }
+
+    var reloadChannelsTrigger by remember { mutableStateOf(0) }
+
 
     val tabs = listOf(
         TabItem("TV", Icons.Default.Tv),
@@ -107,7 +100,7 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
     // Snackbar state
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
-    var exitPressTime by remember { mutableStateOf(0L) }
+    var exitPressTime by remember { mutableLongStateOf(0L) }
 
     var firstLaunch by remember { mutableStateOf(true) }
 
@@ -185,58 +178,67 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
                 }
             }
 
-            // Tabs
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .focusRestorer()
-                    .focusRequester(tabFocusRequester),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                PrimaryTabRow(selectedTabIndex = selectedTabIndex) {
-                    tabs.forEachIndexed { index, tab ->
-                        Tab(
-                            selected = index == selectedTabIndex,
-                            onClick = { selectedTabIndex = index },
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = tab.icon,
-                                        contentDescription = "Tab Icon",
-                                        modifier = Modifier.size(16.dp),
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(text = tab.text)
-                                }
+            if (preferenceManager.myPrefs.customPlaylistSupport &&
+                !preferenceManager.myPrefs.showPLAYLIST) {
+
+                Main_Layout_3rd(context, reloadTrigger = reloadChannelsTrigger)
+
+            } else if (!preferenceManager.myPrefs.showRecentTab) {
+
+                Main_Layout(context, reloadTrigger = reloadChannelsTrigger)
+
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Tabs Row
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .focusRestorer()
+                            .focusRequester(tabFocusRequester)
+                            .focusable(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        PrimaryTabRow(selectedTabIndex = selectedTabIndex) {
+                            tabs.forEachIndexed { index, tab ->
+                                Tab(
+                                    selected = index == selectedTabIndex,
+                                    onClick = { selectedTabIndex = index },
+                                    text = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = tab.icon,
+                                                contentDescription = "Tab Icon",
+                                                modifier = Modifier.size(16.dp),
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(text = tab.text)
+                                        }
+                                    }
+                                )
                             }
-                        )
+                        }
+                    }
+
+                    // Tab Content
+                    when (selectedTabIndex) {
+                        0 -> Main_Layout(context, reloadTrigger = reloadChannelsTrigger)
+                        1 -> Recent_Layout(context)
+                        2 -> if (isRemoteNavigation) SearchTabLayoutTV(context, tabFocusRequester) else SearchTabLayout(context, tabFocusRequester)
                     }
                 }
             }
 
-            // Tab Content
-            when (selectedTabIndex) {
-                0 -> {
-                    if (preferenceManager.myPrefs.customPlaylistSupport &&
-                        !preferenceManager.myPrefs.showPLAYLIST
-                    ) {
-                        if (isRemoteNavigation) Main_LayoutTV_3rd(context)
-                        else Main_Layout_3rd(context)
-                    } else {
-                        if (isRemoteNavigation) Main_LayoutTV(context)
-                        else Main_Layout(context)
-                    }
-                }
-                1 -> if (isRemoteNavigation) Recent_LayoutTV(context) else Recent_Layout(context)
-//                2 -> if (isRemoteNavigation) SearchTabLayoutTV(context, tabFocusRequester) else SearchTabLayout(context, tabFocusRequester)
-            }
         }
     }
 
     // Mode Dialog
-    ModeSelectionDialog2(
+    TvScreenMenu(
         showDialog = showModeDialog,
         onDismiss = { showModeDialog = false },
         onReset = {
@@ -248,19 +250,15 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
             Log.d("ZoneScreen", "Qualities: $selectedQualities, Categories: $selectedCategories, Languages: $selectedLanguages")
             Toast.makeText(context, "Refreshing Channels", Toast.LENGTH_LONG).show()
             selectedTabIndex = savedTabIndex
+
+            reloadChannelsTrigger++
         },
         context = context
     )
 
-    LaunchedEffect(Unit) {
-        tabFocusRequester.requestFocus()
-
-        if (firstLaunch && tabs.size > 1) {
-            firstLaunch = false
-            val originalIndex = selectedTabIndex
-            selectedTabIndex = (originalIndex + 1) % tabs.size
-            kotlinx.coroutines.delay(50)
-            selectedTabIndex = originalIndex
-        }
+    if (firstLaunch) {
+        firstLaunch = false
+        reloadChannelsTrigger++
     }
+
 }
