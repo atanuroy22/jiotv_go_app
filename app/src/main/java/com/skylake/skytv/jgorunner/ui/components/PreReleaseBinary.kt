@@ -3,11 +3,15 @@ import android.os.Build
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.*
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -45,123 +49,133 @@ import java.util.concurrent.TimeUnit
 fun PreReleaseBinary(
     isVisible: Boolean,
     onDismiss: () -> Unit,
-    onConfirm: (Context, selectedRelease: String) -> Unit
+    onConfirm: (Context, selectedRelease: String) -> Unit,
+    onResetToStable: (Context) -> Unit
 ) {
     val context = LocalContext.current
-    val confirmButtonFocusRequester = remember { FocusRequester() }
     var releases by remember { mutableStateOf<List<String>?>(null) }
     var selectedRelease by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
-    var showErrorToast by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
 
     LaunchedEffect(isVisible) {
         if (isVisible) {
-            confirmButtonFocusRequester.requestFocus()
             try {
-                val fetchedReleases = fetchGithubReleases()
-                releases = fetchedReleases
-                selectedRelease = if (fetchedReleases.isNotEmpty()) fetchedReleases[0] else ""
+                releases = fetchGithubReleases()
+                selectedRelease = releases?.firstOrNull() ?: ""
             } catch (e: Exception) {
                 releases = emptyList()
-                selectedRelease = ""
-                showErrorToast = true
+                errorMessage = "Failed to fetch releases. Check your connection."
             }
         } else {
             releases = null
             selectedRelease = ""
             expanded = false
-            showErrorToast = false
+            errorMessage = ""
         }
     }
-
-    if (showErrorToast) {
-        Toast.makeText(context, "Failed to fetch releases. Please check your connection.", Toast.LENGTH_LONG).show()
-        showErrorToast = false
-    }
-
 
     if (!isVisible) return
 
     AlertDialog(
-        onDismissRequest = { onDismiss() },
+        onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                val icon: Painter = painterResource(id = R.drawable.logo)
                 Icon(
-                    painter = icon,
+                    painter = painterResource(id = R.drawable.logo),
                     contentDescription = null,
                     modifier = Modifier
-                        .padding(end = 9.dp)
-                        .size(40.dp)
+                        .size(48.dp)
+                        .padding(end = 12.dp)
                 )
-                Text("Select Pre-Release Binary Version", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    "Select Pre-Release Binary",
+                    style = MaterialTheme.typography.titleLarge
+                )
             }
         },
         text = {
-            Box(modifier = Modifier.fillMaxWidth()) {
-                when {
-                    releases == null -> {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            Column {
+                if (releases == null) {
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
                     }
-                    releases!!.isEmpty() -> {
-                        Text("No releases found", modifier = Modifier.align(Alignment.Center))
-                    }
-                    else -> {
-                        ExposedDropdownMenuBox(
-                            expanded = expanded,
-                            onExpandedChange = { expanded = !expanded }
-                        ) {
-                            TextField(
-                                value = selectedRelease,
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Choose Release") },
-                                trailingIcon = {
-                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .menuAnchor()
-                            )
+                } else if (releases!!.isEmpty()) {
+                    Text(
+                        "No releases found",
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else {
+                    ExposedDropdownMenuBox(
+                        expanded = expanded,
+                        onExpandedChange = { expanded = !expanded }
+                    ) {
+                        TextField(
+                            value = selectedRelease,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Choose Release") },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                            },
+                            colors = TextFieldDefaults.colors(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                        )
 
-                            ExposedDropdownMenu(
-                                expanded = expanded,
-                                onDismissRequest = { expanded = false }
-                            ) {
-                                releases!!.forEach { release ->
-                                    DropdownMenuItem(
-                                        onClick = {
-                                            selectedRelease = release
-                                            expanded = false
-                                            Toast.makeText(context, "Selected: $release", Toast.LENGTH_SHORT).show()
-                                        },
-                                        text = { Text(release) }
-                                    )
-                                }
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            releases!!.forEach { release ->
+                                DropdownMenuItem(
+                                    text = { Text(release) },
+                                    onClick = {
+                                        selectedRelease = release
+                                        expanded = false
+                                        errorMessage = ""
+                                    }
+                                )
                             }
                         }
+                    }
+
+                    if (errorMessage.isNotEmpty()) {
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Text(
+                            errorMessage,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
             }
         },
         confirmButton = {
-            Button(
-                onClick = {
-                    if (selectedRelease.isNotBlank()) {
+            Row {
+                Button(
+                    onClick = {
+                        if (selectedRelease.isNotBlank()) onConfirm(context, selectedRelease)
+                        else errorMessage = "Please select a release!"
+                    },
+                    enabled = releases?.isNotEmpty() == true
+                ) {
+                    Text("✨ Install")
+                }
 
-                        onConfirm(context, selectedRelease)
-                    } else {
-                        Toast.makeText(context, "No release selected", Toast.LENGTH_SHORT).show()
-                    }
-                },
-                enabled = releases?.isNotEmpty() == true,
-                modifier = Modifier.focusRequester(confirmButtonFocusRequester)
-            ) {
-                Text("Download and Install")
+                Spacer(modifier = Modifier.width(8.dp))
+
+                OutlinedButton(
+                    onClick = { onResetToStable(context) }
+                ) {
+                    Text("↩️ Reset")
+                }
             }
         },
         dismissButton = {
-            FilledTonalButton(onClick = onDismiss) {
+            TextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
         },
@@ -171,6 +185,7 @@ fun PreReleaseBinary(
         )
     )
 }
+
 
 
 suspend fun fetchGithubReleases(): List<String> = withContext(Dispatchers.IO) {

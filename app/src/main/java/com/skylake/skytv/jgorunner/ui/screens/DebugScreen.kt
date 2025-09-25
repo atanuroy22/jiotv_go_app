@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.sharp.Info
 import androidx.compose.material.icons.sharp.Support
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -117,9 +118,10 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
         mutableStateOf(preferenceManager.myPrefs.genericTvIcon)
     }
 
-    var isUsingPreRelease = remember {
+    var isUsingPreRelease by remember {
         mutableStateOf(preferenceManager.myPrefs.preRelease)
     }
+
 
     var showPreReleaseBinaryDialog by remember { mutableStateOf(false) }
     var downloadProgress by remember { mutableStateOf<DownloadModelNew?>(null) }
@@ -130,6 +132,11 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
     // Update shared preference when switch states change
     LaunchedEffect(isSwitchForExp) {
         preferenceManager.myPrefs.expDebug = isSwitchForExp
+        applySettings()
+    }
+
+    LaunchedEffect(isUsingPreRelease) {
+        preferenceManager.myPrefs.preRelease = isUsingPreRelease
         applySettings()
     }
 
@@ -236,16 +243,6 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
                 isChecked = isSwitchForExp,
                 onCheckedChange = { isChecked -> isSwitchForExp = isChecked
                     val status = if (isSwitchForExp) "enabled" else "disabled"
-
-                    if (!isSwitchForExp && preferenceManager.myPrefs.preRelease) {
-                        preferenceManager.myPrefs.enableAutoUpdate = true
-                        preferenceManager.myPrefs.jtvGoBinaryName = null
-                        preferenceManager.myPrefs.jtvGoBinaryVersion = "v0.0.0"
-                        preferenceManager.savePreferences()
-                        showRestartDialog = true
-                    }
-
-
                     Toast.makeText(context, "Experimental features $status", Toast.LENGTH_SHORT).show()
                 })
         }
@@ -308,19 +305,21 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
                     title = "Use Pre-release Binary",
                     subtitle = {
                         Text(
-                            text = if (isUsingPreRelease.value)
+                            text = if (isUsingPreRelease)
                                 "Using Pre-release Binary"
                             else
                                 "Using Default Binary",
-                            fontWeight = if (isUsingPreRelease.value) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isUsingPreRelease.value) Color.Red else Color.Gray,
+                            fontWeight = if (isUsingPreRelease) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isUsingPreRelease) Color.Red else Color.Gray,
                             fontSize = 12.sp
                         )
                     },
                     onClick2 = {
-                        Log.d("FRON", "HI")
+                        Log.d("DIX", "PREBin Updater")
                         showPreReleaseBinaryDialog = true
-                    }
+                    },
+                    enabled=true,
+                    isChecked= isUsingPreRelease
                 )
             }
 
@@ -341,12 +340,23 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
                     if (preferenceManager.myPrefs.jtvGoBinaryVersion?.contains("develop", ignoreCase = true) == true) {
                         preferenceManager.myPrefs.preRelease = true
                         applySettings()
+                        isUsingPreRelease = preferenceManager.myPrefs.preRelease
+                    } else {
+                        preferenceManager.myPrefs.preRelease = false
+                        applySettings()
                     }
                     Toast.makeText(ctx, if (success) {"Download complete" } else "Download failed", Toast.LENGTH_LONG).show()
 
                     downloadProgress = null
                 }
                 showPreReleaseBinaryDialog = false
+            },
+            onResetToStable = {
+                preferenceManager.myPrefs.enableAutoUpdate = true
+                preferenceManager.myPrefs.jtvGoBinaryName = null
+                preferenceManager.myPrefs.jtvGoBinaryVersion = "v0.0.0"
+                preferenceManager.savePreferences()
+                showRestartDialog = true
             }
         )
     }
@@ -359,10 +369,10 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
     }
 
     if (showRestartDialog) {
-        androidx.compose.material3.AlertDialog(
+        AlertDialog(
             onDismissRequest = { showRestartDialog = false },
             title = { Text("Restart Required") },
-            text = { Text("Settings changed require app restart. Restart now?") },
+            text = { Text("Stable binary will be installed after restart. Restart now?") },
             confirmButton = {
                 Button(onClick = {
                     showRestartDialog = false
@@ -378,8 +388,6 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
             }
         )
     }
-
-
 }
 
 fun restartAppFast(context: Context) {
@@ -711,6 +719,9 @@ fun DebugItemCust(
     title: String,
     subtitle: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+//    onClick2: (),
+    isChecked: Boolean,
+    enabled: Boolean = true,
     onClick2: () -> Unit
 ) {
     Row(
@@ -727,6 +738,7 @@ fun DebugItemCust(
             subtitle()
         }
         Spacer(modifier = Modifier.weight(1f))
+        Switch(checked = isChecked, onCheckedChange = { onClick2() }, enabled = enabled)
     }
 }
 
