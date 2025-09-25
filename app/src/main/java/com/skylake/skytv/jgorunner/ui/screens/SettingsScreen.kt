@@ -484,7 +484,7 @@ fun SettingsScreen(
             item {
                 SettingItem(icon = Icons.Filled.ArrowCircleUp,
                     title = "Check for Updates Now",
-                    subtitle = "Update to the latest binary and application version.",
+                    subtitle = "Update to the latest stable binary and application",
                     onClick = {
                         checkForUpdates()
                     })

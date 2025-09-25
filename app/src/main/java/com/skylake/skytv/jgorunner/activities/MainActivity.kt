@@ -143,6 +143,14 @@ class MainActivity : ComponentActivity() {
 
         // DEL
 
+        if (preferenceManager.myPrefs.jtvGoBinaryVersion?.contains("develop", ignoreCase = true) == true) {
+            preferenceManager.myPrefs.preRelease = true
+            preferenceManager.savePreferences()
+        } else {
+            preferenceManager.myPrefs.preRelease = false
+            preferenceManager.savePreferences()
+        }
+
         if (preferenceManager.myPrefs.iptvLaunchCountdown == 0) {
             preferenceManager.myPrefs.iptvLaunchCountdown = 4
 //            preferenceManager.myPrefs.autoStartServer = true
@@ -689,6 +697,12 @@ class MainActivity : ComponentActivity() {
             val currentBinaryVersion = preferenceManager.myPrefs.jtvGoBinaryVersion
             val currentBinaryName = preferenceManager.myPrefs.jtvGoBinaryName
             if (currentBinaryName.isNullOrEmpty() || currentBinaryVersion.isNullOrEmpty()) {
+                performBinaryUpdate()
+                return@launch
+            }
+
+            // Switch to stable release on update check
+            if (currentBinaryVersion.contains("develop", ignoreCase = true) && forceCheck) {
                 performBinaryUpdate()
                 return@launch
             }
