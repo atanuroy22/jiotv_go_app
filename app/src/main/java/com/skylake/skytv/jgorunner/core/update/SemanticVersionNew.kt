@@ -25,7 +25,13 @@ data class SemanticVersionNew(
         )
 
         fun parse(version: String): SemanticVersionNew {
-            val trimmedVersion = version.trim()
+            var trimmedVersion = version.trim()
+
+            // If version is pre-release, override it
+            if (trimmedVersion.contains("develop", ignoreCase = true)) {
+                trimmedVersion = "v99.99.99"
+            }
+
             val match = SEMVER_REGEX.matchEntire(trimmedVersion)
                 ?: throw IllegalArgumentException("Invalid semantic version: $trimmedVersion")
 

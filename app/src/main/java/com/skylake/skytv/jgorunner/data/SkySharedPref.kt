@@ -155,7 +155,9 @@ class SkySharedPref(context: Context) {
         @SharedPrefKey("unitHolder") var unitHolder: Int = 0,
         @SharedPrefKey("customPlaylistSupport") var customPlaylistSupport: Boolean = false,
         @SharedPrefKey("genericTvIcon") var genericTvIcon: Boolean = false,
+        @SharedPrefKey("preRelease") var preRelease: Boolean = false,
         @SharedPrefKey("epgDebug") var epgDebug: Boolean = false,
+
 
 
     )

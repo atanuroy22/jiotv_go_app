@@ -64,7 +64,7 @@ object ChannelUtils {
     suspend fun fetchEpg(urlString: String): EpgProgram? {
         return withContext(Dispatchers.IO) {
             try {
-                Log.d("EPG_URL", urlString)
+//                Log.d("EPG_URL", urlString)
                 val json = URL(urlString).readText()
                 val epgResponse = Gson().fromJson(json, EpgResponse::class.java)
 

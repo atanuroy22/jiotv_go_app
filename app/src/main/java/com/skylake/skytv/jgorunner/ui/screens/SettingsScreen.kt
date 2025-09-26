@@ -97,6 +97,7 @@ import com.skylake.skytv.jgorunner.ui.components.ModeSelectionDialog
 import com.skylake.skytv.jgorunner.ui.components.restoreBackup
 import android.os.Process
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.TextStyle
@@ -171,6 +172,7 @@ fun SettingsScreen(
     var showBackupDialog by remember { mutableStateOf(false) }
     var showRestartDialog by remember { mutableStateOf(false) }
     var showRestartAppDialog by remember { mutableStateOf(false) }
+    var showRestart by remember { mutableStateOf(false) }
 
     // Update shared preference when switch states change
     LaunchedEffect(isSwitchOnForLOCAL) {
@@ -484,7 +486,7 @@ fun SettingsScreen(
             item {
                 SettingItem(icon = Icons.Filled.ArrowCircleUp,
                     title = "Check for Updates Now",
-                    subtitle = "Update to the latest binary and application version.",
+                    subtitle = "Update to the latest stable binary and application",
                     onClick = {
                         checkForUpdates()
                     })
@@ -705,7 +707,7 @@ fun SettingsScreen(
                         Button(onClick = {
                             showRestartAppDialog = false
                             resetFunc(activity)
-                            restartApp(activity)
+                            restartAppV1(activity)
                         }) {
                             Text("Restart")
                         }
@@ -714,6 +716,28 @@ fun SettingsScreen(
             }
         }
     }
+
+    if (showRestart) {
+        AlertDialog(
+            onDismissRequest = { showRestart = false },
+            title = { Text("Restart Required") },
+            text = { Text("Settings changed require app restart. Restart now?") },
+            confirmButton = {
+                Button(onClick = {
+                    showRestart = false
+                    restartAppV1(context)
+                }) {
+                    Text("Restart")
+                }
+            },
+            dismissButton = {
+                Button(onClick = { showRestart = false }) {
+                    Text("Later")
+                }
+            }
+        )
+    }
+
 }
 
 //fun restartApp(context: Context) {
@@ -743,6 +767,29 @@ fun restartApp(context: Context) {
     Process.killProcess(Process.myPid())
     exitProcess(0)
 }
+
+fun restartAppV1(context: Context) {
+    try {
+        val packageManager = context.packageManager
+        val intent = packageManager.getLaunchIntentForPackage(context.packageName)
+
+        if (intent != null) {
+            intent.addFlags(
+                Intent.FLAG_ACTIVITY_CLEAR_TASK or
+                        Intent.FLAG_ACTIVITY_NEW_TASK
+            )
+            val mainIntent = Intent.makeRestartActivityTask(intent.component)
+            context.startActivity(mainIntent)
+
+            Runtime.getRuntime().exit(0)
+        } else {
+            Log.e("restartApp", "Launch intent is null")
+        }
+    } catch (e: Exception) {
+        Log.e("restartApp", "Failed to restart app", e)
+    }
+}
+
 
 
 fun resetFunc(context: Context) {
