@@ -1,4 +1,7 @@
 package com.skylake.skytv.jgorunner.ui.screens
+
+// import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+// import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
@@ -95,9 +98,8 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
 import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
-import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -175,12 +177,11 @@ fun ExoPlayJetScreen(
         }
     }
 
-    // --- Resize Config : This ensures overlays and controls remain stable. ---
+    // --- Resize Config ---
     val resizeModes = remember {
         listOf(
             Triple(RESIZE_MODE_FIT, "Default", "DEF"),
-            Triple(RESIZE_MODE_FILL, "Stretch", "STRETCH"),
-            Triple(RESIZE_MODE_ZOOM, "Zoom", "ZOOM")
+            Triple(RESIZE_MODE_FILL, "Stretch", "STRETCH")
         )
     }
     var resizeModeIndex by remember { mutableIntStateOf(0) }
@@ -426,6 +427,12 @@ fun ExoPlayJetScreen(
 
     ) {
         val currentResizeMode = resizeModes[resizeModeIndex].first
+        val isDefaultMode = resizeModeIndex == 0
+        val aspectForModifier = when {
+            isDefaultMode -> 16f / 9f
+            currentResizeMode == RESIZE_MODE_FILL -> videoAspect
+            else -> videoAspect
+        }
 
         AndroidView(
             factory = {
@@ -514,10 +521,11 @@ fun ExoPlayJetScreen(
                     }
                 }
             },
-            // Keep a stable layout area so only the video surface is zoomed by setResizeMode
-            modifier = Modifier
-                .fillMaxSize()
-                .align(Alignment.Center)
+            modifier = when {
+                currentResizeMode == RESIZE_MODE_FILL -> Modifier.fillMaxSize().align(Alignment.Center)
+                isDefaultMode -> Modifier.aspectRatio(16f / 9f).align(Alignment.Center)
+                else -> Modifier.fillMaxWidth().aspectRatio(aspectForModifier).align(Alignment.Center)
+            }
         )
 
         if (isBuffering) {
