@@ -270,6 +270,24 @@ fun ExoPlayJetScreen(
         exoPlayer.prepare()
         exoPlayer.playWhenReady = true
 
+        // Persist currently playing channel details only if changed so autoplay watchdog in layouts can detect active playback
+        val selected = channelList?.getOrNull(currentIndex)
+        val newUrl = selected?.videoUrl ?: videoUrl
+        if (newUrl != lastPersistedChannelUrl) {
+            try {
+                preferenceManager.myPrefs.currChannelUrl = newUrl
+                if (selected != null) {
+                    preferenceManager.myPrefs.currChannelName = selected.channelName
+                    preferenceManager.myPrefs.currChannelLogo = selected.logoUrl
+                }
+                preferenceManager.savePreferences()
+                lastPersistedChannelUrl = newUrl
+                try { com.skylake.skytv.jgorunner.ui.screens.AppStartTracker.shouldPlayChannel = true } catch (_: Exception) {}
+            } catch (_: Exception) {
+                // Ignore persistence failures
+            }
+        }
+
         // そにー Hook
         setupCustomPlaybackLogic(exoPlayer, currentUrl)
 

@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -61,6 +63,7 @@ import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.ui.tvhome.components.TvScreenMenu
 import com.skylake.skytv.jgorunner.ui.tvhome.Main_Layout
 import com.skylake.skytv.jgorunner.ui.tvhome.Recent_Layout
+import com.skylake.skytv.jgorunner.ui.tvhome.FavouriteLayout
 import com.skylake.skytv.jgorunner.ui.tvhome.Main_Layout_3rd
 import com.skylake.skytv.jgorunner.ui.tvhome.depreciated.SearchTabLayout
 import com.skylake.skytv.jgorunner.ui.tvhome.depreciated.SearchTabLayoutTV
@@ -79,11 +82,20 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
     var reloadChannelsTrigger by remember { mutableStateOf(0) }
 
 
-    val tabs = listOf(
-        TabItem("TV", Icons.Default.Tv),
-        TabItem("Recent", Icons.Default.Star)
-//        TabItem("Search", Icons.Default.Search)
+    val preferenceManager = SkySharedPref.getInstance(context)
+
+    val baseTabs = mutableListOf(
+        TabItem("TV", Icons.Default.Tv)
     )
+    if (preferenceManager.myPrefs.showRecentTab) {
+        baseTabs.add(TabItem("Recent", Icons.Default.Star))
+    }
+    if (preferenceManager.myPrefs.showFavouriteTab) {
+        baseTabs.add(TabItem("Favourite", Icons.Default.Favorite))
+    }
+    // Always append Search tab (no preference gating to avoid missing key)
+    // baseTabs.add(TabItem("Search", Icons.Default.Search))
+    val tabs = baseTabs.toList()
 
     val isRemoteNavigation =
         context.resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK ==
@@ -91,10 +103,9 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
 
     Log.d("ZoneScreen", "Running in TV Mode: $isRemoteNavigation")
 
-    val preferenceManager = SkySharedPref.getInstance(context)
     val savedTabIndex = preferenceManager.myPrefs.selectedScreenTV?.toIntOrNull() ?: 0
-
-    var selectedTabIndex by remember { mutableIntStateOf(savedTabIndex) }
+    val initialIndex = if (savedTabIndex in tabs.indices) savedTabIndex else 0
+    var selectedTabIndex by remember { mutableIntStateOf(initialIndex) }
     val tabFocusRequester = remember { FocusRequester() }
 
     // Snackbar state
@@ -183,7 +194,7 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
 
                 Main_Layout_3rd(context, reloadTrigger = reloadChannelsTrigger)
 
-            } else if (!preferenceManager.myPrefs.showRecentTab) {
+            } else if (!preferenceManager.myPrefs.showRecentTab && !preferenceManager.myPrefs.showFavouriteTab) {
 
                 Main_Layout(context, reloadTrigger = reloadChannelsTrigger)
 
@@ -226,10 +237,14 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
                     }
 
                     // Tab Content
+                    val hasRecent = preferenceManager.myPrefs.showRecentTab
+                    val hasFav = preferenceManager.myPrefs.showFavouriteTab
                     when (selectedTabIndex) {
                         0 -> Main_Layout(context, reloadTrigger = reloadChannelsTrigger)
-                        1 -> Recent_Layout(context)
-                        2 -> if (isRemoteNavigation) SearchTabLayoutTV(context, tabFocusRequester) else SearchTabLayout(context, tabFocusRequester)
+                        // If only favourite enabled it will be index 1
+                        1 -> if (hasRecent) {Recent_Layout(context)} else if (hasFav) {FavouriteLayout(context)} else {Recent_Layout(context)}
+                        2 -> if (hasRecent && hasFav) {FavouriteLayout(context)} else if (isRemoteNavigation){ SearchTabLayoutTV(context, tabFocusRequester)} else {SearchTabLayout(context, tabFocusRequester)}
+                        3 -> if (isRemoteNavigation) SearchTabLayoutTV(context, tabFocusRequester) else SearchTabLayout(context, tabFocusRequester)
                     }
                 }
             }

@@ -50,6 +50,7 @@ fun TvScreenMenu(
     var showCustomUrlInputDialog by remember { mutableStateOf(false) }
     var customUrl by remember { mutableStateOf(preferenceManager.myPrefs.custURL ?: "") }
     var showRecentTab by remember { mutableStateOf(preferenceManager.myPrefs.showRecentTab) }
+    var showFavouriteTab by remember { mutableStateOf(preferenceManager.myPrefs.showFavouriteTab) }
     var startTvAutomatically by remember { mutableStateOf(preferenceManager.myPrefs.startTvAutomatically) }
     var startTvAutoDelay by remember { mutableStateOf(preferenceManager.myPrefs.startTvAutoDelay) }
     var startTvAutoDelayTime by remember  { mutableIntStateOf(preferenceManager.myPrefs.startTvAutoDelayTime) }
@@ -120,6 +121,8 @@ fun TvScreenMenu(
                 var selectedScreenTV by remember {
                     mutableIntStateOf(preferenceManager.myPrefs.selectedScreenTV?.toIntOrNull() ?: 0)
                 }
+                // Clamp if Recent removed or invalid
+                // if (!showRecentTab && selectedScreenTV == 1) selectedScreenTV = 0
                 var screenDropdownExpanded by remember { mutableStateOf(false) }
                 val selectedScreenLabel = startScreenTV.entries.find { it.value == selectedScreenTV }?.key ?: startOptionsTV[0]
                 if (showRecentTab) {
@@ -368,6 +371,22 @@ fun TvScreenMenu(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(text = "Show Recent Channels")
                     }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Checkbox(
+                        checked = showFavouriteTab,
+                        onCheckedChange = { checked ->
+                            showFavouriteTab = checked
+                        }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "Show Favourite Channels")
+                }
                 }
 
 ///////////////////////////////
@@ -525,6 +544,8 @@ fun TvScreenMenu(
                                 myPrefs.selectedRemoteNavTV = "0"
                                 myPrefs.showPLAYLIST = false
                                 myPrefs.showRecentTab = false
+                                myPrefs.showFavouriteTab = false
+                                myPrefs.favouriteChannels = ""
                                 myPrefs.startTvAutomatically = false
                                 myPrefs.startTvAutoDelay = false
                                 myPrefs.startTvAutoDelayTime = 0
@@ -554,6 +575,7 @@ fun TvScreenMenu(
                                     myPrefs.showPLAYLIST = showPlaylist
                                 }
                                 myPrefs.showRecentTab = showRecentTab
+                                myPrefs.showFavouriteTab = showFavouriteTab
                                 myPrefs.startTvAutomatically = startTvAutomatically
                                 myPrefs.startTvAutoDelay = startTvAutoDelay
                                 myPrefs.startTvAutoDelayTime = startTvAutoDelayTime
