@@ -47,10 +47,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.core.content.ContextCompat.startActivity
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
+import com.skylake.skytv.jgorunner.ui.tvhome.CardChannelLayoutM3U
 
 @OptIn(ExperimentalGlideComposeApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun Main_Layout_3rd(context: Context, reloadTrigger: Int ) {
+fun Main_Layout_3rd(
+    context: Context,
+    reloadTrigger: Int,
+    layoutModeOverride: String? = null
+) {
     val preferenceManager = remember { SkySharedPref.getInstance(context) }
     var allChannels by remember { mutableStateOf<List<M3UChannelExp>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -62,6 +67,7 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int ) {
     val basefinURL = "http://localhost:$localPORT"
     var selectedChannel by remember { mutableStateOf<M3UChannelExp?>(null) }
     var epgData by remember { mutableStateOf<EpgProgram?>(null) }
+    val layoutMode = layoutModeOverride ?: preferenceManager.myPrefs.tvLayoutMode ?: "Default"
     val epgDebugVar by remember { mutableStateOf(preferenceManager.myPrefs.epgDebug) }
 
     val categories = remember(allChannels) {
@@ -319,13 +325,20 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int ) {
                     // Empty
                 }
 
-
-                ChannelGridTV(
-                    context = context,
-                    channels = filteredChannels,
-                    selectedChannel = selectedChannel,
-                    onSelectedChannelChanged = { channel -> selectedChannel = channel }
-                )
+                if (layoutMode.equals("CardUI", ignoreCase = true)) {
+                    CardChannelLayoutM3U(
+                        context = context,
+                        channels = filteredChannels,
+                        selectedChannelSetter = { selectedChannel = it }
+                    )
+                } else {
+                    ChannelGridTV(
+                        context = context,
+                        channels = filteredChannels,
+                        selectedChannel = selectedChannel,
+                        onSelectedChannelChanged = { channel -> selectedChannel = channel }
+                    )
+                }
 
                 ///////////
 //                ChannelGrid(

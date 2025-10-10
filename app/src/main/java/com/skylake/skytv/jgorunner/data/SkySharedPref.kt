@@ -152,6 +152,7 @@ class SkySharedPref(context: Context) {
         @SharedPrefKey("currChannelName") var currChannelName: String? = "",
         @SharedPrefKey("currChannelLogo") var currChannelLogo: String? = "",
         @SharedPrefKey("currChannelUrl") var currChannelUrl: String? = "",
+        @SharedPrefKey("tv_layout_mode") var tvLayoutMode: String? = "Default",
         @SharedPrefKey("unitHolder") var unitHolder: Int = 0,
         @SharedPrefKey("customPlaylistSupport") var customPlaylistSupport: Boolean = false,
         @SharedPrefKey("genericTvIcon") var genericTvIcon: Boolean = false,

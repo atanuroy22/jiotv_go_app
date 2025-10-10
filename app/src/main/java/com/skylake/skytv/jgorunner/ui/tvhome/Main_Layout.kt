@@ -33,17 +33,21 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
+import com.skylake.skytv.jgorunner.ui.tvhome.CardChannelLayout
 
 @SuppressLint("MutableCollectionMutableState")
 @OptIn(ExperimentalGlideComposeApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun Main_Layout(context: Context, reloadTrigger: Int ) {
+fun Main_Layout(
+    context: Context,
+    reloadTrigger: Int,
+    layoutModeOverride: String? = null
+) {
     val scope = rememberCoroutineScope()
     val channelsResponse = remember { mutableStateOf<ChannelResponse?>(null) }
     val filteredChannels = remember { mutableStateOf<List<Channel>>(emptyList()) }
@@ -56,8 +60,8 @@ fun Main_Layout(context: Context, reloadTrigger: Int ) {
 
     var selectedChannel by remember { mutableStateOf<Channel?>(null) }
     var epgData by remember { mutableStateOf<EpgProgram?>(null) }
+    val layoutMode = layoutModeOverride ?: preferenceManager.myPrefs.tvLayoutMode ?: "Default"
 
-    val focusRequester = remember { FocusRequester() }
     val categoryMap = mapOf(
         "Reset" to null,
         "Entertainment" to 5,
@@ -301,7 +305,6 @@ fun Main_Layout(context: Context, reloadTrigger: Int ) {
 
             AppStartTracker.shouldPlayChannel = true
         }
-
     }
 
     // Re-filter channels when category changes
@@ -500,13 +503,25 @@ fun Main_Layout(context: Context, reloadTrigger: Int ) {
             }
         }
 
-        ChannelGridMain(
-            context = context,
-            filteredChannels = filteredChannels.value ?: emptyList(),
-            selectedChannelSetter = { selectedChannel = it },
-            localPORT = localPORT,
-            preferenceManager = preferenceManager
-        )
+        val nonNullChannels = filteredChannels.value ?: emptyList()
+        if (layoutMode.equals("CardUI", ignoreCase = true)) {
+            CardChannelLayout(
+                context = context,
+                filteredChannels = nonNullChannels,
+                categoryMap = categoryMap,
+                selectedChannelSetter = { selectedChannel = it },
+                localPORT = localPORT,
+                preferenceManager = preferenceManager
+            )
+        } else {
+            ChannelGridMain(
+                context = context,
+                filteredChannels = nonNullChannels,
+                selectedChannelSetter = { selectedChannel = it },
+                localPORT = localPORT,
+                preferenceManager = preferenceManager
+            )
+        }
 
 
     }
