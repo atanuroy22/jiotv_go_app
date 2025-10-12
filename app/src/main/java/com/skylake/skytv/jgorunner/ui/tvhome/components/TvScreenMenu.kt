@@ -6,8 +6,6 @@ import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.verticalScroll
@@ -19,7 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.nativeKeyCode
 import androidx.compose.ui.input.key.onKeyEvent
@@ -28,9 +25,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.skylake.skytv.jgorunner.data.SkySharedPref
+import com.skylake.skytv.jgorunner.ui.tvhome.M3UChannelExp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -67,6 +65,28 @@ fun TvScreenMenu(
         mutableStateOf(preferenceManager.myPrefs.showPLAYLIST)
     }
 
+    var selectedCategories2 by remember { mutableStateOf(preferenceManager.myPrefs.lastSelectedCategoriesExp?.let {
+        Gson().fromJson(it, object : TypeToken<List<String>>() {}.type)
+    } ?: listOf("All")
+    )
+    }
+    var categories by remember { mutableStateOf<List<M3UChannelExp>>(emptyList()) }
+
+    try {
+        val json = preferenceManager.myPrefs.channelListJson
+        if (!json.isNullOrBlank()) {
+            val type = object : TypeToken<List<M3UChannelExp>>() {}.type
+            val channels: List<M3UChannelExp> = Gson().fromJson(json, type)
+            categories = channels.distinctBy { it.url }
+        } else {
+            selectedCategories2 = listOf("All")
+        }
+    } catch (e: Exception) {
+        selectedCategories2 = listOf("All")
+    }
+
+
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
@@ -82,7 +102,7 @@ fun TvScreenMenu(
                     .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                
+
                 if (!preferenceManager.myPrefs.customPlaylistSupport && !preferenceManager.myPrefs.showPLAYLIST) {
                     showPlaylist =true
                 }
@@ -171,7 +191,6 @@ fun TvScreenMenu(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // --- Category Selection ---
-                // JioTV categories (ID-based) and M3U categories (name-based)
                 val categoryMap = mapOf(
                     "All Categories" to null, "Entertainment" to 5, "Movies" to 6, "Kids" to 7,
                     "Sports" to 8, "Lifestyle" to 9, "Infotainment" to 10, "News" to 12,
@@ -193,34 +212,7 @@ fun TvScreenMenu(
                     )
                 }
                 var showCategoryCheckboxes by remember { mutableStateOf(false) }
-
-                // M3U: load distinct categories from saved channel list JSON
-                val channelListJson = preferenceManager.myPrefs.channelListJson
-                val m3uCategoryOptions = remember(channelListJson) {
-                    try {
-                        if (!channelListJson.isNullOrBlank()) {
-                            val type = object : TypeToken<List<Map<String, Any?>>>() {}.type
-                            val list: List<Map<String, Any?>> = Gson().fromJson(channelListJson, type)
-                            list.mapNotNull { it["category"] as? String }
-                                .map { it.trim() }
-                                .filter { it.isNotEmpty() }
-                                .distinct()
-                                .sorted()
-                        } else emptyList()
-                    } catch (e: Exception) {
-                        emptyList()
-                    }
-                }
-                val selectedM3uCategories = remember {
-                    mutableStateOf(
-                        preferenceManager.myPrefs.lastSelectedCategoryExp
-                            ?.split(',')
-                            ?.map { it.trim() }
-                            ?.filter { it.isNotEmpty() && it != "All" }
-                            ?.toMutableList() ?: mutableListOf()
-                    )
-                }
-                var showM3uCategoryCheckboxes by remember { mutableStateOf(false) }
+                var showCategoryCheckboxes2 by remember { mutableStateOf(false) }
 
                 if (showPlaylist) {
                     Column {
@@ -272,55 +264,48 @@ fun TvScreenMenu(
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
-                }
-                // M3U categories selection (name-based)
-                if (!showPlaylist) {
+                } else {
                     Column {
                         Text(
                             text = "Select Categories",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.SemiBold
                         )
-                        if (m3uCategoryOptions.isEmpty()) {
-                            Text(
-                                text = "No categories available",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 12.sp
-                            )
-                        } else {
-                            Box(modifier = Modifier.fillMaxWidth()) {
-                                OutlinedButton(
-                                    onClick = { showM3uCategoryCheckboxes = true },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = MaterialTheme.shapes.medium
-                                ) {
-                                    Text("Categories")
-                                }
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedButton(
+                                onClick = { showCategoryCheckboxes2 = true },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = MaterialTheme.shapes.medium
+                            ) {
+                                Text("Categories")
                             }
                         }
                     }
-                    if (showM3uCategoryCheckboxes) {
-                        Dialog(onDismissRequest = { showM3uCategoryCheckboxes = false }) {
+                    if (showCategoryCheckboxes2) {
+                        Dialog(onDismissRequest = { showCategoryCheckboxes2 = false }) {
                             Surface(
                                 shape = MaterialTheme.shapes.medium,
                                 color = MaterialTheme.colorScheme.surface
                             ) {
                                 Column(
-                                    modifier = Modifier
-                                        .padding(16.dp)
+                                    modifier = Modifier.padding(16.dp)
                                         .verticalScroll(rememberScrollState())
                                 ) {
-                                    MultiSelectDropdown(
+                                    MultiSelectDropdown2(
                                         title = "Category",
-                                        options = m3uCategoryOptions,
-                                        selectedOptions = selectedM3uCategories.value,
-                                        onOptionsSelected = { names ->
-                                            selectedM3uCategories.value = names.toMutableList()
+                                        options = categories,
+                                        selectedOptions = selectedCategories2,
+                                        onOptionsSelected = { newSelection ->
+                                            selectedCategories2 = newSelection
+
+                                            preferenceManager.myPrefs.lastSelectedCategoriesExp =
+                                                Gson().toJson(newSelection)
+                                            preferenceManager.savePreferences()
                                         }
                                     )
                                     Spacer(modifier = Modifier.height(16.dp))
                                     Button(
-                                        onClick = { showM3uCategoryCheckboxes = false },
+                                        onClick = { showCategoryCheckboxes2 = false },
                                         modifier = Modifier.align(Alignment.End)
                                     ) {
                                         Text("Done")
@@ -329,6 +314,8 @@ fun TvScreenMenu(
                             }
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
                 // --- Language Selection ---
@@ -446,18 +433,18 @@ fun TvScreenMenu(
                 }
 ///////////////////////////////
                 if (showPlaylist) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Checkbox(
-                        checked = showRecentTab,
-                        onCheckedChange = { checked ->
-                            showRecentTab = checked
-                        }
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "Show Recent Channels")
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Checkbox(
+                            checked = showRecentTab,
+                            onCheckedChange = { checked ->
+                                showRecentTab = checked
+                            }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "Show Recent Channels")
                     }
                 }
 
@@ -605,7 +592,6 @@ fun TvScreenMenu(
                             selectedTvRemoteNavOption = 0
                             selectedCategories.value.clear()
                             selectedCategoryInts.value.clear()
-                            selectedM3uCategories.value.clear()
                             selectedLanguages.value.clear()
                             selectedLanguageInts.value.clear()
                             showPlaylist = false // Reset playlist selection
@@ -620,7 +606,7 @@ fun TvScreenMenu(
                                 myPrefs.startTvAutomatically = false
                                 myPrefs.startTvAutoDelay = false
                                 myPrefs.startTvAutoDelayTime = 0
-                                myPrefs.lastSelectedCategoryExp = "All"
+                                myPrefs.lastSelectedCategoriesExp = ""
 
                                 savePreferences()
                             }
@@ -632,8 +618,8 @@ fun TvScreenMenu(
                         onClick = {
                             onSelectionsMade(
                                 qualityMap[selectedQuality],
-                                if (showPlaylist) selectedCategories.value else selectedM3uCategories.value,
-                                if (showPlaylist) selectedCategoryInts.value else mutableListOf(),
+                                selectedCategories.value,
+                                selectedCategoryInts.value,
                                 selectedLanguages.value,
                                 selectedLanguageInts.value
                             )
@@ -650,11 +636,6 @@ fun TvScreenMenu(
                                 myPrefs.startTvAutomatically = startTvAutomatically
                                 myPrefs.startTvAutoDelay = startTvAutoDelay
                                 myPrefs.startTvAutoDelayTime = startTvAutoDelayTime
-                                if (!showPlaylist) {
-                                    myPrefs.lastSelectedCategoryExp =
-                                        if (selectedM3uCategories.value.isEmpty()) "All"
-                                        else selectedM3uCategories.value.joinToString(",")
-                                }
                                 savePreferences()
                             }
                             onDismiss()
@@ -676,24 +657,10 @@ fun MultiSelectDropdown(
 ) {
     Column {
         Text(text = title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        // Bounded height + lazy rendering for large lists on TV
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 120.dp, max = 480.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-            contentPadding = PaddingValues(vertical = 4.dp)
-        ) {
-            items(options, key = { it }) { option ->
+        Column(modifier = Modifier.fillMaxWidth()) {
+            options.forEach { option ->
                 val isChecked = selectedOptions.contains(option)
-                var isFocused by remember { mutableStateOf(false) }
-                
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(
                         checked = isChecked,
                         onCheckedChange = { checked ->
@@ -704,23 +671,74 @@ fun MultiSelectDropdown(
                                 mutableSelected.remove(option)
                             }
                             onOptionsSelected(mutableSelected)
-                        },
-                        modifier = Modifier
-                            .onFocusChanged { focusState ->
-                                isFocused = focusState.isFocused
-                            }
+                        }
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = option, 
-                        color = if (isFocused) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurface,
-                        fontSize = 14.sp
-                    )
+                    Text(text = option, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
         }
     }
 }
+
+@Composable
+fun MultiSelectDropdown2(
+    title: String,
+    options: List<M3UChannelExp>,
+    selectedOptions: List<String>,
+    onOptionsSelected: (List<String>) -> Unit
+) {
+    val distinctCategoryNames = options.mapNotNull { it.category?.toString() }.distinct()
+
+    val sortedOptions = if (distinctCategoryNames.firstOrNull() == "All") {
+        distinctCategoryNames
+    } else {
+        listOf("All") + distinctCategoryNames.filter { it != "All" }
+    }
+
+    Column {
+        Text(text = title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Column(modifier = Modifier.fillMaxWidth()) {
+            sortedOptions.forEach { categoryName ->
+                val isChecked = selectedOptions.contains(categoryName)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = isChecked,
+                        onCheckedChange = { checked ->
+                            val mutableSelected = selectedOptions.toMutableList()
+
+                            if (checked) {
+                                if (categoryName == "All") {
+                                    mutableSelected.clear()
+                                    mutableSelected.add("All")
+                                } else {
+                                    mutableSelected.remove("All")
+                                    if (!mutableSelected.contains(categoryName)) {
+                                        mutableSelected.add(categoryName)
+                                    }
+                                }
+                            } else {
+                                mutableSelected.remove(categoryName)
+                                if (mutableSelected.isEmpty()) {
+                                    mutableSelected.add("All")
+                                }
+                            }
+
+                            onOptionsSelected(mutableSelected)
+                        }
+                    )
+                    Text(text = categoryName, color = MaterialTheme.colorScheme.onSurface)
+                }
+            }
+        }
+    }
+}
+
+
+
+
 
 @Composable
 fun DropdownSelection2(
