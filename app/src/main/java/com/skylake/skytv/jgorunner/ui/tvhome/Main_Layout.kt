@@ -39,11 +39,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
+import com.skylake.skytv.jgorunner.ui.tvhome.CardChannelLayout
 
 @SuppressLint("MutableCollectionMutableState")
 @OptIn(ExperimentalGlideComposeApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun Main_Layout(context: Context, reloadTrigger: Int ) {
+fun Main_Layout(context: Context, reloadTrigger: Int, layoutModeOverride: String? = null) {
     val scope = rememberCoroutineScope()
     val channelsResponse = remember { mutableStateOf<ChannelResponse?>(null) }
     val filteredChannels = remember { mutableStateOf<List<Channel>>(emptyList()) }
@@ -56,6 +57,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int ) {
 
     var selectedChannel by remember { mutableStateOf<Channel?>(null) }
     var epgData by remember { mutableStateOf<EpgProgram?>(null) }
+    val layoutMode = layoutModeOverride ?: preferenceManager.myPrefs.tvLayoutMode ?: "Default"
 
     val focusRequester = remember { FocusRequester() }
     val categoryMap = mapOf(
@@ -301,7 +303,6 @@ fun Main_Layout(context: Context, reloadTrigger: Int ) {
 
             AppStartTracker.shouldPlayChannel = true
         }
-
     }
 
     // Re-filter channels when category changes
@@ -500,13 +501,25 @@ fun Main_Layout(context: Context, reloadTrigger: Int ) {
             }
         }
 
+        val nonNullChannels = filteredChannels.value ?: emptyList()
+        if (layoutMode.equals("CardUI(TV)", ignoreCase = true)) {
+            CardChannelLayout(
+                context = context,
+                filteredChannels = nonNullChannels,
+                categoryMap = categoryMap,
+                selectedChannelSetter = { selectedChannel = it },
+                localPORT = localPORT,
+                preferenceManager = preferenceManager
+            )
+        } else {
         ChannelGridMain(
             context = context,
-            filteredChannels = filteredChannels.value ?: emptyList(),
+                filteredChannels = nonNullChannels,
             selectedChannelSetter = { selectedChannel = it },
             localPORT = localPORT,
             preferenceManager = preferenceManager
         )
+        }
 
 
     }

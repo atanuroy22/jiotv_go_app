@@ -41,6 +41,7 @@ fun TvScreenMenu(
     onReset: () -> Unit,
     onSelectionsMade: (
         quality: String?,
+        layoutMode: String,
         categoryNames: List<String>,
         categoryIds: List<Int>,
         languageNames: List<String>,
@@ -64,12 +65,19 @@ fun TvScreenMenu(
     var showPlaylist by remember {
         mutableStateOf(preferenceManager.myPrefs.showPLAYLIST)
     }
+    var layoutMode by remember {
+        mutableStateOf(preferenceManager.myPrefs.tvLayoutMode ?: "Default")
+    }
+
+    val layoutOptions = listOf("Default", "CardUI(TV)")
+    var layoutDropdownExpanded by remember { mutableStateOf(false) }
 
     var selectedCategories2 by remember { mutableStateOf(preferenceManager.myPrefs.lastSelectedCategoriesExp?.let {
         Gson().fromJson(it, object : TypeToken<List<String>>() {}.type)
     } ?: listOf("All")
     )
     }
+    val selectedM3uCategories = remember { mutableStateOf(selectedCategories2.toMutableList()) }
     var categories by remember { mutableStateOf<List<M3UChannelExp>>(emptyList()) }
 
     try {
@@ -106,6 +114,19 @@ fun TvScreenMenu(
                 if (!preferenceManager.myPrefs.customPlaylistSupport && !preferenceManager.myPrefs.showPLAYLIST) {
                     showPlaylist =true
                 }
+
+                DropdownSelection2(
+                    title = "Layout",
+                    options = layoutOptions,
+                    selectedOption = layoutMode,
+                    onOptionSelected = { selected ->
+                        layoutMode = selected
+                    },
+                    expanded = layoutDropdownExpanded,
+                    onExpandChange = { layoutDropdownExpanded = it }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // --- Quality Selection ---
                 var selectedQuality by remember {
@@ -297,6 +318,7 @@ fun TvScreenMenu(
                                         selectedOptions = selectedCategories2,
                                         onOptionsSelected = { newSelection ->
                                             selectedCategories2 = newSelection
+                                            selectedM3uCategories.value = newSelection.toMutableList()
 
                                             preferenceManager.myPrefs.lastSelectedCategoriesExp =
                                                 Gson().toJson(newSelection)
@@ -595,6 +617,7 @@ fun TvScreenMenu(
                             selectedLanguages.value.clear()
                             selectedLanguageInts.value.clear()
                             showPlaylist = false // Reset playlist selection
+                            layoutMode = "Default"
                             preferenceManager.apply {
                                 myPrefs.selectedScreenTV = "0"
                                 myPrefs.filterQX = "auto"
@@ -606,7 +629,10 @@ fun TvScreenMenu(
                                 myPrefs.startTvAutomatically = false
                                 myPrefs.startTvAutoDelay = false
                                 myPrefs.startTvAutoDelayTime = 0
-                                myPrefs.lastSelectedCategoriesExp = ""
+                                // myPrefs.lastSelectedCategoriesExp = ""
+                                myPrefs.lastSelectedCategoryExp = "All"
+                                myPrefs.tvLayoutMode = "Default"
+                                
 
                                 savePreferences()
                             }
@@ -617,9 +643,13 @@ fun TvScreenMenu(
                     Button(
                         onClick = {
                             onSelectionsMade(
-                                qualityMap[selectedQuality],
-                                selectedCategories.value,
-                                selectedCategoryInts.value,
+                                selectedQuality,
+                                layoutMode,
+                                if (showPlaylist) selectedCategories.value else selectedM3uCategories.value,
+                                if (showPlaylist) selectedCategoryInts.value else mutableListOf(),
+                                // qualityMap[selectedQuality],
+                                // selectedCategories.value,
+                                // selectedCategoryInts.value,
                                 selectedLanguages.value,
                                 selectedLanguageInts.value
                             )
@@ -636,6 +666,12 @@ fun TvScreenMenu(
                                 myPrefs.startTvAutomatically = startTvAutomatically
                                 myPrefs.startTvAutoDelay = startTvAutoDelay
                                 myPrefs.startTvAutoDelayTime = startTvAutoDelayTime
+                                myPrefs.tvLayoutMode = layoutMode
+                                if (!showPlaylist) {
+                                    myPrefs.lastSelectedCategoryExp =
+                                        if (selectedM3uCategories.value.isEmpty()) "All"
+                                        else selectedM3uCategories.value.joinToString(",")
+                                }
                                 savePreferences()
                             }
                             onDismiss()
