@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -48,6 +49,8 @@ import androidx.core.content.ContextCompat.startActivity
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 import com.skylake.skytv.jgorunner.ui.tvhome.CardChannelLayoutM3U
+import com.skylake.skytv.jgorunner.ui.screens.restartAppV1
+import com.skylake.skytv.jgorunner.ui.tvhome.components.TvScreenMenu
 
 @OptIn(ExperimentalGlideComposeApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -70,37 +73,25 @@ fun Main_Layout_3rd(
     val layoutMode = layoutModeOverride ?: preferenceManager.myPrefs.tvLayoutMode ?: "Default"
     val epgDebugVar by remember { mutableStateOf(preferenceManager.myPrefs.epgDebug) }
 
-    val categories = remember(allChannels) {
+    var showDialog by remember { mutableStateOf(false) }
+
+    var selectedCategories2 by remember {
+        mutableStateOf(preferenceManager.myPrefs.lastSelectedCategoriesExp?.let {
+            Gson().fromJson(it, object : TypeToken<List<String>>() {}.type)
+        } ?: listOf("All"))
+    }
+
+    val categoriesList = remember(allChannels) {
         listOf("All") + allChannels.mapNotNull { it.category }.distinct().sorted()
     }
-    // Reorder for display: keep "All" first, then currently selected categories, then the rest
-    val categoriesDisplay = remember(categories, selectedCategory) {
-        val selectedSet = selectedCategory
-            ?.split(',')
-            ?.map { it.trim() }
-            ?.filter { it.isNotEmpty() && it != "All" }
-            ?.toSet()
-            ?: emptySet()
-        val withoutAll = categories.filter { it != "All" }
-        val selectedFirst = withoutAll.filter { it in selectedSet }
-        val unselectedLater = withoutAll.filter { it !in selectedSet }
-        listOf("All") + selectedFirst + unselectedLater
-    }
 
-    val filteredChannels = remember(selectedCategory, allChannels) {
-        val sels = selectedCategory
-            ?.split(',')
-            ?.map { it.trim() }
-            ?.filter { it.isNotEmpty() && it != "All" }
-            ?.toSet()
-            ?: emptySet()
-        if (selectedCategory == null || selectedCategory == "All" || sels.isEmpty()) {
+    val filteredChannels = remember(selectedCategories2, allChannels) {
+        if (selectedCategories2.contains("All") || selectedCategories2.isEmpty()) {
             allChannels
         } else {
-            allChannels.filter { ch -> ch.category?.let { it in sels } == true }
+            allChannels.filter { it.category in selectedCategories2 }
         }
     }
-
 
     LaunchedEffect(reloadTrigger) {
         isLoading = true
@@ -112,25 +103,31 @@ fun Main_Layout_3rd(
                 allChannels = channels.distinctBy { it.url }
 
                 val availableCategories = listOf("All") + allChannels.mapNotNull { it.category }.distinct()
-                // Read saved value from existing key
-                val savedValue = preferenceManager.myPrefs.lastSelectedCategoryExp ?: "All"
-                val savedSet = savedValue.split(',').map { it.trim() }.filter { it.isNotEmpty() && it != "All" }.toSet()
-                val intersect = savedSet.intersect(availableCategories.toSet())
+                val savedCategory = preferenceManager.myPrefs.lastSelectedCategoryExp
+
                 selectedCategory = when {
-                    intersect.isNotEmpty() -> intersect.joinToString(",")
                     availableCategories.contains("  Marathi") -> "  Marathi"
+                    savedCategory != null && availableCategories.contains(savedCategory) -> savedCategory
                     else -> "All"
                 }
+
+                selectedCategories2 = preferenceManager.myPrefs.lastSelectedCategoriesExp?.let {
+                    Gson().fromJson(it, object : TypeToken<List<String>>() {}.type)
+                } ?: listOf("All")
+
             } else {
                 Log.d("TVChannelsScreen", "Channel list JSON is empty.")
                 selectedCategory = "All"
+                selectedCategories2 = listOf("All")
             }
         } catch (e: Exception) {
             Log.e("TVChannelsScreen", "Failed to load or parse channels.", e)
             selectedCategory = "All"
+            selectedCategories2 = listOf("All")
         }
         isLoading = false
     }
+
 
 
     LaunchedEffect(filteredChannels) {
@@ -203,50 +200,65 @@ fun Main_Layout_3rd(
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(horizontal = 24.dp)
                 )
-//                Spacer(modifier = Modifier.height(24.dp))
-//                Button(
-//                    onClick = {
+                ////---
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = {
 //                        (context as? Activity)?.let { activity ->
 //                            val intent = activity.intent
 //                            activity.finish()
 //                            activity.startActivity(intent)
 //                        }
-//                    },
-//                    modifier = Modifier.padding(horizontal = 24.dp)
-//                ) {
-//                    Icon(
-//                        imageVector = Icons.Filled.AddLink,
-//                        contentDescription = "Add Playlist",
-//                        modifier = Modifier.size(18.dp)
-//                    )
-//                    Spacer(modifier = Modifier.width(8.dp))
-//                    Text("Add M3U Playlist")
-//                }
+
+                        Log.d("ninit","hello from m3u")
+
+
+                        showDialog = true
+
+                    },
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.AddLink,
+                        contentDescription = "Add Playlist",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Add M3U Playlist")
+                }
+
+                if (showDialog) {
+                    TvScreenMenu(
+                        showDialog = showDialog,
+                        context = context,
+                        onDismiss = { showDialog = false },
+                        onReset = {
+                            showDialog = false
+                        },
+                        onSelectionsMade = { quality, categoryNames, categoryIds, languageNames, languageIds ->
+                            Toast.makeText(context, "Restarting App!", Toast.LENGTH_LONG).show()
+                            restartAppV1(context)
+                        }
+                    )
+                }
+
+                ////---
             }
         }
 
     } else {
-        run {
+        selectedCategory?.let { currentSelection ->
             Column(modifier = Modifier.fillMaxSize()) {
                 CategoryFilterRow(
-                    categories = categoriesDisplay,
-                    selectedCategory = selectedCategory ?: "All",
-                    onCategorySelected = { category ->
-                        selectedCategory = if (category == "All") {
-                            "All"
-                        } else {
-                            val current = selectedCategory
-                                ?.split(',')
-                                ?.map { it.trim() }
-                                ?.filter { it.isNotEmpty() && it != "All" }
-                                ?.toMutableSet() ?: mutableSetOf()
-                            if (current.contains(category)) current.remove(category) else current.add(category)
-                            if (current.isEmpty()) "All" else current.joinToString(",")
-                        }
-                        preferenceManager.myPrefs.lastSelectedCategoryExp = selectedCategory ?: "All"
+                    categories = categoriesList,
+                    selectedCategories2 = selectedCategories2,
+                    onSelectedCategoriesChange = { newSelection ->
+                        selectedCategories2 = newSelection
+                        preferenceManager.myPrefs.lastSelectedCategoriesExp = Gson().toJson(newSelection)
                         preferenceManager.savePreferences()
                     }
                 )
+
                 //////////
 
                 if (epgDebugVar) {
@@ -356,36 +368,54 @@ fun Main_Layout_3rd(
 @Composable
 private fun CategoryFilterRow(
     categories: List<String>,
-    selectedCategory: String,
-    onCategorySelected: (String) -> Unit
+    selectedCategories2: List<String>,
+    onSelectedCategoriesChange: (List<String>) -> Unit
 ) {
-    // For UI highlighting: derive set from selectedCategory string
-    val selectedSet = selectedCategory
-        .split(',')
-        .map { it.trim() }
-        .filter { it.isNotEmpty() && it != "All" }
-        .toSet()
+    val reorderedCategories = remember(categories, selectedCategories2) {
+        val allCategory = categories.find { it == "All" }
+        val selectedExceptAll = selectedCategories2.filter { it != "All" && it in categories }
+        val others = categories.filter { it != "All" && it !in selectedCategories2 }
+        listOfNotNull(allCategory) + selectedExceptAll + others
+    }
+
     LazyRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        items(categories, key = { it }) { category ->
-            val isSelected = if (category == "All") selectedSet.isEmpty() else selectedSet.contains(category)
+        items(reorderedCategories, key = { it }) { category ->
+            val isSelected = selectedCategories2.contains(category)
             FilterChip(
                 selected = isSelected,
-                onClick = { onCategorySelected(category) },
+                onClick = {
+                    val newSelection = selectedCategories2.toMutableList()
+                    if (category == "All") {
+                        newSelection.clear()
+                        newSelection.add("All")
+                    } else {
+                        if (isSelected) {
+                            newSelection.remove(category)
+                            if (newSelection.isEmpty()) {
+                                newSelection.add("All")
+                            }
+                        } else {
+                            newSelection.add(category)
+                            newSelection.remove("All")
+                        }
+                    }
+                    onSelectedCategoriesChange(newSelection)
+                }
+                ,
                 label = { Text(category) },
                 leadingIcon = if (isSelected) {
                     { Icon(Icons.Filled.Done, contentDescription = "Selected") }
-                } else {
-                    null
-                }
+                } else null
             )
         }
     }
 }
+
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
