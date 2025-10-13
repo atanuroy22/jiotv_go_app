@@ -72,6 +72,7 @@ fun CardChannelLayout(
         categories.firstOrNull { groupedChannels[it.second]?.isNotEmpty() == true } ?: categories.firstOrNull()
     }
     var lastFocusedCategoryId by rememberSaveable { mutableStateOf(firstCategoryToFocus?.second) }
+    var selectedChannelId by rememberSaveable { mutableStateOf<String?>(null) }
 
     LaunchedEffect(categories, firstCategoryToFocus) {
         val validCategoryIds = categories.mapNotNull { it.second }.toSet()
@@ -109,7 +110,9 @@ fun CardChannelLayout(
                 preferenceManager = preferenceManager,
                 selectedChannelSetter = selectedChannelSetter,
                 requestInitialFocus = requestInitialFocus,
-                onCategoryFocused = { focusedId -> lastFocusedCategoryId = focusedId }
+                onCategoryFocused = { focusedId -> lastFocusedCategoryId = focusedId },
+                selectedChannelId = selectedChannelId,
+                onChannelSelected = { channelId -> selectedChannelId = channelId }
             )
         }
     }
@@ -127,14 +130,19 @@ private fun CategoryCarousel(
     preferenceManager: SkySharedPref,
     selectedChannelSetter: (Channel) -> Unit,
     requestInitialFocus: Boolean,
-    onCategoryFocused: (Int?) -> Unit
+    onCategoryFocused: (Int?) -> Unit,
+    selectedChannelId: String?,
+    onChannelSelected: (String) -> Unit
 ) {
-    val cardWidth = 220.dp
-    val cardHeight = 180.dp
-    val cardSpacing = 24.dp
+    val cardWidth = 180.dp
+    val cardHeight = 140.dp
+    val cardSpacing = 20.dp
     val rowPadding = 48.dp
     val lazyRowState = rememberLazyListState()
     val density = LocalDensity.current
+
+    // Hide empty categories
+    if (channels.isEmpty()) return
 
     Column(
         modifier = Modifier
@@ -156,29 +164,21 @@ private fun CategoryCarousel(
             val spacingPx = with(density) { cardSpacing.toPx() }
             val baseRowPaddingPx = with(density) { rowPadding.toPx() }
 
-            if (channels.isEmpty()) {
-                EmptyCategoryCard(
-                    message = "No channels for this category",
-                    cardWidth = cardWidth,
-                    cardHeight = cardHeight,
-                    requestInitialFocus = requestInitialFocus,
-                    onFocusGained = { onCategoryFocused(categoryId) }
-                )
-            } else {
-                LazyRow(
-                    state = lazyRowState,
-                    horizontalArrangement = Arrangement.spacedBy(cardSpacing),
-                    contentPadding = PaddingValues(horizontal = rowPadding),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusProperties { canFocus = false }
-                ) {
-                    itemsIndexed(channels, key = { _, channel -> channel.channel_id }) { index, channel ->
+            LazyRow(
+                state = lazyRowState,
+                horizontalArrangement = Arrangement.spacedBy(cardSpacing),
+                contentPadding = PaddingValues(horizontal = rowPadding),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusProperties { canFocus = false }
+            ) {
+                itemsIndexed(channels, key = { _, channel -> channel.channel_id }) { index, channel ->
                         val focusRequester = remember { FocusRequester() }
                         var isFocused by remember { mutableStateOf(false) }
                         var initialFocusRequested by remember { mutableStateOf(false) }
+                        val isSelected = selectedChannelId == channel.channel_id.toString()
                         val scale by animateFloatAsState(
-                            targetValue = if (isFocused) 1.08f else 1f,
+                            targetValue = if (isFocused || isSelected) 1.08f else 1f,
                             animationSpec = spring(
                                 dampingRatio = Spring.DampingRatioMediumBouncy,
                                 stiffness = Spring.StiffnessLow
@@ -241,8 +241,10 @@ private fun CategoryCarousel(
                                 },
                             channel = channel,
                             basefinURL = basefinURL,
-                            isFocused = isFocused,
+                            isHighlighted = isFocused || isSelected,
                             onClick = {
+                                selectedChannelSetter(channel)
+                                onChannelSelected(channel.channel_id.toString())
                                 handleChannelPlay(
                                     context = context,
                                     channel = channel,
@@ -254,7 +256,6 @@ private fun CategoryCarousel(
                         )
                     }
                 }
-            }
         }
     }
 }
@@ -265,33 +266,33 @@ private fun ChannelCard(
     modifier: Modifier,
     channel: Channel,
     basefinURL: String,
-    isFocused: Boolean,
+    isHighlighted: Boolean,
     onClick: () -> Unit
 ) {
     Card(
         onClick = onClick,
         modifier = modifier,
         shape = RoundedCornerShape(28.dp),
-        border = if (isFocused) BorderStroke(4.dp, MaterialTheme.colorScheme.primary) else null,
+        border = if (isHighlighted) BorderStroke(4.dp, MaterialTheme.colorScheme.primary) else null,
         colors = CardDefaults.cardColors(
-            containerColor = if (isFocused) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant
+            containerColor = if (isHighlighted) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isFocused) 14.dp else 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isHighlighted) 14.dp else 4.dp)
     ) {
         GlideImage(
             model = "$basefinURL/jtvimage/${channel.logoUrl}",
             contentDescription = channel.channel_name,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(120.dp),
+                .height(90.dp),
             contentScale = ContentScale.Fit
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = channel.channel_name,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            fontSize = 18.sp,
+            fontSize = 16.sp,
             modifier = Modifier
                 .padding(horizontal = 16.dp)
                 .fillMaxWidth(),
@@ -423,6 +424,7 @@ fun CardChannelLayoutM3U(
         orderedCategories.firstOrNull { groupedCategories[it]?.isNotEmpty() == true } ?: orderedCategories.firstOrNull()
     }
     var lastFocusedCategoryName by rememberSaveable { mutableStateOf(firstCategory) }
+    var selectedChannelUrl by rememberSaveable { mutableStateOf<String?>(null) }
 
     LaunchedEffect(orderedCategories, firstCategory) {
         if (lastFocusedCategoryName != null && lastFocusedCategoryName !in orderedCategories) {
@@ -456,7 +458,9 @@ fun CardChannelLayoutM3U(
                 allChannels = channels,
                 selectedChannelSetter = selectedChannelSetter,
                 requestInitialFocus = requestInitialFocus,
-                onCategoryFocused = { focusedName -> lastFocusedCategoryName = focusedName }
+                onCategoryFocused = { focusedName -> lastFocusedCategoryName = focusedName },
+                selectedChannelUrl = selectedChannelUrl,
+                onChannelSelected = { url -> selectedChannelUrl = url }
             )
         }
     }
@@ -471,14 +475,19 @@ private fun CategoryCarouselM3U(
     allChannels: List<M3UChannelExp>,
     selectedChannelSetter: (M3UChannelExp) -> Unit,
     requestInitialFocus: Boolean,
-    onCategoryFocused: (String) -> Unit
+    onCategoryFocused: (String) -> Unit,
+    selectedChannelUrl: String?,
+    onChannelSelected: (String) -> Unit
 ) {
-    val cardWidth = 220.dp
-    val cardHeight = 180.dp
-    val cardSpacing = 24.dp
+    val cardWidth = 180.dp
+    val cardHeight = 140.dp
+    val cardSpacing = 20.dp
     val rowPadding = 48.dp
     val lazyRowState = rememberLazyListState()
     val density = LocalDensity.current
+
+    // Hide empty categories
+    if (channels.isEmpty()) return
 
     Column(
         modifier = Modifier
@@ -500,29 +509,21 @@ private fun CategoryCarouselM3U(
             val spacingPx = with(density) { cardSpacing.toPx() }
             val baseRowPaddingPx = with(density) { rowPadding.toPx() }
 
-            if (channels.isEmpty()) {
-                EmptyCategoryCard(
-                    message = "No channels for this category",
-                    cardWidth = cardWidth,
-                    cardHeight = cardHeight,
-                    requestInitialFocus = requestInitialFocus,
-                    onFocusGained = { onCategoryFocused(categoryName) }
-                )
-            } else {
-                LazyRow(
-                    state = lazyRowState,
-                    horizontalArrangement = Arrangement.spacedBy(cardSpacing),
-                    contentPadding = PaddingValues(horizontal = rowPadding),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusProperties { canFocus = false }
-                ) {
-                    itemsIndexed(channels, key = { _, channel -> channel.url }) { index, channel ->
+            LazyRow(
+                state = lazyRowState,
+                horizontalArrangement = Arrangement.spacedBy(cardSpacing),
+                contentPadding = PaddingValues(horizontal = rowPadding),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusProperties { canFocus = false }
+            ) {
+                itemsIndexed(channels, key = { _, channel -> channel.url }) { index, channel ->
                         val focusRequester = remember { FocusRequester() }
                         var isFocused by remember { mutableStateOf(false) }
                         var initialFocusRequested by remember { mutableStateOf(false) }
+                        val isSelected = selectedChannelUrl == channel.url
                         val scale by animateFloatAsState(
-                            targetValue = if (isFocused) 1.08f else 1f,
+                            targetValue = if (isFocused || isSelected) 1.08f else 1f,
                             animationSpec = spring(
                                 dampingRatio = Spring.DampingRatioMediumBouncy,
                                 stiffness = Spring.StiffnessLow
@@ -584,8 +585,10 @@ private fun CategoryCarouselM3U(
                                     }
                                 },
                             channel = channel,
-                            isFocused = isFocused,
+                            isHighlighted = isFocused || isSelected,
                             onClick = {
+                                selectedChannelSetter(channel)
+                                onChannelSelected(channel.url)
                                 handleM3UChannelPlay(
                                     context = context,
                                     channel = channel,
@@ -595,7 +598,6 @@ private fun CategoryCarouselM3U(
                         )
                     }
                 }
-            }
         }
     }
 }
@@ -605,33 +607,33 @@ private fun CategoryCarouselM3U(
 private fun M3UChannelCard(
     modifier: Modifier,
     channel: M3UChannelExp,
-    isFocused: Boolean,
+    isHighlighted: Boolean,
     onClick: () -> Unit
 ) {
     Card(
         onClick = onClick,
         modifier = modifier,
         shape = RoundedCornerShape(28.dp),
-        border = if (isFocused) BorderStroke(4.dp, MaterialTheme.colorScheme.primary) else null,
+        border = if (isHighlighted) BorderStroke(4.dp, MaterialTheme.colorScheme.primary) else null,
         colors = CardDefaults.cardColors(
-            containerColor = if (isFocused) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant
+            containerColor = if (isHighlighted) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isFocused) 14.dp else 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isHighlighted) 14.dp else 4.dp)
     ) {
         GlideImage(
             model = channel.logo,
             contentDescription = channel.name,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(120.dp),
+                .height(90.dp),
             contentScale = ContentScale.Fit
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = channel.name,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            fontSize = 18.sp,
+            fontSize = 16.sp,
             modifier = Modifier
                 .padding(horizontal = 16.dp)
                 .fillMaxWidth(),
