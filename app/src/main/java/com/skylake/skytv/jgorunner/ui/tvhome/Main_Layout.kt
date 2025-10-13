@@ -92,6 +92,68 @@ fun Main_Layout(context: Context, reloadTrigger: Int, layoutModeOverride: String
         listOf(resetCategoryName) + selectedOtherCategories + unselectedOtherCategories
     }
 
+    // Helper functions for enhanced autoplay
+    suspend fun fetchFromBackend(): List<Channel> {
+        return try {
+            ChannelUtils.fetchChannels("$basefinURL/channels")?.let { response ->
+                channelsResponse.value = response
+                context.getSharedPreferences("channel_cache", Context.MODE_PRIVATE).edit().apply {
+                    putString("channels_json", Gson().toJson(response))
+                    apply()
+                }
+                val categories = preferenceManager.myPrefs.filterCI
+                    ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+                val languages = preferenceManager.myPrefs.filterLI
+                    ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+
+                val filtered = when {
+                    categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(response)
+                    categories.isNullOrEmpty() -> ChannelUtils.filterChannels(
+                        response,
+                        languageIds = languages?.mapNotNull { it.toIntOrNull() }?.takeIf { it.isNotEmpty() }
+                    )
+                    languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
+                        response,
+                        categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
+                    )
+                    else -> ChannelUtils.filterChannels(
+                        response,
+                        categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() },
+                        languageIds = languages.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
+                    )
+                }
+                filteredChannels.value = filtered ?: emptyList()
+                filtered ?: emptyList()
+            } ?: emptyList()
+        } catch (e: Exception) { emptyList() }
+    }
+
+    suspend fun watchdogAutoplay(channels: List<Channel>) {
+        repeat(5) {
+            if (preferenceManager.myPrefs.currChannelUrl.isNullOrEmpty()) {
+                val channelsToUse = if (channels.isEmpty()) fetchFromBackend() else channels
+                if (channelsToUse.isNotEmpty()) {
+                    try {
+                        val firstChannel = channelsToUse.first()
+                        startActivity(context, Intent(context, ExoPlayJet::class.java).apply {
+                            putExtra("zone", "TV")
+                            putParcelableArrayListExtra("channel_list_data", ArrayList(channelsToUse.map { ch ->
+                                ChannelInfo(ch.channel_url ?: "", "http://localhost:$localPORT/jtvimage/${ch.logoUrl ?: ""}", ch.channel_name ?: "")
+                            }))
+                            putExtra("current_channel_index", 0)
+                            putExtra("video_url", firstChannel.channel_url)
+                            putExtra("logo_url", "http://localhost:$localPORT/jtvimage/${firstChannel.logoUrl}")
+                            putExtra("ch_name", firstChannel.channel_name)
+                        }, null)
+                        AppStartTracker.shouldPlayChannel = true
+                        return
+                    } catch (_: Exception) {}
+                }
+            }
+            kotlinx.coroutines.delay(2000)
+        }
+    }
+
     // Fetch and filter channels (cache/network)
     LaunchedEffect(reloadTrigger) {
         val sharedPref = context.getSharedPreferences("channel_cache", Context.MODE_PRIVATE)
@@ -187,14 +249,17 @@ fun Main_Layout(context: Context, reloadTrigger: Int, layoutModeOverride: String
         }
 
         if (preferenceManager.myPrefs.startTvAutomatically) {
-            if (!AppStartTracker.shouldPlayChannel &&
-                filteredChannels.value.isNotEmpty()) {
-
-                val firstChannel = filteredChannels.value.first()
+            var channelsForAutoplay = filteredChannels.value
+            if (channelsForAutoplay.isEmpty()) {
+                channelsForAutoplay = fetchFromBackend()
+            }
+            
+            if (!AppStartTracker.shouldPlayChannel && channelsForAutoplay.isNotEmpty()) {
+                val firstChannel = channelsForAutoplay.first()
                 val intent = Intent(context, ExoPlayJet::class.java).apply {
                     putExtra("zone", "TV")
                     putParcelableArrayListExtra("channel_list_data", ArrayList(
-                        filteredChannels.value.map { ch ->
+                        channelsForAutoplay.map { ch ->
                             ChannelInfo(
                                 ch.channel_url ?: "",
                                 "http://localhost:$localPORT/jtvimage/${ch.logoUrl ?: ""}",
@@ -204,10 +269,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int, layoutModeOverride: String
                     ))
                     putExtra("current_channel_index", 0)
                     putExtra("video_url", firstChannel.channel_url ?: "")
-                    putExtra(
-                        "logo_url",
-                        "http://localhost:$localPORT/jtvimage/${firstChannel.logoUrl ?: ""}"
-                    )
+                    putExtra("logo_url", "http://localhost:$localPORT/jtvimage/${firstChannel.logoUrl ?: ""}")
                     putExtra("ch_name", firstChannel.channel_name ?: "")
                 }
                 kotlinx.coroutines.delay(1000)
@@ -234,6 +296,9 @@ fun Main_Layout(context: Context, reloadTrigger: Int, layoutModeOverride: String
                 }
                 preferenceManager.myPrefs.recentChannels = Gson().toJson(recentChannels)
                 preferenceManager.savePreferences()
+            } else {
+                // Watchdog for reliability
+                watchdogAutoplay(channelsForAutoplay)
             }
 
             AppStartTracker.shouldPlayChannel = true
