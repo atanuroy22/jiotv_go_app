@@ -38,6 +38,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat.startActivity
+import android.content.pm.PackageManager
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import com.google.gson.Gson
@@ -140,6 +141,7 @@ private fun CategoryCarousel(
     val rowPadding = 48.dp
     val lazyRowState = rememberLazyListState()
     val density = LocalDensity.current
+    val isTvDevice = remember { context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) }
 
     // Hide empty categories
     if (channels.isEmpty()) return
@@ -176,9 +178,8 @@ private fun CategoryCarousel(
                         val focusRequester = remember { FocusRequester() }
                         var isFocused by remember { mutableStateOf(false) }
                         var initialFocusRequested by remember { mutableStateOf(false) }
-                        val isSelected = selectedChannelId == channel.channel_id.toString()
                         val scale by animateFloatAsState(
-                            targetValue = if (isFocused || isSelected) 1.08f else 1f,
+                            targetValue = if (isFocused) 1.15f else 1f,
                             animationSpec = spring(
                                 dampingRatio = Spring.DampingRatioMediumBouncy,
                                 stiffness = Spring.StiffnessLow
@@ -199,7 +200,6 @@ private fun CategoryCarousel(
                         LaunchedEffect(isFocused) {
                             if (isFocused) {
                                 onCategoryFocused(categoryId)
-                                selectedChannelSetter(channel)
                                 delay(50) // Small delay to prevent competing scrolls
                                 // Disney+ style centering: scroll so item is at center of viewport
                                 // LazyRow scrolls by moving content, where scrollOffset is pixels from item start
@@ -233,6 +233,17 @@ private fun CategoryCarousel(
                                         when (event.key) {
                                             Key.DirectionLeft -> isFirstItem
                                             Key.DirectionRight -> isLastItem
+                                            Key.DirectionCenter, Key.Enter -> {
+                                                selectedChannelSetter(channel)
+                                                handleChannelPlay(
+                                                    context = context,
+                                                    channel = channel,
+                                                    basefinURL = basefinURL,
+                                                    allChannels = allChannels,
+                                                    preferenceManager = preferenceManager
+                                                )
+                                                true
+                                            }
                                             else -> false
                                         }
                                     } else {
@@ -241,10 +252,9 @@ private fun CategoryCarousel(
                                 },
                             channel = channel,
                             basefinURL = basefinURL,
-                            isHighlighted = isFocused || isSelected,
+                            isHighlighted = if (isTvDevice) isFocused else false,
                             onClick = {
                                 selectedChannelSetter(channel)
-                                onChannelSelected(channel.channel_id.toString())
                                 handleChannelPlay(
                                     context = context,
                                     channel = channel,
@@ -273,11 +283,11 @@ private fun ChannelCard(
         onClick = onClick,
         modifier = modifier,
         shape = RoundedCornerShape(28.dp),
-        border = if (isHighlighted) BorderStroke(4.dp, MaterialTheme.colorScheme.primary) else null,
+        border = if (isHighlighted) BorderStroke(3.dp, MaterialTheme.colorScheme.primary) else null,
         colors = CardDefaults.cardColors(
-            containerColor = if (isHighlighted) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isHighlighted) 14.dp else 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isHighlighted) 8.dp else 4.dp)
     ) {
         GlideImage(
             model = "$basefinURL/jtvimage/${channel.logoUrl}",
@@ -485,6 +495,7 @@ private fun CategoryCarouselM3U(
     val rowPadding = 48.dp
     val lazyRowState = rememberLazyListState()
     val density = LocalDensity.current
+    val isTvDevice = remember { context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) }
 
     // Hide empty categories
     if (channels.isEmpty()) return
@@ -521,9 +532,8 @@ private fun CategoryCarouselM3U(
                         val focusRequester = remember { FocusRequester() }
                         var isFocused by remember { mutableStateOf(false) }
                         var initialFocusRequested by remember { mutableStateOf(false) }
-                        val isSelected = selectedChannelUrl == channel.url
                         val scale by animateFloatAsState(
-                            targetValue = if (isFocused || isSelected) 1.08f else 1f,
+                            targetValue = if (isFocused) 1.15f else 1f,
                             animationSpec = spring(
                                 dampingRatio = Spring.DampingRatioMediumBouncy,
                                 stiffness = Spring.StiffnessLow
@@ -544,7 +554,6 @@ private fun CategoryCarouselM3U(
                         LaunchedEffect(isFocused) {
                             if (isFocused) {
                                 onCategoryFocused(categoryName)
-                                selectedChannelSetter(channel)
                                 delay(50) // Small delay to prevent competing scrolls
                                 // Disney+ style centering: scroll so item is at center of viewport
                                 // LazyRow scrolls by moving content, where scrollOffset is pixels from item start
@@ -578,6 +587,15 @@ private fun CategoryCarouselM3U(
                                         when (event.key) {
                                             Key.DirectionLeft -> isFirstItem
                                             Key.DirectionRight -> isLastItem
+                                            Key.DirectionCenter, Key.Enter -> {
+                                                selectedChannelSetter(channel)
+                                                handleM3UChannelPlay(
+                                                    context = context,
+                                                    channel = channel,
+                                                    allChannels = allChannels
+                                                )
+                                                true
+                                            }
                                             else -> false
                                         }
                                     } else {
@@ -585,10 +603,9 @@ private fun CategoryCarouselM3U(
                                     }
                                 },
                             channel = channel,
-                            isHighlighted = isFocused || isSelected,
+                            isHighlighted = if (isTvDevice) isFocused else false,
                             onClick = {
                                 selectedChannelSetter(channel)
-                                onChannelSelected(channel.url)
                                 handleM3UChannelPlay(
                                     context = context,
                                     channel = channel,
@@ -614,11 +631,11 @@ private fun M3UChannelCard(
         onClick = onClick,
         modifier = modifier,
         shape = RoundedCornerShape(28.dp),
-        border = if (isHighlighted) BorderStroke(4.dp, MaterialTheme.colorScheme.primary) else null,
+        border = if (isHighlighted) BorderStroke(3.dp, MaterialTheme.colorScheme.primary) else null,
         colors = CardDefaults.cardColors(
-            containerColor = if (isHighlighted) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isHighlighted) 14.dp else 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isHighlighted) 8.dp else 4.dp)
     ) {
         GlideImage(
             model = channel.logo,

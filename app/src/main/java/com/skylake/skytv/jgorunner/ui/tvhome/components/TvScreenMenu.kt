@@ -77,6 +77,7 @@ fun TvScreenMenu(
     } ?: listOf("All")
     )
     }
+    val selectedM3uCategories = remember { mutableStateOf(selectedCategories2.toMutableList()) }
     var categories by remember { mutableStateOf<List<M3UChannelExp>>(emptyList()) }
 
     try {
@@ -317,6 +318,7 @@ fun TvScreenMenu(
                                         selectedOptions = selectedCategories2,
                                         onOptionsSelected = { newSelection ->
                                             selectedCategories2 = newSelection
+                                            selectedM3uCategories.value = newSelection.toMutableList()
 
                                             preferenceManager.myPrefs.lastSelectedCategoriesExp =
                                                 Gson().toJson(newSelection)

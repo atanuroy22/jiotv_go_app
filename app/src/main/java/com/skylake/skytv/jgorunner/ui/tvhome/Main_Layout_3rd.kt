@@ -235,7 +235,7 @@ fun Main_Layout_3rd(
                         onReset = {
                             showDialog = false
                         },
-                        onSelectionsMade = { quality, categoryNames, categoryIds, languageNames, languageIds ->
+                        onSelectionsMade = { quality, layoutMode, categoryNames, categoryIds, languageNames, languageIds ->
                             Toast.makeText(context, "Restarting App!", Toast.LENGTH_LONG).show()
                             restartAppV1(context)
                         }
