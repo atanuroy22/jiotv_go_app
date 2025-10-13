@@ -150,9 +150,6 @@ fun ExoPlayJetScreen(
     var numericJob: Job? by remember { mutableStateOf(null) }
     var isControllerVisible by remember { mutableStateOf(false) }
 
-    // Cache of last persisted channel URL to avoid redundant SharedPreferences writes
-    var lastPersistedChannelUrl by remember { mutableStateOf<String?>(null) }
-
     // --- Epg fetch ---
     val epgCache = remember { mutableStateMapOf<String, Pair<Long, String?>>() }
     LaunchedEffect(showChannelPanel, channelList) {
@@ -679,16 +676,6 @@ fun ExoPlayJetScreen(
                     }
                 }
             }
-        }
-    }
-
-    // Clear sentinel on leaving the player so future autoplay sessions can trigger again
-    DisposableEffect(Unit) {
-        onDispose {
-            try {
-                preferenceManager.myPrefs.currChannelUrl = ""
-                preferenceManager.savePreferences()
-            } catch (_: Exception) { }
         }
     }
 }

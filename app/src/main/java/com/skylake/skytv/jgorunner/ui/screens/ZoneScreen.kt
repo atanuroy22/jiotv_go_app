@@ -182,11 +182,7 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
             if (preferenceManager.myPrefs.customPlaylistSupport &&
                 !preferenceManager.myPrefs.showPLAYLIST) {
 
-                Main_Layout_3rd(
-                    context = context,
-                    reloadTrigger = reloadChannelsTrigger,
-                    layoutModeOverride = layoutModeSelection
-                )
+                Main_Layout_3rd(context, reloadTrigger = reloadChannelsTrigger, layoutModeOverride = layoutModeSelection)
 
             } else if (!preferenceManager.myPrefs.showRecentTab) {
 

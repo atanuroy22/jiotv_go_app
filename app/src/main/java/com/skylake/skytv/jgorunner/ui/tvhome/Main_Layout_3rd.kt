@@ -337,7 +337,7 @@ fun Main_Layout_3rd(
                     // Empty
                 }
 
-                if (layoutMode.equals("CardUI", ignoreCase = true)) {
+                if (layoutMode.equals("CardUI(TV)", ignoreCase = true)) {
                     CardChannelLayoutM3U(
                         context = context,
                         channels = filteredChannels,

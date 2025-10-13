@@ -69,7 +69,7 @@ fun TvScreenMenu(
         mutableStateOf(preferenceManager.myPrefs.tvLayoutMode ?: "Default")
     }
 
-    val layoutOptions = listOf("Default", "CardUI")
+    val layoutOptions = listOf("Default", "CardUI(TV)")
     var layoutDropdownExpanded by remember { mutableStateOf(false) }
 
     var selectedCategories2 by remember { mutableStateOf(preferenceManager.myPrefs.lastSelectedCategoriesExp?.let {

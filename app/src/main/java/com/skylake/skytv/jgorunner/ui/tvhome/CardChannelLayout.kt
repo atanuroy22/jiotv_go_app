@@ -223,16 +223,23 @@ private fun CategoryCarousel(
                                     isFocused = focusState.isFocused
                                 }
                                 .scale(scale)
-                                .focusable()
-                                .focusProperties {
-                                    if (isFirstItem) left = FocusRequester.Cancel
-                                    if (isLastItem) right = FocusRequester.Cancel
-                                }
                                 .onPreviewKeyEvent { event ->
                                     if (event.type == KeyEventType.KeyDown) {
                                         when (event.key) {
-                                            Key.DirectionLeft -> isFirstItem
-                                            Key.DirectionRight -> isLastItem
+                                            Key.DirectionLeft -> {
+                                                if (isFirstItem) {
+                                                    true // Consume the event to prevent navigation
+                                                } else {
+                                                    false // Allow normal navigation
+                                                }
+                                            }
+                                            Key.DirectionRight -> {
+                                                if (isLastItem) {
+                                                    true // Consume the event to prevent navigation
+                                                } else {
+                                                    false // Allow normal navigation
+                                                }
+                                            }
                                             Key.DirectionCenter, Key.Enter -> {
                                                 selectedChannelSetter(channel)
                                                 handleChannelPlay(
@@ -249,6 +256,11 @@ private fun CategoryCarousel(
                                     } else {
                                         false
                                     }
+                                }
+                                .focusable()
+                                .focusProperties {
+                                    if (isFirstItem) left = FocusRequester.Cancel
+                                    if (isLastItem) right = FocusRequester.Cancel
                                 },
                             channel = channel,
                             basefinURL = basefinURL,
@@ -289,14 +301,20 @@ private fun ChannelCard(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isHighlighted) 8.dp else 4.dp)
     ) {
-        GlideImage(
-            model = "$basefinURL/jtvimage/${channel.logoUrl}",
-            contentDescription = channel.channel_name,
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(90.dp),
-            contentScale = ContentScale.Fit
-        )
+                .height(90.dp)
+                .padding(12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            GlideImage(
+                model = "$basefinURL/jtvimage/${channel.logoUrl}",
+                contentDescription = channel.channel_name,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit
+            )
+        }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = channel.channel_name,
@@ -577,16 +595,23 @@ private fun CategoryCarouselM3U(
                                     isFocused = focusState.isFocused
                                 }
                                 .scale(scale)
-                                .focusable()
-                                .focusProperties {
-                                    if (isFirstItem) left = FocusRequester.Cancel
-                                    if (isLastItem) right = FocusRequester.Cancel
-                                }
                                 .onPreviewKeyEvent { event ->
                                     if (event.type == KeyEventType.KeyDown) {
                                         when (event.key) {
-                                            Key.DirectionLeft -> isFirstItem
-                                            Key.DirectionRight -> isLastItem
+                                            Key.DirectionLeft -> {
+                                                if (isFirstItem) {
+                                                    true // Consume the event to prevent navigation
+                                                } else {
+                                                    false // Allow normal navigation
+                                                }
+                                            }
+                                            Key.DirectionRight -> {
+                                                if (isLastItem) {
+                                                    true // Consume the event to prevent navigation
+                                                } else {
+                                                    false // Allow normal navigation
+                                                }
+                                            }
                                             Key.DirectionCenter, Key.Enter -> {
                                                 selectedChannelSetter(channel)
                                                 handleM3UChannelPlay(
@@ -601,6 +626,11 @@ private fun CategoryCarouselM3U(
                                     } else {
                                         false
                                     }
+                                }
+                                .focusable()
+                                .focusProperties {
+                                    if (isFirstItem) left = FocusRequester.Cancel
+                                    if (isLastItem) right = FocusRequester.Cancel
                                 },
                             channel = channel,
                             isHighlighted = if (isTvDevice) isFocused else false,
@@ -637,14 +667,20 @@ private fun M3UChannelCard(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isHighlighted) 8.dp else 4.dp)
     ) {
-        GlideImage(
-            model = channel.logo,
-            contentDescription = channel.name,
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(90.dp),
-            contentScale = ContentScale.Fit
-        )
+                .height(90.dp)
+                .padding(12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            GlideImage(
+                model = channel.logo,
+                contentDescription = channel.name,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit
+            )
+        }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = channel.name,
