@@ -29,6 +29,8 @@ class BinaryService : Service() {
             "${BuildConfig.APPLICATION_ID}.action.STOP_BINARY"
         const val ACTION_BINARY_STOPPED: String =
             "${BuildConfig.APPLICATION_ID}.action.BINARY_STOPPED"
+        const val ACTION_BINARY_STARTED: String =
+            "${BuildConfig.APPLICATION_ID}.action.BINARY_STARTED"
 
         // Singleton instance of the BinaryService
         var instance: BinaryService? = null
@@ -95,12 +97,47 @@ class BinaryService : Service() {
                 var temp = binaryOutput.value
                 if (temp == null) {
                     binaryOutput.postValue(output)
+                    // Persist logs for widget
+                    try {
+                        val pref = SkySharedPref.getInstance(this)
+                        val existing = pref.myPrefs.widgetLogs ?: ""
+                        var newLogs = (existing + output)
+                        if (newLogs.length > 4000) {
+                            newLogs = newLogs.takeLast(4000)
+                        }
+                        pref.myPrefs.widgetLogs = newLogs
+                        pref.savePreferences()
+                        // Notify widgets to refresh
+                        val refreshIntent = Intent("com.skylake.skytv.jgorunner.widgets.action.REFRESH")
+                        refreshIntent.setPackage(packageName)
+                        sendBroadcast(refreshIntent)
+                    } catch (e: Exception) {
+                        Log.e("BinaryService", "Error persisting widget logs", e)
+                    }
                     return@executeBinary
                 }
                 temp += output
                 if (temp.length > 5000)
                     temp = temp.substring(5000)
                 binaryOutput.postValue(temp.toString())
+
+                // Persist logs for widget
+                try {
+                    val pref = SkySharedPref.getInstance(this)
+                    val existing = pref.myPrefs.widgetLogs ?: ""
+                    var newLogs = (existing + output)
+                    if (newLogs.length > 4000) {
+                        newLogs = newLogs.takeLast(4000)
+                    }
+                    pref.myPrefs.widgetLogs = newLogs
+                    pref.savePreferences()
+                    // Notify widgets to refresh
+                    val refreshIntent = Intent("com.skylake.skytv.jgorunner.widgets.action.REFRESH")
+                    refreshIntent.setPackage(packageName)
+                    sendBroadcast(refreshIntent)
+                } catch (e: Exception) {
+                    Log.e("BinaryService", "Error persisting widget logs", e)
+                }
             },
             onError = {
                 Log.e("BinaryService", "Error executing binary: ${it.errorType.name}", it)
@@ -118,6 +155,11 @@ class BinaryService : Service() {
                 stopService()
             }
         )
+
+        // Broadcast that the binary has started
+        val startedIntent = Intent(ACTION_BINARY_STARTED)
+        startedIntent.setPackage(packageName)
+        sendBroadcast(startedIntent)
 
         Log.d(
             "BinaryService",
