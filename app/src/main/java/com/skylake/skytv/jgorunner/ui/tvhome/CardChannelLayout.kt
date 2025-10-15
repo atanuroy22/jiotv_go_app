@@ -142,6 +142,9 @@ private fun CategoryCarousel(
     val lazyRowState = rememberLazyListState()
     val density = LocalDensity.current
     val isTvDevice = remember { context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) }
+    
+    // Track currently focused index to prevent unwanted navigation
+    var currentFocusedIndex by remember { mutableStateOf<Int?>(null) }
 
     // Hide empty categories
     if (channels.isEmpty()) return
@@ -186,11 +189,13 @@ private fun CategoryCarousel(
                             ),
                             label = "cardFocusScale"
                         )
-                        val isFirstItem = index == 0
-                        val isLastItem = index == channels.lastIndex
+                        
+                        // Store focus requesters for navigation
+                        val leftFocusRequester = remember { if (index > 0) FocusRequester() else null }
+                        val rightFocusRequester = remember { if (index < channels.size - 1) FocusRequester() else null }
 
                         LaunchedEffect(requestInitialFocus, initialFocusRequested) {
-                            if (requestInitialFocus && isFirstItem && !initialFocusRequested) {
+                            if (requestInitialFocus && index == 0 && !initialFocusRequested) {
                                 delay(120)
                                 focusRequester.requestFocus()
                                 initialFocusRequested = true
@@ -199,6 +204,7 @@ private fun CategoryCarousel(
 
                         LaunchedEffect(isFocused) {
                             if (isFocused) {
+                                currentFocusedIndex = index
                                 onCategoryFocused(categoryId)
                                 delay(50) // Small delay to prevent competing scrolls
                                 // Disney+ style centering: scroll so item is at center of viewport
@@ -221,23 +227,32 @@ private fun CategoryCarousel(
                                 .height(cardHeight)
                                 .onFocusChanged { focusState ->
                                     isFocused = focusState.isFocused
+                                    if (!focusState.isFocused) {
+                                        // When losing focus, update the tracked index
+                                        if (currentFocusedIndex == index) {
+                                            currentFocusedIndex = null
+                                        }
+                                    }
                                 }
                                 .scale(scale)
+                                .focusable()
                                 .onPreviewKeyEvent { event ->
                                     if (event.type == KeyEventType.KeyDown) {
                                         when (event.key) {
                                             Key.DirectionLeft -> {
-                                                if (isFirstItem) {
-                                                    true // Consume the event to prevent navigation
+                                                // Always check bounds and consume if at boundary
+                                                if (index <= 0) {
+                                                    true // At first item, block left navigation
                                                 } else {
-                                                    false // Allow normal navigation
+                                                    false // Not at boundary, allow navigation
                                                 }
                                             }
                                             Key.DirectionRight -> {
-                                                if (isLastItem) {
-                                                    true // Consume the event to prevent navigation
+                                                // Always check bounds and consume if at boundary
+                                                if (index >= channels.size - 1) {
+                                                    true // At last item, block right navigation
                                                 } else {
-                                                    false // Allow normal navigation
+                                                    false // Not at boundary, allow navigation
                                                 }
                                             }
                                             Key.DirectionCenter, Key.Enter -> {
@@ -257,10 +272,11 @@ private fun CategoryCarousel(
                                         false
                                     }
                                 }
-                                .focusable()
                                 .focusProperties {
-                                    if (isFirstItem) left = FocusRequester.Cancel
-                                    if (isLastItem) right = FocusRequester.Cancel
+                                    // Strict boundary enforcement
+                                    canFocus = true
+                                    left = if (index == 0) FocusRequester.Cancel else FocusRequester.Default
+                                    right = if (index == channels.size - 1) FocusRequester.Cancel else FocusRequester.Default
                                 },
                             channel = channel,
                             basefinURL = basefinURL,
@@ -514,6 +530,9 @@ private fun CategoryCarouselM3U(
     val lazyRowState = rememberLazyListState()
     val density = LocalDensity.current
     val isTvDevice = remember { context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) }
+    
+    // Track currently focused index to prevent unwanted navigation
+    var currentFocusedIndex by remember { mutableStateOf<Int?>(null) }
 
     // Hide empty categories
     if (channels.isEmpty()) return
@@ -558,11 +577,13 @@ private fun CategoryCarouselM3U(
                             ),
                             label = "cardFocusScaleM3U"
                         )
-                        val isFirstItem = index == 0
-                        val isLastItem = index == channels.lastIndex
+                        
+                        // Store focus requesters for navigation
+                        val leftFocusRequester = remember { if (index > 0) FocusRequester() else null }
+                        val rightFocusRequester = remember { if (index < channels.size - 1) FocusRequester() else null }
 
                         LaunchedEffect(requestInitialFocus, initialFocusRequested) {
-                            if (requestInitialFocus && isFirstItem && !initialFocusRequested) {
+                            if (requestInitialFocus && index == 0 && !initialFocusRequested) {
                                 delay(120)
                                 focusRequester.requestFocus()
                                 initialFocusRequested = true
@@ -571,6 +592,7 @@ private fun CategoryCarouselM3U(
 
                         LaunchedEffect(isFocused) {
                             if (isFocused) {
+                                currentFocusedIndex = index
                                 onCategoryFocused(categoryName)
                                 delay(50) // Small delay to prevent competing scrolls
                                 // Disney+ style centering: scroll so item is at center of viewport
@@ -593,23 +615,32 @@ private fun CategoryCarouselM3U(
                                 .height(cardHeight)
                                 .onFocusChanged { focusState ->
                                     isFocused = focusState.isFocused
+                                    if (!focusState.isFocused) {
+                                        // When losing focus, update the tracked index
+                                        if (currentFocusedIndex == index) {
+                                            currentFocusedIndex = null
+                                        }
+                                    }
                                 }
                                 .scale(scale)
+                                .focusable()
                                 .onPreviewKeyEvent { event ->
                                     if (event.type == KeyEventType.KeyDown) {
                                         when (event.key) {
                                             Key.DirectionLeft -> {
-                                                if (isFirstItem) {
-                                                    true // Consume the event to prevent navigation
+                                                // Always check bounds and consume if at boundary
+                                                if (index <= 0) {
+                                                    true // At first item, block left navigation
                                                 } else {
-                                                    false // Allow normal navigation
+                                                    false // Not at boundary, allow navigation
                                                 }
                                             }
                                             Key.DirectionRight -> {
-                                                if (isLastItem) {
-                                                    true // Consume the event to prevent navigation
+                                                // Always check bounds and consume if at boundary
+                                                if (index >= channels.size - 1) {
+                                                    true // At last item, block right navigation
                                                 } else {
-                                                    false // Allow normal navigation
+                                                    false // Not at boundary, allow navigation
                                                 }
                                             }
                                             Key.DirectionCenter, Key.Enter -> {
@@ -627,10 +658,11 @@ private fun CategoryCarouselM3U(
                                         false
                                     }
                                 }
-                                .focusable()
                                 .focusProperties {
-                                    if (isFirstItem) left = FocusRequester.Cancel
-                                    if (isLastItem) right = FocusRequester.Cancel
+                                    // Strict boundary enforcement
+                                    canFocus = true
+                                    left = if (index == 0) FocusRequester.Cancel else FocusRequester.Default
+                                    right = if (index == channels.size - 1) FocusRequester.Cancel else FocusRequester.Default
                                 },
                             channel = channel,
                             isHighlighted = if (isTvDevice) isFocused else false,
