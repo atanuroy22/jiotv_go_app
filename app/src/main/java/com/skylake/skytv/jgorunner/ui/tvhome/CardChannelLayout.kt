@@ -313,7 +313,7 @@ private fun ChannelCard(
         shape = RoundedCornerShape(28.dp),
         border = if (isHighlighted) BorderStroke(3.dp, MaterialTheme.colorScheme.primary) else null,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
+            containerColor = MaterialTheme.colorScheme.primaryContainer
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isHighlighted) 8.dp else 4.dp)
     ) {
@@ -695,7 +695,7 @@ private fun M3UChannelCard(
         shape = RoundedCornerShape(28.dp),
         border = if (isHighlighted) BorderStroke(3.dp, MaterialTheme.colorScheme.primary) else null,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
+            containerColor = MaterialTheme.colorScheme.primaryContainer
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isHighlighted) 8.dp else 4.dp)
     ) {

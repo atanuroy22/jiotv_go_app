@@ -68,6 +68,7 @@ fun TvScreenMenu(
     var layoutMode by remember {
         mutableStateOf(preferenceManager.myPrefs.tvLayoutMode ?: "Default")
     }
+    val isCardUiExperimentEnabled = remember { preferenceManager.myPrefs.cardUiExperiment }
 
     val layoutOptions = listOf("Default", "CardUI(TV)")
     var layoutDropdownExpanded by remember { mutableStateOf(false) }
@@ -115,16 +116,18 @@ fun TvScreenMenu(
                     showPlaylist =true
                 }
 
-                DropdownSelection2(
-                    title = "Layout",
-                    options = layoutOptions,
-                    selectedOption = layoutMode,
-                    onOptionSelected = { selected ->
-                        layoutMode = selected
-                    },
-                    expanded = layoutDropdownExpanded,
-                    onExpandChange = { layoutDropdownExpanded = it }
-                )
+                if (isCardUiExperimentEnabled) {
+                    DropdownSelection2(
+                        title = "Layout",
+                        options = layoutOptions,
+                        selectedOption = layoutMode,
+                        onOptionSelected = { selected ->
+                            layoutMode = selected
+                        },
+                        expanded = layoutDropdownExpanded,
+                        onExpandChange = { layoutDropdownExpanded = it }
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -666,7 +669,8 @@ fun TvScreenMenu(
                                 myPrefs.startTvAutomatically = startTvAutomatically
                                 myPrefs.startTvAutoDelay = startTvAutoDelay
                                 myPrefs.startTvAutoDelayTime = startTvAutoDelayTime
-                                myPrefs.tvLayoutMode = layoutMode
+                                // Respect experiment toggle: if off, force Default and do not save CardUI
+                                myPrefs.tvLayoutMode = if (isCardUiExperimentEnabled) layoutMode else "Default"
                                 if (!showPlaylist) {
                                     myPrefs.lastSelectedCategoryExp =
                                         if (selectedM3uCategories.value.isEmpty()) "All"
