@@ -74,6 +74,7 @@ import com.skylake.skytv.jgorunner.activities.CastActivity
 import com.skylake.skytv.jgorunner.core.update.DownloadModelNew
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.LandingPage
+import com.skylake.skytv.jgorunner.services.player.PlayerCommandBus
 import com.skylake.skytv.jgorunner.ui.components.ButtonContent
 import com.skylake.skytv.jgorunner.ui.components.ProgressPopup
 import com.skylake.skytv.jgorunner.ui.tvhome.changeIconTOFirst
@@ -290,6 +291,34 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
                         Toast.makeText(
                             context,
                             "Generic TV Icon ${if (checked) "enabled" else "disabled"}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                )
+            }
+
+            // Experimental: PiP Toggle
+            item {
+                val enablePip = remember { mutableStateOf(preferenceManager.myPrefs.enablePip) }
+                DebugSwitchItem(
+                    icon = Icons.Default.PlayCircleOutline,
+                    title = "Picture-in-Picture",
+                    subtitle = if (enablePip.value) "Enabled: PiP button, Back-to-PiP, auto-PiP" else "Disabled: no PiP UI or actions",
+                    isChecked = enablePip.value,
+                    onCheckedChange = { checked ->
+                        enablePip.value = checked
+                        preferenceManager.myPrefs.enablePip = checked
+                        applySettings()
+                        // If PiP is being disabled, ensure any active PiP and playback are stopped
+                        if (!checked) {
+                            try {
+                                PlayerCommandBus.requestStopPlayback()
+                                PlayerCommandBus.requestClosePip()
+                            } catch (_: Exception) { /* no-op */ }
+                        }
+                        Toast.makeText(
+                            context,
+                            "PiP ${if (checked) "enabled" else "disabled"}",
                             Toast.LENGTH_SHORT
                         ).show()
                     }

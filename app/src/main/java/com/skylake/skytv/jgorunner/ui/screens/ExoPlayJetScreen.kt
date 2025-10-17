@@ -106,6 +106,7 @@ import coil.request.ImageRequest
 import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.data.SkySharedPref
+import com.skylake.skytv.jgorunner.services.player.PlayerCommandBus
 import com.skylake.skytv.jgorunner.ui.tvhome.ChannelUtils
 import com.skylake.skytv.jgorunner.ui.tvhome.extractChannelIdFromPlayUrl
 import com.skylake.skytv.jgorunner.utils.containsAnyId
@@ -136,6 +137,7 @@ fun ExoPlayJetScreen(
     val localPORT by remember { mutableIntStateOf(preferenceManager.myPrefs.jtvGoServerPort) }
     val basefinURL = "http://localhost:$localPORT"
     val tvNAV = preferenceManager.myPrefs.selectedRemoteNavTV ?: "0"
+    val pipEnabled = preferenceManager.myPrefs.enablePip
     val focusRequester = remember { FocusRequester() }
     var currentIndex by remember { mutableStateOf(currentChannelIndex) }
     var showChannelPanel by remember { mutableStateOf(false) }
@@ -152,6 +154,14 @@ fun ExoPlayJetScreen(
 
     // Cache of last persisted channel URL to avoid redundant SharedPreferences writes
     var lastPersistedChannelUrl by remember { mutableStateOf<String?>(null) }
+
+    // Keep local state in sync when a new intent provides a different index
+    LaunchedEffect(currentChannelIndex) {
+        val incoming = currentChannelIndex.coerceAtLeast(0)
+        if (incoming != currentIndex) {
+            currentIndex = incoming
+        }
+    }
 
     // --- Epg fetch ---
     val epgCache = remember { mutableStateMapOf<String, Pair<Long, String?>>() }
@@ -232,8 +242,14 @@ fun ExoPlayJetScreen(
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> exoPlayer.playWhenReady = true
-                Lifecycle.Event.ON_PAUSE -> exoPlayer.playWhenReady = false
-                Lifecycle.Event.ON_DESTROY -> exoPlayer.release()
+                Lifecycle.Event.ON_PAUSE -> if (!PlayerCommandBus.isInPipMode && !PlayerCommandBus.isEnteringPip) exoPlayer.playWhenReady = false
+                Lifecycle.Event.ON_DESTROY -> {
+                    try {
+                        exoPlayer.stop()
+                        exoPlayer.clearMediaItems()
+                    } catch (_: Exception) {}
+                    exoPlayer.release()
+                }
                 else -> Unit
             }
         }
@@ -253,6 +269,21 @@ fun ExoPlayJetScreen(
                 if (state == Player.STATE_READY) {
                     isBuffering = false
                 }
+                // Update PiP actions as play/pause state may have effectively changed
+                PlayerCommandBus.notifyStateChanged()
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                PlayerCommandBus.notifyStateChanged()
+            }
+
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                PlayerCommandBus.notifyStateChanged()
+            }
+
+            override fun onPositionDiscontinuity(reason: Int) {
+                // Seek or track changes can flip playing state; refresh PiP actions
+                PlayerCommandBus.notifyStateChanged()
             }
         }
         exoPlayer.addListener(listener)
@@ -276,9 +307,86 @@ fun ExoPlayJetScreen(
         // そにー Hook
         setupCustomPlaybackLogic(exoPlayer, currentUrl)
 
-        showChannelOverlay = true
-        delay(overlayDisplayTimeMs.toLong())
-        showChannelOverlay = false
+        if (!PlayerCommandBus.isInPipMode) {
+            showChannelOverlay = true
+            delay(overlayDisplayTimeMs.toLong())
+            showChannelOverlay = false
+        }
+    }
+
+    // Expose player controls to PiP actions
+    DisposableEffect(Unit) {
+    PlayerCommandBus.setHandlers(
+            playPause = {
+                try {
+                    exoPlayer.playWhenReady = !exoPlayer.playWhenReady
+                } finally {
+                    PlayerCommandBus.notifyStateChanged()
+                    // Some launchers refresh PiP actions a tick later; send a follow-up update
+                    scope.launch {
+                        delay(120)
+                        PlayerCommandBus.notifyStateChanged()
+                    }
+                }
+            },
+            next = {
+                channelList?.let {
+                    if (it.isNotEmpty()) {
+                        val ni = (currentIndex + 1) % it.size
+                        currentIndex = ni
+                        PlayerCommandBus.requestSwitch(index = ni)
+                    }
+                }
+            },
+            prev = {
+                channelList?.let {
+                    if (it.isNotEmpty()) {
+                        val pi = if (currentIndex - 1 < 0) it.size - 1 else currentIndex - 1
+                        currentIndex = pi
+                        PlayerCommandBus.requestSwitch(index = pi)
+                    }
+                }
+            },
+            // Use ExoPlayer.isPlaying so PiP icon matches actual playback (pause shows Play icon, play shows Pause icon)
+            isPlaying = { exoPlayer.isPlaying }
+        )
+        PlayerCommandBus.setOnStopPlayback {
+            try {
+                exoPlayer.stop()
+                exoPlayer.clearMediaItems()
+                exoPlayer.playWhenReady = false
+            } catch (_: Exception) {}
+        }
+        onDispose {
+            PlayerCommandBus.setOnStopPlayback(null)
+            PlayerCommandBus.clearHandlers()
+        }
+    }
+
+    // Respond to external switch requests (e.g., when a new channel is picked while in PiP)
+    DisposableEffect(Unit) {
+        PlayerCommandBus.setOnSwitchRequest { url, index ->
+            try {
+                var targetUrl: String? = null
+                if (index != null && !channelList.isNullOrEmpty() && index in channelList.indices) {
+                    // Index switch has priority
+                    currentIndex = index
+                    targetUrl = channelList!![index].videoUrl
+                } else if (!url.isNullOrEmpty()) {
+                    targetUrl = url
+                    // If list contains this item, also advance the index to keep UI in sync
+                    val foundIdx = channelList?.indexOfFirst { it.videoUrl == url } ?: -1
+                    if (foundIdx >= 0) currentIndex = foundIdx
+                }
+                if (!targetUrl.isNullOrEmpty()) {
+                    val mi = MediaItem.fromUri(Uri.parse(targetUrl))
+                    exoPlayer.setMediaItem(mi)
+                    exoPlayer.prepare()
+                    exoPlayer.playWhenReady = true
+                }
+            } catch (_: Exception) {}
+        }
+        onDispose { PlayerCommandBus.setOnSwitchRequest(null) }
     }
 
     LaunchedEffect(currentIndex) {
@@ -295,6 +403,7 @@ fun ExoPlayJetScreen(
         }
     }
 
+    // Back-to-PiP: pressing Back enters PiP (YouTube-like); fallback to finish if PiP unsupported
     BackHandler {
         when {
             showChannelPanel -> {
@@ -306,7 +415,25 @@ fun ExoPlayJetScreen(
                 exoPlayerView?.hideController()
             }
             else -> {
-                (context as? Activity)?.finish()
+                val act = (context as? Activity)
+                val pm = context.packageManager
+                val supportsPip = try {
+                    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O &&
+                            pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE)
+                } catch (_: Exception) { false }
+                if (supportsPip && pipEnabled) {
+                    try {
+                        PlayerCommandBus.isEnteringPip = true
+                        val params = android.app.PictureInPictureParams.Builder()
+                            .setAspectRatio(android.util.Rational(16,9))
+                            .build()
+                        act?.enterPictureInPictureMode(params)
+                    } catch (_: Exception) {
+                        act?.finish()
+                    }
+                } else {
+                    act?.finish()
+                }
             }
         }
     }
@@ -430,6 +557,7 @@ fun ExoPlayJetScreen(
                     setShowNextButton(false)
                     setShowPreviousButton(false)
                     setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+                    controllerShowTimeoutMs = 3000
                     setResizeMode(resizeModes[resizeModeIndex].first)
                     player = exoPlayer
                     exoPlayerView = this
@@ -469,6 +597,48 @@ fun ExoPlayJetScreen(
                                 targetBar = deepest(controller)
                             }
 
+                            // PiP button (left of resize) — phones/tablets only
+                            val isTV = try {
+                                val pm = context.packageManager
+                                pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK) ||
+                                        pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TELEVISION)
+                            } catch (_: Exception) { false }
+                            val supportsPip = try {
+                                android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O &&
+                                        (context as? Activity)?.packageManager?.hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE) == true
+                            } catch (_: Exception) { false }
+
+                            val pipButton = ImageButton(context).apply {
+                                setBackgroundResource(android.R.color.transparent)
+                                setImageResource(R.drawable.ic_pip_24)
+                                contentDescription = "Picture-in-Picture"
+                                imageAlpha = 230
+                                val pad = (4 * resources.displayMetrics.density).toInt()
+                                setPadding(pad, pad, pad, pad)
+                                setOnClickListener {
+                                    try {
+                                        (context as? Activity)?.let { act ->
+                                            // Mark entering PiP so onPause doesn't pause playback
+                                            PlayerCommandBus.isEnteringPip = true
+                                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                                val params = android.app.PictureInPictureParams.Builder()
+                                                    .setAspectRatio(android.util.Rational(16,9))
+                                                    .build()
+                                                act.enterPictureInPictureMode(params)
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.w(TAG, "Failed PiP enter: ${e.message}")
+                                    }
+                                }
+                                val params = LinearLayout.LayoutParams(
+                                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                                    ViewGroup.LayoutParams.WRAP_CONTENT
+                                )
+                                params.gravity = Gravity.CENTER_VERTICAL
+                                layoutParams = params
+                            }
+
                             val resizeButton = ImageButton(context).apply {
                                 setBackgroundResource(android.R.color.transparent)
                                 setImageResource(R.drawable.baseline_aspect_ratio_24)
@@ -499,8 +669,16 @@ fun ExoPlayJetScreen(
 
                             val count = targetBar.childCount
                             val insertIndex = if (count > 0) count - 1 else count
+                            if (!isTV && supportsPip && pipEnabled) {
+                                try {
+                                    // Add PiP first, then resize so PiP sits left of resize
+                                    targetBar.addView(pipButton, insertIndex)
+                                } catch (_: Exception) {
+                                    targetBar.addView(pipButton)
+                                }
+                            }
                             try {
-                                targetBar.addView(resizeButton, insertIndex)
+                                targetBar.addView(resizeButton, insertIndex + 1)
                             } catch (_: Exception) {
                                 targetBar.addView(resizeButton)
                             }
@@ -533,6 +711,25 @@ fun ExoPlayJetScreen(
             }
         }
 
+        // When PiP mode changes, immediately hide controllers/overlays
+        DisposableEffect(Unit) {
+            PlayerCommandBus.setOnPipModeChanged { isPip ->
+                if (isPip) {
+                    try {
+                        showChannelPanel = false
+                        isControllerVisible = false
+                        exoPlayerView?.useController = false
+                        exoPlayerView?.hideController()
+                    } catch (_: Exception) {}
+                } else {
+                    try {
+                        exoPlayerView?.useController = true
+                    } catch (_: Exception) {}
+                }
+            }
+            onDispose { PlayerCommandBus.setOnPipModeChanged(null) }
+        }
+
         LaunchedEffect(showChannelPanel) {
             if (showChannelPanel) {
                 focusRequester.requestFocus()
@@ -540,7 +737,7 @@ fun ExoPlayJetScreen(
         }
 
         AnimatedVisibility(
-            visible = (showChannelOverlay && channelList != null) || isControllerVisible,
+            visible = !PlayerCommandBus.isInPipMode && ((showChannelOverlay && channelList != null) || isControllerVisible),
             enter = fadeIn(),
             exit = fadeOut()
         ) {
@@ -550,12 +747,12 @@ fun ExoPlayJetScreen(
                 currentProgramName = currentProgramName
             )
             CurrentTimeOverlay(
-                visible = (showChannelOverlay && channelList != null) || isControllerVisible
+                visible = !PlayerCommandBus.isInPipMode && ((showChannelOverlay && channelList != null) || isControllerVisible)
             )
         }
 
         // --- Key Num Config ---
-        if (showNumericOverlay && numericBuffer.isNotEmpty()) {
+        if (!PlayerCommandBus.isInPipMode && showNumericOverlay && numericBuffer.isNotEmpty()) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -573,7 +770,7 @@ fun ExoPlayJetScreen(
             }
         }
 
-        if (isControllerVisible) {
+        if (!PlayerCommandBus.isInPipMode && isControllerVisible) {
             IconButton(
                 onClick = {
                     panelSelectedIndex = currentIndex
@@ -679,6 +876,16 @@ fun ExoPlayJetScreen(
                     }
                 }
             }
+        }
+    }
+
+    // Also handle direct video URL changes (e.g., new intent while in PiP with no channel list/index)
+    LaunchedEffect(videoUrl) {
+        if (channelList.isNullOrEmpty() || currentIndex < 0) {
+            val url = channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
+            exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(url)))
+            exoPlayer.prepare()
+            exoPlayer.playWhenReady = true
         }
     }
 
