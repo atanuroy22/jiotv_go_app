@@ -107,4 +107,9 @@ dependencies {
     debugImplementation libs.androidx.ui.test.manifest
     debugImplementation libs.androidx.customview.poolingcontainer
     debugImplementation libs.androidx.customview
+//----------------------------------------------------------
+    implementation libs.androidx.glance.appwidget
+    implementation libs.androidx.glance.material3
+//----------------------------------------------------------
+
 }
