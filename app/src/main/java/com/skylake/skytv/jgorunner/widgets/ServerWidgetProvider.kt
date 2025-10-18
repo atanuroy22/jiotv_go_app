@@ -46,7 +46,6 @@ class ServerWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.widget_port, "Port: $port")
             views.setTextViewText(R.id.widget_mode, "Mode: $modeText")
             views.setTextViewText(R.id.widget_url, "URL: $fullUrl")
-            views.setTextColor(R.id.widget_url, Color.parseColor("#B2EBF2"))
             views.setTextViewText(R.id.widget_logs, if (showLogs) logs else "")
             views.setViewVisibility(R.id.widget_logs, if (showLogs) android.view.View.VISIBLE else android.view.View.GONE)
             views.setTextViewText(R.id.widget_toggle_logs_button, if (showLogs) "Hide Logs" else "Show Logs")
