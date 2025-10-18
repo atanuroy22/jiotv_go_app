@@ -157,6 +157,11 @@ class SkySharedPref(context: Context) {
         @SharedPrefKey("genericTvIcon") var genericTvIcon: Boolean = false,
         @SharedPrefKey("preRelease") var preRelease: Boolean = false,
         @SharedPrefKey("epgDebug") var epgDebug: Boolean = false,
+        @SharedPrefKey("lastSelectedCategoriesExp") var lastSelectedCategoriesExp: String? = "",
+
+        // Widget-specific preferences
+        @SharedPrefKey("widget_show_logs") var widgetShowLogs: Boolean = false,
+        @SharedPrefKey("widget_logs") var widgetLogs: String? = ""
 
 
 

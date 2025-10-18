@@ -108,11 +108,15 @@ import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.ui.tvhome.ChannelUtils
 import com.skylake.skytv.jgorunner.ui.tvhome.extractChannelIdFromPlayUrl
+import com.skylake.skytv.jgorunner.utils.containsAnyId
+import com.skylake.skytv.jgorunner.utils.setupCustomPlaybackLogic
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 const val TAG = "ExoJetScreen"
 
@@ -146,13 +150,17 @@ fun ExoPlayJetScreen(
     var numericJob: Job? by remember { mutableStateOf(null) }
     var isControllerVisible by remember { mutableStateOf(false) }
 
+    // Cache of last persisted channel URL to avoid redundant SharedPreferences writes
+    var lastPersistedChannelUrl by remember { mutableStateOf<String?>(null) }
+
     // --- Epg fetch ---
     val epgCache = remember { mutableStateMapOf<String, Pair<Long, String?>>() }
-    LaunchedEffect(channelList) {
-        while (true) {
-            channelList?.let { list ->
-                kotlinx.coroutines.coroutineScope {
-                    list.mapNotNull { channel ->
+    LaunchedEffect(showChannelPanel, channelList) {
+        if (showChannelPanel && channelList != null) {
+            while (showChannelPanel) {
+                val visibleChannels = channelList
+                withContext(Dispatchers.IO) {
+                    visibleChannels.mapNotNull { channel ->
                         val channelId = extractChannelIdFromPlayUrl(channel.videoUrl)
                         if (channelId != null) {
                             async {
@@ -160,15 +168,14 @@ fun ExoPlayJetScreen(
                                 val cached = epgCache[channelId]
                                 if (cached == null || now - cached.first > 900_000) {
                                     val epgName = fetchCurrentProgram(basefinURL, channelId)
-                                    Log.d(TAG, "EPG fetched!")
                                     epgCache[channelId] = now to epgName
                                 }
                             }
                         } else null
                     }.awaitAll()
                 }
+                delay(900_000)
             }
-            delay(900_000)
         }
     }
 
@@ -261,9 +268,13 @@ fun ExoPlayJetScreen(
     LaunchedEffect(currentIndex) {
         retryCountRef.value = 0
         isBuffering = true
+        val currentUrl = channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
         exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl)))
         exoPlayer.prepare()
         exoPlayer.playWhenReady = true
+
+        // そにー Hook
+        setupCustomPlaybackLogic(exoPlayer, currentUrl)
 
         showChannelOverlay = true
         delay(overlayDisplayTimeMs.toLong())
@@ -573,7 +584,7 @@ fun ExoPlayJetScreen(
                 Icon(
                     imageVector = Icons.Filled.AutoAwesomeMotion,
                     contentDescription = "Toggle channel list",
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    tint = Color.White.copy(alpha = 0.5f)
                 )
             }
         }
@@ -670,6 +681,16 @@ fun ExoPlayJetScreen(
             }
         }
     }
+
+    // Clear sentinel on leaving the player so future autoplay sessions can trigger again
+    DisposableEffect(Unit) {
+        onDispose {
+            try {
+                preferenceManager.myPrefs.currChannelUrl = ""
+                preferenceManager.savePreferences()
+            } catch (_: Exception) { }
+        }
+    }
 }
 
 @Composable
@@ -697,7 +718,7 @@ fun EpgText(
 
 suspend fun fetchCurrentProgram(basefinURL: String, channelId: String): String? {
     val epgURLc = "$basefinURL/epg/${channelId}/0"
-    Log.d("NANOdix1", epgURLc)
+//    Log.d("NANOdix1", epgURLc)
     val epgData = ChannelUtils.fetchEpg(epgURLc)
 //    Log.d(TAG, "Now playing: ${epgData?.showname}")
     return epgData?.showname
@@ -840,18 +861,32 @@ fun initializePlayer(
     val mediaSourceFactory = DefaultMediaSourceFactory(context).setDataSourceFactory(httpDataSourceFactory)
 
     val player = ExoPlayer.Builder(context).setMediaSourceFactory(mediaSourceFactory).build()
+    var resumePosition: Long = 0L
     val maxRetries = 5
     retryCountRef.value = 0
 
-    fun prepareAndPlay() {
+    fun prepareAndPlay(seekToPosition: Long = 0L) {
         val mediaItem = MediaItem.Builder()
             .setUri(Uri.parse(getCurrentVideoUrl()))
             .setMimeType(MimeTypes.APPLICATION_M3U8)
             .build()
         player.setMediaItem(mediaItem)
         player.prepare()
+        if (seekToPosition > 0L) {
+            player.seekTo(seekToPosition)
+        }
         player.playWhenReady = true
     }
+
+//    fun prepareAndPlay() {
+//        val mediaItem = MediaItem.Builder()
+//            .setUri(Uri.parse(getCurrentVideoUrl()))
+//            .setMimeType(MimeTypes.APPLICATION_M3U8)
+//            .build()
+//        player.setMediaItem(mediaItem)
+//        player.prepare()
+//        player.playWhenReady = true
+//    }
 
     prepareAndPlay()
 
@@ -872,9 +907,18 @@ fun initializePlayer(
     // Always Retry
     player.addListener(object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
-            Log.d(TAG, "Retrying playback infinitely")
-            player.stop()
-            prepareAndPlay()
+            val currentUrl = getCurrentVideoUrl()
+            if (currentUrl.containsAnyId()) {
+                // そにー Resume
+                resumePosition = player.currentPosition
+                Log.d(TAG, "Retrying special channel from position $resumePosition")
+                player.stop()
+                prepareAndPlay(resumePosition)
+            } else {
+                Log.d(TAG, "Retrying normal channel from start")
+                player.stop()
+                prepareAndPlay()
+            }
         }
     })
 

@@ -76,48 +76,13 @@ import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.LandingPage
 import com.skylake.skytv.jgorunner.ui.components.ButtonContent
 import com.skylake.skytv.jgorunner.ui.components.ProgressPopup
-import com.skylake.skytv.jgorunner.ui.dev.changeIconTOFirst
-import com.skylake.skytv.jgorunner.ui.dev.changeIconToSecond
+import com.skylake.skytv.jgorunner.ui.tvhome.changeIconTOFirst
+import com.skylake.skytv.jgorunner.ui.tvhome.changeIconToSecond
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import performSelectedBinaryUpdate
-import androidx.compose.runtime.LaunchedEffect
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import android.util.Log
-import androidx.compose.animation.Animatable
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.automirrored.filled.DirectionsRun
-import androidx.compose.material.icons.sharp.Info
-import androidx.compose.material.icons.sharp.Support
-import androidx.compose.runtime.*
-import com.skylake.skytv.jgorunner.data.SkySharedPref
-import com.skylake.skytv.jgorunner.ui.components.ButtonContent
-
-import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
-import com.skylake.skytv.jgorunner.activities.CastActivity
-import com.skylake.skytv.jgorunner.services.player.LandingPage
-import com.skylake.skytv.jgorunner.ui.tvhome.changeIconTOFirst
-import com.skylake.skytv.jgorunner.ui.tvhome.changeIconToSecond
 
 @SuppressLint("UnrememberedMutableState")
 @Composable
