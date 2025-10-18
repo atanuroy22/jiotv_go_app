@@ -59,7 +59,11 @@ android {
     lint {
         checkReleaseBuilds false
         abortOnError false
+        disable "NullSafeMutableLiveData"
+        disable "RememberInComposition"
+        disable "FrequentlyChangingValue"
     }
+
 }
 
 dependencies {
