@@ -170,9 +170,9 @@
             </intent-filter>
         </receiver>
 
-        <!-- Server control App Widget -->
         <receiver
             android:name=".widgets.ServerWidgetProvider"
+            android:label="@string/widget_v1"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -186,6 +186,20 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_server_control_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widgets.ServerGlanceWidgetReceiver"
+            android:label="@string/widget_v2"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.skylake.skytv.jgorunner.action.BINARY_STARTED" />
+                <action android:name="com.skylake.skytv.jgorunner.action.BINARY_STOPPED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_glance_server_control_info" />
         </receiver>
 
         <provider

@@ -8,6 +8,7 @@ import android.content.Intent
 import android.os.Build
 import android.widget.RemoteViews
 import android.app.PendingIntent
+import android.graphics.Color
 import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.BinaryService
@@ -27,43 +28,6 @@ class ServerWidgetProvider : AppWidgetProvider() {
             for (id in appWidgetIds) {
                 updateAppWidget(context, appWidgetManager, id)
             }
-        }
-
-        private fun getFullServerUrl(context: Context): String {
-            val prefs = SkySharedPref.getInstance(context).myPrefs
-            val port = prefs.jtvGoServerPort
-            val isPublic = !prefs.serveLocal
-
-            // Reuse logic similar to MainActivity.getPublicJTVServerURL()
-            if (!isPublic) return "http://localhost:$port/"
-
-            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
-            val activeNetwork = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                connectivityManager.activeNetwork
-            } else {
-                @Suppress("deprecation")
-                val networks = connectivityManager.allNetworks
-                if (networks.isNotEmpty()) networks[0] else null
-            }
-
-            if (activeNetwork != null) {
-                val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
-                if (networkCapabilities != null &&
-                    (networkCapabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) ||
-                            networkCapabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET))) {
-                    val linkProperties = connectivityManager.getLinkProperties(activeNetwork)
-                    val ipAddress = linkProperties?.linkAddresses
-                        ?.filter { it.address is java.net.Inet4Address }
-                        ?.map { it.address.hostAddress }
-                        ?.firstOrNull()
-                    if (ipAddress != null) return "http://$ipAddress:$port/"
-                }
-                // If cellular, fallback to localhost
-                if (networkCapabilities != null && networkCapabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR)) {
-                    return "http://localhost:$port/"
-                }
-            }
-            return "http://localhost:$port/"
         }
 
         private fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
@@ -125,6 +89,16 @@ class ServerWidgetProvider : AppWidgetProvider() {
                 PendingIntent.FLAG_UPDATE_CURRENT or if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
             )
             views.setOnClickPendingIntent(R.id.widget_toggle_logs_button, togglePending)
+
+            // Open main app
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            val pendingLaunchIntent = PendingIntent.getActivity(
+                context,
+                4,
+                launchIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+            )
+            views.setOnClickPendingIntent(R.id.widget_app_icon, pendingLaunchIntent)
 
             appWidgetManager.updateAppWidget(appWidgetId, views)
         }
