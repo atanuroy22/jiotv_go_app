@@ -172,6 +172,7 @@
 
         <receiver
             android:name=".widgets.ServerWidgetProvider"
+            android:label="@string/widget_v1"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -189,6 +190,7 @@
 
         <receiver
             android:name=".widgets.ServerGlanceWidgetReceiver"
+            android:label="@string/widget_v2"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

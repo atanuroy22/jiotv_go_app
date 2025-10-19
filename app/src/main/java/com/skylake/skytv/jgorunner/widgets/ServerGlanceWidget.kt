@@ -33,6 +33,7 @@ import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
+import androidx.glance.layout.wrapContentHeight
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
@@ -71,8 +72,9 @@ class ServerGlanceWidget : GlanceAppWidget() {
 
         Column(
             modifier = GlanceModifier
-                .fillMaxSize()
+                .wrapContentHeight()
                 .themedBackground(GlanceTheme.colors.surface)
+                .cornerRadius(20.dp)
                 .padding(16.dp)
         ) {
 
@@ -89,7 +91,9 @@ class ServerGlanceWidget : GlanceAppWidget() {
                     ),
                     modifier = GlanceModifier
                         .defaultWeight()
-                        .clickable(onClick = actionRunCallback<StartAppAction>())
+                        .clickable(onClick = actionRunCallback<StartAppAction>()),
+                    maxLines = 1
+
                 )
 
                 Image(
@@ -112,18 +116,20 @@ class ServerGlanceWidget : GlanceAppWidget() {
             ) {
                 Text(
                     if (isRunning) "🟢 Running" else "🔴 Stopped",
-                    style = TextStyle(color = statusColor)
+                    style = TextStyle(color = statusColor),
+                    maxLines = 1
                 )
                 Spacer(GlanceModifier.height(2.dp))
-                Text("Port: $port", style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant))
-                Text("Mode: $mode", style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant))
+                Text("Port: $port", style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant), maxLines = 1)
+                Text("Mode: $mode", style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant), maxLines = 1)
                 Spacer(GlanceModifier.height(4.dp))
                 Text(
                     text = "🌍 $fullUrl",
                     style = TextStyle(color = accentColor), //, fontSize = 12.sp)
                     modifier = GlanceModifier.clickable(
                         onClick = actionRunCallback<StartChromeAction>()
-                    )
+                    ),
+                    maxLines = 1
                 )
             }
 
@@ -138,7 +144,8 @@ class ServerGlanceWidget : GlanceAppWidget() {
                     text = if (isRunning) "Restart" else "Start",
                     onClick = actionRunCallback<StartServerAction>(),
                     modifier = GlanceModifier
-                        .defaultWeight()
+                        .defaultWeight(),
+                    maxLines = 1
                 )
 
                 Spacer(GlanceModifier.width(8.dp))
@@ -147,7 +154,8 @@ class ServerGlanceWidget : GlanceAppWidget() {
                     text = "Stop",
                     onClick = actionRunCallback<StopServerAction>(),
                     modifier = GlanceModifier
-                        .defaultWeight()
+                        .defaultWeight(),
+                    maxLines = 1
                 )
 
             }
