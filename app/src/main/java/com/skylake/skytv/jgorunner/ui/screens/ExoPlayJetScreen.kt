@@ -138,6 +138,13 @@ fun ExoPlayJetScreen(
     val basefinURL = "http://localhost:$localPORT"
     val tvNAV = preferenceManager.myPrefs.selectedRemoteNavTV ?: "0"
     val pipEnabled = preferenceManager.myPrefs.enablePip
+    val isTv = remember {
+        try {
+            val pm = context.packageManager
+            pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK) ||
+            pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TELEVISION)
+        } catch (_: Exception) { false }
+    }
     val focusRequester = remember { FocusRequester() }
     var currentIndex by remember { mutableStateOf(currentChannelIndex) }
     var showChannelPanel by remember { mutableStateOf(false) }
@@ -421,7 +428,7 @@ fun ExoPlayJetScreen(
                     android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O &&
                             pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE)
                 } catch (_: Exception) { false }
-                if (supportsPip && pipEnabled) {
+                if (!isTv && supportsPip && pipEnabled) {
                     try {
                         PlayerCommandBus.isEnteringPip = true
                         val params = android.app.PictureInPictureParams.Builder()
@@ -669,7 +676,7 @@ fun ExoPlayJetScreen(
 
                             val count = targetBar.childCount
                             val insertIndex = if (count > 0) count - 1 else count
-                            if (!isTV && supportsPip && pipEnabled) {
+                            if (!isTv && !isTV && supportsPip && pipEnabled) {
                                 try {
                                     // Add PiP first, then resize so PiP sits left of resize
                                     targetBar.addView(pipButton, insertIndex)

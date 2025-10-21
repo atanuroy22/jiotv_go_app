@@ -31,6 +31,7 @@ import android.graphics.drawable.Icon
 import android.util.Rational
 import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.receivers.PipActionReceiver
+import android.content.pm.PackageManager
 
 class ExoPlayJet : ComponentActivity() {
 
@@ -44,6 +45,14 @@ class ExoPlayJet : ComponentActivity() {
     private var currentChannelIndexState by mutableStateOf(-1)
     // Bump this to force-refresh PiP actions (some launchers cache by PendingIntent equality)
     private var pipActionSeq: Int = 0
+
+    private fun isTvDevice(): Boolean {
+        val pm = packageManager
+        return try {
+            pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK) ||
+            pm.hasSystemFeature(PackageManager.FEATURE_TELEVISION)
+        } catch (_: Exception) { false }
+    }
 
     @RequiresApi(Build.VERSION_CODES.R)
     @SuppressLint("WrongConstant")
@@ -182,7 +191,7 @@ class ExoPlayJet : ComponentActivity() {
         super.onUserLeaveHint()
         val prefManager = SkySharedPref.getInstance(this)
         // Auto-enter PiP when user presses Home or swipes up (YouTube-like)
-        if (prefManager.myPrefs.enablePip) enterPipWithActions()
+        if (prefManager.myPrefs.enablePip && !isTvDevice()) enterPipWithActions()
     }
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
@@ -192,11 +201,11 @@ class ExoPlayJet : ComponentActivity() {
         PlayerCommandBus.notifyPipModeChanged(isInPictureInPictureMode)
         if (isInPictureInPictureMode) {
             val prefManager = SkySharedPref.getInstance(this)
-            if (prefManager.myPrefs.enablePip) updatePipActions()
+            if (prefManager.myPrefs.enablePip && !isTvDevice()) updatePipActions()
         } else {
             // Exiting PiP: if we are not coming back to fullscreen, ensure playback is stopped and close
             val prefManager = SkySharedPref.getInstance(this)
-            if (prefManager.myPrefs.enablePip) {
+            if (prefManager.myPrefs.enablePip && !isTvDevice()) {
                 // Wait a short moment to see if the Activity regains focus (Open/maximize case)
                 window.decorView.postDelayed({
                     // If we still don't have focus, the PiP was likely dismissed/closed by gesture
@@ -211,7 +220,7 @@ class ExoPlayJet : ComponentActivity() {
 
     private fun enterPipWithActions() {
         val prefManager = SkySharedPref.getInstance(this)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && prefManager.myPrefs.enablePip) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && prefManager.myPrefs.enablePip && !isTvDevice()) {
             try {
                 PlayerCommandBus.isEnteringPip = true
                 pipActionSeq = (pipActionSeq + 1) % 1000
@@ -228,7 +237,7 @@ class ExoPlayJet : ComponentActivity() {
 
     private fun updatePipActions() {
         val prefManager = SkySharedPref.getInstance(this)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && prefManager.myPrefs.enablePip) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && prefManager.myPrefs.enablePip && !isTvDevice()) {
             try {
                 pipActionSeq = (pipActionSeq + 1) % 1000
                 val params = PictureInPictureParams.Builder()
