@@ -34,7 +34,6 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -58,10 +57,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.data.SkySharedPref
-import com.skylake.skytv.jgorunner.ui.tvhome.components.TvScreenMenu
 import com.skylake.skytv.jgorunner.ui.tvhome.Main_Layout
-import com.skylake.skytv.jgorunner.ui.tvhome.Recent_Layout
 import com.skylake.skytv.jgorunner.ui.tvhome.Main_Layout_3rd
+import com.skylake.skytv.jgorunner.ui.tvhome.Recent_Layout
+import com.skylake.skytv.jgorunner.ui.tvhome.components.TvScreenMenu
 import com.skylake.skytv.jgorunner.ui.tvhome.depreciated.SearchTabLayout
 import com.skylake.skytv.jgorunner.ui.tvhome.depreciated.SearchTabLayoutTV
 import kotlinx.coroutines.launch

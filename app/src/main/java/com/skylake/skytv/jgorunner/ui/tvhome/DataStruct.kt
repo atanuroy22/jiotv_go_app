@@ -21,10 +21,6 @@ data class Channel(
 )
 
 @Keep
-data class ChannelResponse2(val data: List<Channel>)
-
-// Data classes for EPG
-@Keep
 data class EpgResponse(val epg: List<EpgProgram>)
 
 @Keep

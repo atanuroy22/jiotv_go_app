@@ -119,7 +119,7 @@ class BinaryService : Service() {
                 temp += output
                 if (temp.length > 5000)
                     temp = temp.substring(5000)
-                binaryOutput.postValue(temp.toString())
+                binaryOutput.postValue(temp)
 
                 // Persist logs for widget
                 try {

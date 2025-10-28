@@ -43,8 +43,8 @@ object BinaryExecutor {
                             *args.toTypedArray()
                         ).joinToString(" ")
                     ),
-                    null, // Environment variables (null means inherit from parent process)
-                    binaryFile.parentFile // Set the working directory
+                    null,
+                    binaryFile.parentFile
                 )
 
                 Thread(
@@ -83,32 +83,32 @@ object BinaryExecutor {
         }
     }
 
-    private fun buildArgsListOld(
-        context: Context,
-        arguments: Array<String>?
-    ): List<String> {
-        if (!arguments.isNullOrEmpty()) {
-            return arguments.toList()
-        }
-
-        val port = SkySharedPref.getInstance(context).myPrefs.jtvGoServerPort
-        val jtvConfigLocation = SkySharedPref.getInstance(context).myPrefs.jtvConfigLocation
-
-        val command = mutableListOf(
-            "run",
-        )
-        if (port in 1..65535) {
-            command.add("--port")
-            command.add(port.toString())
-        }
-        if (!SkySharedPref.getInstance(context).myPrefs.serveLocal)
-            command.add("--public")
-
-        command.add("--config")
-        command.add("\"${jtvConfigLocation}\"")
-
-        return command
-    }
+//    private fun buildArgsListOld(
+//        context: Context,
+//        arguments: Array<String>?
+//    ): List<String> {
+//        if (!arguments.isNullOrEmpty()) {
+//            return arguments.toList()
+//        }
+//
+//        val port = SkySharedPref.getInstance(context).myPrefs.jtvGoServerPort
+//        val jtvConfigLocation = SkySharedPref.getInstance(context).myPrefs.jtvConfigLocation
+//
+//        val command = mutableListOf(
+//            "run",
+//        )
+//        if (port in 1..65535) {
+//            command.add("--port")
+//            command.add(port.toString())
+//        }
+//        if (!SkySharedPref.getInstance(context).myPrefs.serveLocal)
+//            command.add("--public")
+//
+//        command.add("--config")
+//        command.add("\"${jtvConfigLocation}\"")
+//
+//        return command
+//    }
 
     private fun buildArgsList(
         context: Context,

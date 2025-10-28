@@ -1,13 +1,16 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
 }
 
 apply from: "version.gradle"
 
 android {
     namespace 'com.skylake.skytv.jgorunner'
-    compileSdk 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId 'com.skylake.skytv.jgorunner'
@@ -39,8 +42,10 @@ android {
         sourceCompatibility JavaVersion.VERSION_18
         targetCompatibility JavaVersion.VERSION_18
     }
-    kotlinOptions {
-        jvmTarget = '18'
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_18)
+        }
     }
     buildFeatures {
         buildConfig true
@@ -56,13 +61,13 @@ android {
 //            exclude "lib/x86_64/**"
         }
     }
-    lint {
-        checkReleaseBuilds false
-        abortOnError false
-        disable "NullSafeMutableLiveData"
-        disable "RememberInComposition"
-        disable "FrequentlyChangingValue"
-    }
+//    lint {
+//        checkReleaseBuilds false
+//        abortOnError false
+//        disable "NullSafeMutableLiveData"
+//        disable "RememberInComposition"
+//        disable "FrequentlyChangingValue"
+//    }
 
 }
 
@@ -93,7 +98,7 @@ dependencies {
     implementation libs.androidx.mediarouter
 //----------------------------------------------------------
 //    Skipping FFMPEG
-//    implementation 'com.arthenica:ffmpeg-kit-min:6.0-2'
+//    implementation 'io.github.maitrungduc1410:ffmpeg-kit-min:6.0.1'
 //----------------------------------------------------------
     implementation libs.androidx.tv.foundation
     implementation libs.androidx.tv.material
@@ -107,6 +112,8 @@ dependencies {
     androidTestImplementation libs.androidx.espresso.core
     androidTestImplementation platform(libs.androidx.compose.bom)
     androidTestImplementation libs.androidx.ui.test.junit4
+    implementation libs.glide
+    annotationProcessor libs.compiler
 //----------------------------------------------------------
     debugImplementation libs.androidx.ui.tooling
     debugImplementation libs.androidx.ui.test.manifest
@@ -116,5 +123,4 @@ dependencies {
     implementation libs.androidx.glance.appwidget
     implementation libs.androidx.glance.material3
 //----------------------------------------------------------
-
 }

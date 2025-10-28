@@ -8,21 +8,47 @@ import android.widget.Toast
 import androidx.compose.animation.Animatable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Pin
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularWavyProgressIndicator
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.*
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
@@ -30,16 +56,19 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.input.*
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.skylake.skytv.jgorunner.R
-import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.activities.MainActivity
+import com.skylake.skytv.jgorunner.data.SkySharedPref
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -47,9 +76,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.Executors
 import kotlin.random.Random
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import kotlinx.coroutines.delay
 
 @Composable
 fun LoginScreenPop(
@@ -224,226 +250,135 @@ private fun LoginDialogContent(
 //        }
         Spacer(modifier = Modifier.height(24.dp))
 
-        if (true) {
-            OutlinedTextField(
-                value = phoneNumber,
-                onValueChange = { newValue ->
-                    val filteredText = newValue.text.filter { it.isDigit() }
-                    phoneNumber = newValue.copy(text = filteredText)
-                },
-                label = { Text("Phone Number") },
-                placeholder = { Text("Enter your 10-digit number") },
-                leadingIcon = { Icon(Icons.Default.Phone, contentDescription = "Phone Icon") },
-                keyboardOptions = KeyboardOptions.Default.copy(
-                    keyboardType = KeyboardType.Phone,
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(onNext = { otpCodeFocusRequester.requestFocus() },onDone = {
-                    isLoadingOtpSend = true
-                    sendOtp(context, phoneNumber.text, basefinURL, updateUiStatusMessage) {
-                        isLoadingOtpSend = false
-                    }
-                    otpCodeFocusRequester.requestFocus()}),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(phoneNumberFocusRequester)
-                    .focusable()
-                    .onKeyEvent { event ->
-                        handleKeyEvent(
-                            event = event,
-                            focusManager = focusManager,
-                            focusRequesterList = focusRequesterList,
-                            currentFieldValue = phoneNumber.text,
-                            cursorPosition = phoneNumber.selection.end
-                        )
-                    }
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-
-            var isSendOtpButtonFocused by remember { mutableStateOf(false) }
-            Button(
-                onClick = {
-                    isLoadingOtpSend = true
-                    sendOtp(context, phoneNumber.text, basefinURL, updateUiStatusMessage) {
-                        isLoadingOtpSend = false
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .onFocusChanged { focusState ->
-                        isSendOtpButtonFocused = focusState.isFocused
-                    },
-                enabled = !isLoadingOtpSend,
-                shape = RoundedCornerShape(8.dp),
-                border = if (isSendOtpButtonFocused) BorderStroke(2.dp, colorBORDER) else null,
-            ) {
-                if (isLoadingOtpSend) {
-                    CircularWavyProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    Text("Send OTP")
+        OutlinedTextField(
+            value = phoneNumber,
+            onValueChange = { newValue ->
+                val filteredText = newValue.text.filter { it.isDigit() }
+                phoneNumber = newValue.copy(text = filteredText)
+            },
+            label = { Text("Phone Number") },
+            placeholder = { Text("Enter your 10-digit number") },
+            leadingIcon = { Icon(Icons.Default.Phone, contentDescription = "Phone Icon") },
+            keyboardOptions = KeyboardOptions.Default.copy(
+                keyboardType = KeyboardType.Phone,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(onNext = { otpCodeFocusRequester.requestFocus() },onDone = {
+                isLoadingOtpSend = true
+                sendOtp(context, phoneNumber.text, basefinURL, updateUiStatusMessage) {
+                    isLoadingOtpSend = false
                 }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            OutlinedTextField(
-                value = otpCode,
-                onValueChange = { newValue ->
-                    val filteredText = newValue.text.filter { it.isDigit() }
-                    otpCode = newValue.copy(text = filteredText)
-                },
-                label = { Text("OTP Code") },
-                placeholder = { Text("Enter the 6-digit OTP") },
-                leadingIcon = { Icon(Icons.Default.Pin, contentDescription = "OTP Icon") },
-                keyboardOptions = KeyboardOptions.Default.copy(
-                    keyboardType = KeyboardType.NumberPassword,
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(onDone = {
-                    isLoadingOtpVerify = true
-                    verifyOtp(context, phoneNumber.text, otpCode.text, basefinURL, updateUiStatusMessage) {
-                        isLoadingOtpVerify = false
-                    }
-                }),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(otpCodeFocusRequester)
-                    .focusable()
-                    .onKeyEvent { event ->
-                        handleKeyEvent(
-                            event = event,
-                            focusManager = focusManager,
-                            focusRequesterList = focusRequesterList,
-                            currentFieldValue = otpCode.text,
-                            cursorPosition = otpCode.selection.end
-                        )
-                    }
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-
-            var isVerifyOtpButtonFocused by remember { mutableStateOf(false) }
-            Button(
-                onClick = {
-                    isLoadingOtpVerify = true
-                    verifyOtp(context, phoneNumber.text, otpCode.text, basefinURL, updateUiStatusMessage) {
-                        isLoadingOtpVerify = false
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .onFocusChanged { focusState ->
-                        isVerifyOtpButtonFocused = focusState.isFocused
-                    },
-                enabled = !isLoadingOtpVerify,
-                shape = RoundedCornerShape(8.dp),
-                border = if (isVerifyOtpButtonFocused) BorderStroke(2.dp, colorBORDER) else null,
-            ) {
-                if (isLoadingOtpVerify) {
-                    CircularWavyProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary
+                otpCodeFocusRequester.requestFocus()}),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(phoneNumberFocusRequester)
+                .focusable()
+                .onKeyEvent { event ->
+                    handleKeyEvent(
+                        event = event,
+                        focusManager = focusManager,
+                        focusRequesterList = focusRequesterList,
+                        currentFieldValue = phoneNumber.text,
+                        cursorPosition = phoneNumber.selection.end
                     )
-                } else {
-                    Text("Verify OTP")
                 }
-            }
-
-        } else {
-            OutlinedTextField(
-                value = phoneNumber,
-                onValueChange = { phoneNumber = it },
-                label = { Text("Phone Number / Email") },
-                placeholder = { Text("Enter phone number / email") },
-                leadingIcon = { Icon(Icons.Default.Phone, contentDescription = "Phone Icon") },
-                keyboardOptions = KeyboardOptions.Default.copy(
-                    keyboardType = KeyboardType.Text,
-                    imeAction = ImeAction.Next
-                ),
-                keyboardActions = KeyboardActions(onNext = { passwordFocusRequester.requestFocus() }, onDone = { passwordFocusRequester.requestFocus() }),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(phoneNumberFocusRequester)
-                    .focusable()
-                    .onKeyEvent { event ->
-                        handleKeyEvent(
-                            event = event,
-                            focusManager = focusManager,
-                            focusRequesterList = focusRequesterList,
-                            currentFieldValue = phoneNumber.text,
-                            cursorPosition = phoneNumber.selection.end
-                        )
-                    }
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Password") },
-                placeholder = { Text("Enter your password") },
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = "Lock Icon") },
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions.Default.copy(
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(onDone = {
-                    isLoadingLogin = true
-                    login(context, phoneNumber.text, password.text, basefinURL, updateUiStatusMessage) {
-                        isLoadingLogin = false
-                    }
-                }),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(passwordFocusRequester)
-                    .focusable()
-                    .onKeyEvent { event ->
-                        handleKeyEvent(
-                            event = event,
-                            focusManager = focusManager,
-                            focusRequesterList = focusRequesterList,
-                            currentFieldValue = password.text,
-                            cursorPosition = password.selection.end
-                        )
-                    }
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
+        )
+        Spacer(modifier = Modifier.height(16.dp))
 
 
-            var isLoginButtonFocused by remember { mutableStateOf(false) }
-            Button(
-                onClick = {
-                    isLoadingLogin = true
-                    login(context, phoneNumber.text, password.text, basefinURL, updateUiStatusMessage) {
-                        isLoadingLogin = false
-                    }
+        var isSendOtpButtonFocused by remember { mutableStateOf(false) }
+        Button(
+            onClick = {
+                isLoadingOtpSend = true
+                sendOtp(context, phoneNumber.text, basefinURL, updateUiStatusMessage) {
+                    isLoadingOtpSend = false
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .onFocusChanged { focusState ->
+                    isSendOtpButtonFocused = focusState.isFocused
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .onFocusChanged { focusState ->
-                        isLoginButtonFocused = focusState.isFocused
-                    },
-                enabled = !isLoadingLogin,
-                shape = RoundedCornerShape(8.dp),
-                border = if (isLoginButtonFocused) BorderStroke(2.dp, colorBORDER) else null,
-            ) {
-                if (isLoadingLogin) {
-                    CircularWavyProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    Text("Login")
-                }
+            enabled = !isLoadingOtpSend,
+            shape = RoundedCornerShape(8.dp),
+            border = if (isSendOtpButtonFocused) BorderStroke(2.dp, colorBORDER) else null,
+        ) {
+            if (isLoadingOtpSend) {
+                CircularWavyProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            } else {
+                Text("Send OTP")
             }
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = otpCode,
+            onValueChange = { newValue ->
+                val filteredText = newValue.text.filter { it.isDigit() }
+                otpCode = newValue.copy(text = filteredText)
+            },
+            label = { Text("OTP Code") },
+            placeholder = { Text("Enter the 6-digit OTP") },
+            leadingIcon = { Icon(Icons.Default.Pin, contentDescription = "OTP Icon") },
+            keyboardOptions = KeyboardOptions.Default.copy(
+                keyboardType = KeyboardType.NumberPassword,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(onDone = {
+                isLoadingOtpVerify = true
+                verifyOtp(context, phoneNumber.text, otpCode.text, basefinURL, updateUiStatusMessage) {
+                    isLoadingOtpVerify = false
+                }
+            }),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(otpCodeFocusRequester)
+                .focusable()
+                .onKeyEvent { event ->
+                    handleKeyEvent(
+                        event = event,
+                        focusManager = focusManager,
+                        focusRequesterList = focusRequesterList,
+                        currentFieldValue = otpCode.text,
+                        cursorPosition = otpCode.selection.end
+                    )
+                }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+
+        var isVerifyOtpButtonFocused by remember { mutableStateOf(false) }
+        Button(
+            onClick = {
+                isLoadingOtpVerify = true
+                verifyOtp(context, phoneNumber.text, otpCode.text, basefinURL, updateUiStatusMessage) {
+                    isLoadingOtpVerify = false
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .onFocusChanged { focusState ->
+                    isVerifyOtpButtonFocused = focusState.isFocused
+                },
+            enabled = !isLoadingOtpVerify,
+            shape = RoundedCornerShape(8.dp),
+            border = if (isVerifyOtpButtonFocused) BorderStroke(2.dp, colorBORDER) else null,
+        ) {
+            if (isLoadingOtpVerify) {
+                CircularWavyProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            } else {
+                Text("Verify OTP")
+            }
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
 
 

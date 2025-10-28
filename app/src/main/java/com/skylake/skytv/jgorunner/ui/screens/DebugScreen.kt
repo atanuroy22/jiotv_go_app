@@ -1,6 +1,5 @@
 package com.skylake.skytv.jgorunner.ui.screens
 
-import PreReleaseBinary
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
@@ -75,14 +74,15 @@ import com.skylake.skytv.jgorunner.core.update.DownloadModelNew
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.LandingPage
 import com.skylake.skytv.jgorunner.ui.components.ButtonContent
+import com.skylake.skytv.jgorunner.ui.components.PreReleaseBinary
 import com.skylake.skytv.jgorunner.ui.components.ProgressPopup
+import com.skylake.skytv.jgorunner.ui.components.performSelectedBinaryUpdate
 import com.skylake.skytv.jgorunner.ui.tvhome.changeIconTOFirst
 import com.skylake.skytv.jgorunner.ui.tvhome.changeIconToSecond
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import performSelectedBinaryUpdate
 
 @SuppressLint("UnrememberedMutableState")
 @Composable
@@ -772,7 +772,7 @@ fun handleButton5Click(context: Context, onNavigate: (String) -> Unit) {
 
 fun handleButton6Click(context: Context) {
 //    Toast.makeText(context, "Demo Stream Playing", Toast.LENGTH_SHORT).show()
-//    val intent = Intent(context, ExoplayerActivityPass::class.java)
+//    val intent = Intent(context, ExoplayerActivity::class.java)
 //    intent.putExtra("video_url", "http://localhost:5350/live/144.m3u8")
 //    intent.putExtra("zone", "TV")
 //    intent.putExtra("logo_url", "TV")
