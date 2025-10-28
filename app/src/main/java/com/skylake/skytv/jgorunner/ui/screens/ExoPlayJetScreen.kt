@@ -359,10 +359,19 @@ fun ExoPlayJetScreen(
                 }
 
                 if (event.type == KeyEventType.KeyUp) {
+                    if (event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter) {
+                        if (isControllerVisible) {
+                            return@onPreviewKeyEvent false
+                        } else {
+                            exoPlayerView?.showController()
+                            return@onPreviewKeyEvent true
+                        }
+                    }
+
                     if (isControllerVisible) {
                         return@onPreviewKeyEvent false
                     } else {
-                        if (numericBuffer.isNotEmpty() && (event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter)) {
+                        if (numericBuffer.isNotEmpty()) {
                             numericJob?.cancel()
                             commitNumericEntryLocal(channelList)
                             return@onPreviewKeyEvent true
