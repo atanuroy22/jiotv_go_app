@@ -317,6 +317,7 @@ fun ExoPlayJetScreen(
             .focusRequester(focusRequester)
             .focusable()
             .onPreviewKeyEvent { event ->
+                val isOkKey = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter
                 if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft) {
                     if (isControllerVisible) {
                         return@onPreviewKeyEvent false
@@ -327,7 +328,6 @@ fun ExoPlayJetScreen(
                     }
                 }
 
-                // --- Key Num Entry ---
                 if (event.type == KeyEventType.KeyDown) {
                     val digit = when (event.key) {
                         Key.Zero -> 0
@@ -343,89 +343,71 @@ fun ExoPlayJetScreen(
                         else -> null
                     }
                     if (digit != null) {
-                        if (!(numericBuffer.isEmpty() && digit == 0)) { // avoid leading zero
-                            if (numericBuffer.length < 4) {
-                                numericBuffer += digit.toString()
-                                showNumericOverlay = true
-                                numericJob?.cancel()
-                                numericJob = scope.launch {
-                                    delay(1200)
-                                    commitNumericEntryLocal(channelList)
-                                }
+                        if (!(numericBuffer.isEmpty() && digit == 0) && numericBuffer.length < 4) {
+                            numericBuffer += digit.toString()
+                            showNumericOverlay = true
+                            numericJob?.cancel()
+                            numericJob = scope.launch {
+                                delay(1200)
+                                commitNumericEntryLocal(channelList)
                             }
                         }
                         return@onPreviewKeyEvent true
                     }
                 }
 
-                if (event.type == KeyEventType.KeyUp) {
-                    if (event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter) {
-                        if (isControllerVisible) {
-                            return@onPreviewKeyEvent false
-                        } else {
-                            exoPlayerView?.showController()
-                            return@onPreviewKeyEvent true
+                if (event.type == KeyEventType.KeyUp && isOkKey) {
+                    if (showChannelPanel) {
+                        if (!channelList.isNullOrEmpty()) {
+                            currentIndex = panelSelectedIndex.coerceIn(0, channelList.size - 1)
+                            showChannelPanel = false
                         }
+                        return@onPreviewKeyEvent true
                     }
 
                     if (isControllerVisible) {
                         return@onPreviewKeyEvent false
                     } else {
-                        if (numericBuffer.isNotEmpty()) {
-                            numericJob?.cancel()
-                            commitNumericEntryLocal(channelList)
-                            return@onPreviewKeyEvent true
-                        }
+                        val androidKeyEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DPAD_CENTER)
+                        val handled = exoPlayerView?.dispatchKeyEvent(androidKeyEvent) == true
+                        return@onPreviewKeyEvent handled
                     }
-                    if (event.key == Key.Menu || event.key == Key.DirectionLeft) {
-                        panelSelectedIndex = currentIndex
-                        showChannelPanel = channelList?.isNotEmpty() == true
-                        return@onPreviewKeyEvent true
-                    }
+                }
+
+                if (event.type == KeyEventType.KeyUp) {
                     if (showChannelPanel && (event.key == Key.DirectionRight || event.key == Key.Back)) {
                         showChannelPanel = false
                         return@onPreviewKeyEvent true
                     }
-                    if (showChannelPanel) {
-                        when (event.key) {
-                            Key.DirectionUp -> {
-                                if (!channelList.isNullOrEmpty()) {
-                                    panelSelectedIndex =
-                                        (panelSelectedIndex - 1 + channelList.size) % channelList.size
-                                }
-                                return@onPreviewKeyEvent true
-                            }
-
-                            Key.DirectionDown -> {
-                                if (!channelList.isNullOrEmpty()) {
-                                    panelSelectedIndex = (panelSelectedIndex + 1) % channelList.size
-                                }
-                                return@onPreviewKeyEvent true
-                            }
-
-                            Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
-                                if (!channelList.isNullOrEmpty()) {
-                                    currentIndex =
-                                        panelSelectedIndex.coerceIn(0, channelList.size - 1)
-                                    showChannelPanel = false
-                                }
-                                return@onPreviewKeyEvent true
-                            }
-
-                            else -> {}
-                        }
-                    }
-
-                    return@onPreviewKeyEvent handleTVRemoteKey(
-                        event = event,
-                        tvNAV = tvNAV,
-                        channelList = channelList,
-                        currentIndexState = { currentIndex },
-                        onChannelChange = { currentIndex = it }
-                    )
                 }
-                false
+
+                if (showChannelPanel && event.type == KeyEventType.KeyUp) {
+                    when (event.key) {
+                        Key.DirectionUp -> {
+                            if (!channelList.isNullOrEmpty()) {
+                                panelSelectedIndex = (panelSelectedIndex - 1 + channelList.size) % channelList.size
+                            }
+                            return@onPreviewKeyEvent true
+                        }
+                        Key.DirectionDown -> {
+                            if (!channelList.isNullOrEmpty()) {
+                                panelSelectedIndex = (panelSelectedIndex + 1) % channelList.size
+                            }
+                            return@onPreviewKeyEvent true
+                        }
+                        else -> {}
+                    }
+                }
+
+                return@onPreviewKeyEvent handleTVRemoteKey(
+                    event = event,
+                    tvNAV = tvNAV,
+                    channelList = channelList,
+                    currentIndexState = { currentIndex },
+                    onChannelChange = { currentIndex = it }
+                )
             }
+
 
     ) {
         val currentResizeMode = resizeModes[resizeModeIndex].first

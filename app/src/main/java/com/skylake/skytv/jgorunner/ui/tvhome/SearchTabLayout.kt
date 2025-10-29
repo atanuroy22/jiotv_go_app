@@ -1,4 +1,4 @@
-package com.skylake.skytv.jgorunner.ui.tvhome.depreciated
+package com.skylake.skytv.jgorunner.ui.tvhome
 
 import android.app.Activity
 import android.content.Context
@@ -65,9 +65,6 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
-import com.skylake.skytv.jgorunner.ui.tvhome.Channel
-import com.skylake.skytv.jgorunner.ui.tvhome.ChannelResponse
-import com.skylake.skytv.jgorunner.ui.tvhome.ChannelUtils
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -88,9 +85,7 @@ fun SearchTabLayout(context: Context, focusRequester: FocusRequester) {
     var searchText by remember { mutableStateOf("") }
 
     val searchBarFocusRequester = remember { FocusRequester() }
-    remember { FocusRequester() }
     val listFocusRequester = remember { FocusRequester() }
-
 
     LaunchedEffect(Unit) {
         if (!fetched) {
@@ -99,28 +94,28 @@ fun SearchTabLayout(context: Context, focusRequester: FocusRequester) {
                 channelsResponse.value = response
 
                 if (response != null) {
-
-                    val initialFiltered = ChannelUtils.filterChannels(response)
-
-                    allChannels.value = initialFiltered
-                    filteredChannels.value = initialFiltered
+                    allChannels.value = ChannelUtils.filterChannels(response)
                 }
 
                 fetched = true
 
+                // focus search bar
                 scope2.launch {
                     delay(10)
                     searchBarFocusRequester.requestFocus()
                 }
-
             }
         }
     }
 
     fun updateFilteredChannels(text: String) {
         searchText = text
-        filteredChannels.value = allChannels.value.filter { channel ->
-            channel.channel_name.contains(text, ignoreCase = true)
+        filteredChannels.value = if (text.isBlank()) {
+            emptyList()
+        } else {
+            allChannels.value.filter { channel ->
+                channel.channel_name.contains(text, ignoreCase = true)
+            }
         }
     }
 
@@ -129,119 +124,118 @@ fun SearchTabLayout(context: Context, focusRequester: FocusRequester) {
             contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxSize()
         ) {
-            CircularWavyProgressIndicator(
-                modifier = Modifier.size(60.dp)
-            )
+            CircularWavyProgressIndicator(modifier = Modifier.size(60.dp))
         }
     } else {
-
         Column {
             SearchBar(
                 searchText = searchText,
-                onSearchTextChanged = { text ->
-                    updateFilteredChannels(text)
-                },
-                onClearClick = {
-                    updateFilteredChannels("")
-                },
+                onSearchTextChanged = { text -> updateFilteredChannels(text) },
+                onClearClick = { updateFilteredChannels("") },
                 focusRequester = searchBarFocusRequester,
-                onDownKey = {
-                    listFocusRequester.requestFocus()
-                },
-                onUPKey = {
-                    focusRequester.requestFocus()
-                }
+                onDownKey = { listFocusRequester.requestFocus() },
+                onUPKey = { focusRequester.requestFocus() }
             )
 
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 100.dp),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.focusRequester(listFocusRequester)
-            ) {
-                items(filteredChannels.value) { channel ->
-                    var isFocused by remember { mutableStateOf(false) }
-                    val scale by animateFloatAsState(
-                        targetValue = if (isFocused) 1.1f else 1f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessLow
-                        ), label = ""
-                    )
-
-                    ElevatedCard(
-                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                        modifier = Modifier
-                            .height(120.dp)
-                            .scale(scale)
-                            .onFocusEvent { focusState ->
-                                isFocused = focusState.isFocused
-                            }
-                            .clickable {
-                                Log.d("HT", channel.channel_name)
-                                val intent = Intent(context, ExoPlayJet::class.java).apply {
-                                    putExtra("video_url", channel.channel_url)
-                                }
-                                if (context !is Activity) {
-                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                }
-                                context.startActivity(intent)
-
-
-                                val recentChannelsJson = preferenceManager.myPrefs.recentChannels
-                                val type = object : TypeToken<List<Channel>>() {}.type
-                                val recentChannels: MutableList<Channel> =
-                                    Gson().fromJson(recentChannelsJson, type)
-                                        ?: mutableListOf()
-
-                                val existingIndex =
-                                    recentChannels.indexOfFirst { it.channel_id == channel.channel_id }
-
-                                if (existingIndex != -1) {
-                                    val existingChannel = recentChannels[existingIndex]
-                                    recentChannels.removeAt(existingIndex)
-                                    recentChannels.add(0, existingChannel)
-                                } else {
-                                    recentChannels.add(0, channel)
-                                    if (recentChannels.size > 25) {
-                                        recentChannels.removeAt(recentChannels.size - 1)
-                                    }
-                                }
-
-                                val gson = Gson()
-                                val recentChannelsJsonx = gson.toJson(recentChannels)
-                                preferenceManager.myPrefs.recentChannels = recentChannelsJsonx
-                                preferenceManager.savePreferences()
-                            },
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            // 🔹 Only show results when user has typed something
+            if (searchText.isNotBlank()) {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 100.dp),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.focusRequester(listFocusRequester)
+                ) {
+                    items(filteredChannels.value) { channel ->
+                        var isFocused by remember { mutableStateOf(false) }
+                        val scale by animateFloatAsState(
+                            targetValue = if (isFocused) 1.1f else 1f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessLow
+                            ), label = ""
                         )
-                    ) {
-                        Column {
-                            // Image
-                            GlideImage(
-                                model = "http://localhost:${localPORT}/jtvimage/${channel.logoUrl}",
-                                contentDescription = channel.channel_name,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(80.dp),
-                                contentScale = ContentScale.Fit
-                            )
 
-                            // Title
-                            Text(
-                                text = channel.channel_name,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(8.dp)
+                        ElevatedCard(
+                            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                            modifier = Modifier
+                                .height(120.dp)
+                                .scale(scale)
+                                .onFocusEvent { focusState ->
+                                    isFocused = focusState.isFocused
+                                }
+                                .clickable {
+                                    Log.d("HT", channel.channel_name)
+                                    val intent = Intent(context, ExoPlayJet::class.java).apply {
+                                        putExtra("video_url", channel.channel_url)
+                                    }
+                                    if (context !is Activity) {
+                                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    context.startActivity(intent)
+
+                                    // 🔹 Save to recents
+                                    val recentChannelsJson = preferenceManager.myPrefs.recentChannels
+                                    val type = object : TypeToken<List<Channel>>() {}.type
+                                    val recentChannels: MutableList<Channel> =
+                                        Gson().fromJson(recentChannelsJson, type)
+                                            ?: mutableListOf()
+
+                                    val existingIndex =
+                                        recentChannels.indexOfFirst { it.channel_id == channel.channel_id }
+
+                                    if (existingIndex != -1) {
+                                        val existingChannel = recentChannels[existingIndex]
+                                        recentChannels.removeAt(existingIndex)
+                                        recentChannels.add(0, existingChannel)
+                                    } else {
+                                        recentChannels.add(0, channel)
+                                        if (recentChannels.size > 25) {
+                                            recentChannels.removeAt(recentChannels.size - 1)
+                                        }
+                                    }
+
+                                    val gson = Gson()
+                                    val recentChannelsJsonx = gson.toJson(recentChannels)
+                                    preferenceManager.myPrefs.recentChannels = recentChannelsJsonx
+                                    preferenceManager.savePreferences()
+                                },
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
                             )
+                        ) {
+                            Column {
+                                GlideImage(
+                                    model = "http://localhost:${localPORT}/jtvimage/${channel.logoUrl}",
+                                    contentDescription = channel.channel_name,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(80.dp),
+                                    contentScale = ContentScale.Fit
+                                )
+                                Text(
+                                    text = channel.channel_name,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(8.dp)
+                                )
+                            }
                         }
                     }
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 40.dp),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    Text("Type to search channels", color = Color.Gray)
                 }
             }
         }
     }
 }
+
 
 @Composable
 fun SearchBar(

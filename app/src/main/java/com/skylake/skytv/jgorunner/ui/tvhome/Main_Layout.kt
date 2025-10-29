@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -60,6 +61,7 @@ import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
+import kotlinx.coroutines.delay
 
 @SuppressLint("MutableCollectionMutableState")
 @OptIn(ExperimentalGlideComposeApi::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -77,6 +79,9 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
 
     var selectedChannel by remember { mutableStateOf<Channel?>(null) }
     var epgData by remember { mutableStateOf<EpgProgram?>(null) }
+    var isEpgLoading by remember { mutableStateOf(false) }
+    var epgError by remember { mutableStateOf(false) }
+    var showLoading by remember { mutableStateOf(false) }
 
     remember { FocusRequester() }
     val categoryMap = mapOf(
@@ -400,27 +405,53 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
 
     // Fetch EPG data for selected channel
     LaunchedEffect(selectedChannel) {
-        selectedChannel?.let { channel ->
-            val epgURLc = "$basefinURL/epg/${channel.channel_id}/0"
-            Log.d("NANOdix", epgURLc)
-            epgData = ChannelUtils.fetchEpg(epgURLc)
-        } ?: run {
+        if (selectedChannel != null) {
+            isEpgLoading = true
+            epgError = false
+            val epgURL = "$basefinURL/epg/${selectedChannel!!.channel_id}/0"
+            Log.d("EPG_FETCH", epgURL)
+
+            try {
+                val fetchedEpg = ChannelUtils.fetchEpg(epgURL)
+                if (fetchedEpg != null) {
+                    epgData = fetchedEpg
+                } else {
+                    epgData = null
+                    epgError = true
+                }
+            } catch (e: Exception) {
+                epgData = null
+                epgError = true
+            } finally {
+                isEpgLoading = false
+            }
+        } else {
             epgData = null
+            epgError = false
+            isEpgLoading = false
+        }
+    }
+
+    LaunchedEffect(fetched) {
+        if (!fetched) {
+            delay(100)
+            if (!fetched) showLoading = true
+        } else {
+            showLoading = false
         }
     }
 
     // UI: Loading state
-    if (!fetched) {
+    if (!fetched && showLoading) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxSize()
         ) {
-//            CircularWavyProgressIndicator(modifier = Modifier.size(60.dp))
             ContainedLoadingIndicator(modifier = Modifier.size(100.dp))
         }
     }
     // UI: Empty state
-    else if (filteredChannels.value.isEmpty()) {
+    else if (fetched && filteredChannels.value.isEmpty()) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxSize()
@@ -511,6 +542,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                                 )
                             }
                         }
+
                         isSelected -> {
                             {
                                 Icon(
@@ -520,6 +552,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                                 )
                             }
                         }
+
                         else -> null
                     }
                 )
@@ -527,54 +560,103 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
         }
 
         // EPG CARD (null-safe)
-        epgData?.let { epg ->
+        if (isEpgLoading || epgData != null || epgError) {
             Column(
                 modifier = Modifier
                     .padding(horizontal = 12.dp, vertical = 4.dp)
                     .fillMaxWidth()
             ) {
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
                     shape = RoundedCornerShape(16.dp)
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(start = 8.dp, end = 12.dp)
-                        ) {
-                            Text(
-                                text = epg.channel_name,
-                                style = TextStyle(fontSize = 14.sp)
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = epg.showname,
-                                maxLines = 1,
-                                style = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = epg.description,
-                                style = TextStyle(fontSize = 13.sp),
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                    when {
+                        isEpgLoading -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(100.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Loading EPG...",
+                                    style = TextStyle(
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color.Gray
+                                    )
+                                )
+                            }
                         }
-                        GlideImage(
-                            model = "$basefinURL/jtvposter/${epg.episodePoster}",
-                            contentDescription = null,
-                            modifier = Modifier
-                                .height(90.dp)
-                                .clip(RoundedCornerShape(12.dp)),
-                            contentScale = ContentScale.Fit
-                        )
+
+                        epgError -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(100.dp)
+                                    .padding(12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "No EPG available",
+                                    style = TextStyle(
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color.Gray
+                                    )
+                                )
+                            }
+                        }
+
+                        epgData != null -> {
+                            val epg = epgData!!
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(start = 8.dp, end = 12.dp)
+                                        .heightIn(max = 110.dp)
+                                ) {
+                                    Text(
+                                        text = epg.channel_name,
+                                        style = TextStyle(fontSize = 14.sp)
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = epg.showname,
+                                        maxLines = 1,
+                                        style = TextStyle(
+                                            fontSize = 22.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = epg.description,
+                                        style = TextStyle(fontSize = 13.sp),
+                                        maxLines = 3,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                GlideImage(
+                                    model = "$basefinURL/jtvposter/${epg.episodePoster}",
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .height(90.dp)
+                                        .clip(RoundedCornerShape(12.dp)),
+                                    contentScale = ContentScale.Fit
+                                )
+                            }
+                        }
                     }
                 }
             }
