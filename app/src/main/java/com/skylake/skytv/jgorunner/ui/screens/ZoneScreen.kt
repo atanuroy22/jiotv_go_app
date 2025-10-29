@@ -63,6 +63,9 @@ import com.skylake.skytv.jgorunner.ui.tvhome.Recent_Layout
 import com.skylake.skytv.jgorunner.ui.tvhome.components.TvScreenMenu
 import com.skylake.skytv.jgorunner.ui.tvhome.depreciated.SearchTabLayout
 import com.skylake.skytv.jgorunner.ui.tvhome.depreciated.SearchTabLayoutTV
+import com.skylake.skytv.jgorunner.utils.HandleTvBackKey
+import com.skylake.skytv.jgorunner.utils.RememberBackPressManager
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 
@@ -103,25 +106,29 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
 
     var firstLaunch by remember { mutableStateOf(true) }
 
-    // Back press handler
-    BackHandler {
-        val now = System.currentTimeMillis()
-        if (now - exitPressTime < 2000) {
-            onNavigate("Home")
-        } else {
-            exitPressTime = now
-            coroutineScope.launch {
-                val result = snackbarHostState.showSnackbar(
-                    message = "Press back again to exit",
-                    actionLabel = "Exit",
-                    duration = SnackbarDuration.Short
-                )
-                if (result == SnackbarResult.ActionPerformed) {
-                    onNavigate("Home")
-                }
-            }
-        }
+    val backPressedOnce = remember { mutableStateOf(false) }
+
+
+   // Back press handler
+
+    HandleTvBackKey {
+        onNavigate("Home")
     }
+
+    RememberBackPressManager(
+        timeoutMs = 2000L,
+        onExit = { onNavigate("Home") },
+        showHint = {
+            snackbarHostState.currentSnackbarData?.dismiss()
+            val job = coroutineScope.launch {
+                snackbarHostState.showSnackbar("Press back again to exit", duration = SnackbarDuration.Indefinite)
+            }
+            delay(2000L)
+            snackbarHostState.currentSnackbarData?.dismiss()
+            job.cancel()
+        }
+    )
+
 
     // UI Glow Effect
     val glowColors = listOf(Color.Red, Color.Green, Color.Blue, Color.Yellow, Color.Cyan, Color.Magenta)
