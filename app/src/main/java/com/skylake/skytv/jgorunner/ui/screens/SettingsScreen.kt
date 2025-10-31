@@ -1,11 +1,11 @@
 package com.skylake.skytv.jgorunner.ui.screens
 
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.Process
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -33,7 +33,6 @@ import androidx.compose.material.icons.filled.BrowserUpdated
 import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Hub
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Mediation
@@ -46,19 +45,17 @@ import androidx.compose.material.icons.filled.SoupKitchen
 import androidx.compose.material.icons.filled.Stream
 import androidx.compose.material.icons.filled.Timelapse
 import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -77,6 +74,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.nativeKeyCode
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -88,19 +86,12 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.activities.AppListActivity
-import com.skylake.skytv.jgorunner.activities.MainActivity
 import com.skylake.skytv.jgorunner.core.data.JTVConfigurationManager
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.ui.components.BackupDialog
 import com.skylake.skytv.jgorunner.ui.components.JTVModeSelectorPopup
 import com.skylake.skytv.jgorunner.ui.components.ModeSelectionDialog
 import com.skylake.skytv.jgorunner.ui.components.restoreBackup
-import android.os.Process
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.text.TextStyle
 import kotlin.system.exitProcess
 
 
@@ -465,14 +456,12 @@ fun SettingsScreen(
                 HorizontalDividerLineTrx("Miscellaneous")
             }
 
-            if (true) {
-                item {
-                    SettingSwitchItem(icon = Icons.Filled.DarkMode,
-                        title = "Always Dark Mode",
-                        subtitle = "Toggle between dark and auto",
-                        isChecked = isSwitchDarkMode,
-                        onCheckedChange = { isChecked -> isSwitchDarkMode = isChecked })
-                }
+            item {
+                SettingSwitchItem(icon = Icons.Filled.DarkMode,
+                    title = "Always Dark Mode",
+                    subtitle = "Toggle between dark and auto",
+                    isChecked = isSwitchDarkMode,
+                    onCheckedChange = { isChecked -> isSwitchDarkMode = isChecked })
             }
 
             item {

@@ -12,7 +12,7 @@ class CastActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         val url: String?
-        val DEFAULT_URL_TEMPLATE: String = "http://localhost:%d"
+        val defaultUrlTemplate = "http://localhost:%d"
         val prefManager = SkySharedPref.getInstance(this)
         val savedPortNumber = prefManager.myPrefs.jtvGoServerPort
         val filterQ = prefManager.myPrefs.filterQ
@@ -35,7 +35,7 @@ class CastActivity : AppCompatActivity() {
             }
         }
 
-        url = String.format(Locale.getDefault(), DEFAULT_URL_TEMPLATE, savedPortNumber) + extraFilterUrl
+        url = String.format(Locale.getDefault(), defaultUrlTemplate, savedPortNumber) + extraFilterUrl
 
         setContent {
             CastScreen(

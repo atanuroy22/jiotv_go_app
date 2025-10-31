@@ -1,5 +1,7 @@
 package com.skylake.skytv.jgorunner.ui.tvhome
 
+
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.util.Log
@@ -17,32 +19,30 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat.startActivity
-//import androidx.tv.material3.Text
-import androidx.compose.material3.Text
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
-import androidx.compose.material3.Text as CText
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
+import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
+import androidx.compose.material3.Text as CText
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
@@ -62,11 +62,11 @@ fun Recent_Layout(context: Context) {
             .padding(top = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        CText(
-            text = "Recent Channels",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold
-        )
+//        CText(
+//            text = "Recent Channels",
+//            fontSize = 18.sp,
+//            fontWeight = FontWeight.Bold
+//        )
 
         if (recentChannels.value.isEmpty()) {
             CText(
@@ -97,30 +97,41 @@ fun Recent_Layout(context: Context) {
                             }
                             .clickable {
                                 Log.d("HT", channel.channel_name)
+                                val serverPort = SkySharedPref.getInstance(context).myPrefs.jtvGoServerPort
+
                                 val intent = Intent(context, ExoPlayJet::class.java).apply {
-                                    putExtra("video_url", "http://localhost:${SkySharedPref.getInstance(context).myPrefs.jtvGoServerPort}/live/${channel.channel_id}" )
+                                    putExtra("video_url", "http://localhost:$serverPort/live/${channel.channel_id}")
                                     putExtra("zone", "TV")
-                                    // Prepare channel list for ExoplayerActivityPass
-                                    val allChannelsData = ArrayList(recentChannels.value.map { ch ->
-                                        val fullLogoUrl = "http://localhost:${SkySharedPref.getInstance(context).myPrefs.jtvGoServerPort}/jtvimage/${ch.logoUrl}"
-                                        ChannelInfo(ch.channel_url, fullLogoUrl, ch.channel_name)
-                                    })
+
+                                    val allChannelsData = ArrayList(
+                                        recentChannels.value.map { ch ->
+                                            val fullLogoUrl = "http://localhost:$serverPort/jtvimage/${ch.logoUrl}"
+                                            ChannelInfo(ch.channel_url, fullLogoUrl, ch.channel_name)
+                                        }
+                                    )
                                     putParcelableArrayListExtra("channel_list_data", allChannelsData)
 
                                     val currentChannelIndex = recentChannels.value.indexOf(channel)
                                     putExtra("current_channel_index", currentChannelIndex)
 
                                     putExtra("video_url", channel.channel_url)
-                                    putExtra("logo_url", "http://localhost:${SkySharedPref.getInstance(context).myPrefs.jtvGoServerPort}/jtvimage/${channel.logoUrl}")
+                                    putExtra("logo_url", "http://localhost:$serverPort/jtvimage/${channel.logoUrl}")
                                     putExtra("ch_name", channel.channel_name)
                                 }
-                                startActivity(context, intent, null)
+
+                                if (context !is Activity) {
+                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(intent)
+
 
                                 val recentChannelsJson = preferenceManager.myPrefs.recentChannels
                                 val type = object : TypeToken<List<Channel>>() {}.type
-                                val recentChannels: MutableList<Channel> = Gson().fromJson(recentChannelsJson, type) ?: mutableListOf()
+                                val recentChannels: MutableList<Channel> =
+                                    Gson().fromJson(recentChannelsJson, type) ?: mutableListOf()
 
-                                val existingIndex = recentChannels.indexOfFirst { it.channel_id == channel.channel_id }
+                                val existingIndex =
+                                    recentChannels.indexOfFirst { it.channel_id == channel.channel_id }
 
                                 if (existingIndex != -1) {
                                     val existingChannel = recentChannels[existingIndex]
@@ -144,8 +155,12 @@ fun Recent_Layout(context: Context) {
                         )
                     ) {
                         Column {
-                            // Image
-                            val imageUrl = "http://localhost:${SkySharedPref.getInstance(context).myPrefs.jtvGoServerPort}/jtvimage/${channel.logoUrl}"
+
+                            val imageUrl = if (channel.logoUrl.contains("http")) {
+                                channel.logoUrl
+                            } else {
+                                "http://localhost:${SkySharedPref.getInstance(context).myPrefs.jtvGoServerPort}/jtvimage/${channel.logoUrl}"
+                            }
 
                             GlideImage(
                                 model = imageUrl,
@@ -156,10 +171,9 @@ fun Recent_Layout(context: Context) {
                                 contentScale = ContentScale.Fit
                             )
 
-                            // Title
                             Text(
                                 text = channel.channel_name,
-                                color=MaterialTheme.colorScheme.onSurface,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 fontSize = 12.sp,
                                 modifier = Modifier.padding(8.dp)
                             )

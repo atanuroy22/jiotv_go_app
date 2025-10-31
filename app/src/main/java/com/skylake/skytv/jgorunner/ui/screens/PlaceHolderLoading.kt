@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.sp
 @SuppressLint("NewApi")
 
 @Composable
-fun LandingPageScreen2() {
+fun PlaceHolderLoading() {
         Column(
             modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,

@@ -1,5 +1,6 @@
 package com.skylake.skytv.jgorunner.ui.tvhome
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.util.Log
@@ -8,8 +9,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -19,10 +20,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -32,7 +33,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat.startActivity
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import com.google.gson.Gson
@@ -47,10 +47,11 @@ import com.skylake.skytv.jgorunner.services.player.PlayerCommandBus
 fun ChannelGridTV(
     context: Context,
     channels: List<M3UChannelExp>,
-    selectedChannel: M3UChannelExp?,
+//    selectedChannel: M3UChannelExp?,
     onSelectedChannelChanged: (M3UChannelExp) -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
+    val preferenceManager = remember { SkySharedPref.getInstance(context) }
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 100.dp),
         contentPadding = PaddingValues(16.dp),
@@ -104,6 +105,49 @@ fun ChannelGridTV(
                             }
                         }
                     ),
+
+                        if (context !is Activity) {
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+
+                        // Recent Channels
+                        val recentChannelsJson = preferenceManager.myPrefs.recentChannels
+                        val type = object : TypeToken<List<Channel>>() {}.type
+                        val recentChannels: MutableList<Channel> =
+                            if (!recentChannelsJson.isNullOrEmpty())
+                                Gson().fromJson(recentChannelsJson, type) ?: mutableListOf()
+                            else
+                                mutableListOf()
+
+                        val clickedAsChannel = Channel(
+                            channel_id = extractChannelIdFromPlayUrl(channel.url).toString(),
+                            channel_url = channel.url,
+                            logoUrl = channel.logo ?: "",
+                            channel_name = channel.name,
+                            channelCategoryId= 0,
+                            channelLanguageId= 0,
+                            isHD= true,
+                        )
+
+                        val existingIndex =
+                            recentChannels.indexOfFirst { it.channel_id == clickedAsChannel.channel_id }
+
+                        if (existingIndex != -1) {
+                            val existingChannel = recentChannels[existingIndex]
+                            recentChannels.removeAt(existingIndex)
+                            recentChannels.add(0, existingChannel)
+                        } else {
+                            recentChannels.add(0, clickedAsChannel)
+                            if (recentChannels.size > 25) {
+                                recentChannels.removeAt(recentChannels.size - 1)
+                            }
+                        }
+                        preferenceManager.myPrefs.recentChannels = Gson().toJson(recentChannels)
+                        preferenceManager.savePreferences()
+
+
+                    },
                 border = if (isFocused) BorderStroke(4.dp, Color(0xFFFFD700)) else null,
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
@@ -146,7 +190,6 @@ fun ChannelGridMain(
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         items(filteredChannels) { channel ->
-            if (channel == null) return@items
             var isFocused by remember { mutableStateOf(false) }
 
             Card(
@@ -248,18 +291,18 @@ fun ChannelGridMain(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
             ) {
-                val logoUrl = channel.logoUrl ?: ""
+                val logoUrl = channel.logoUrl
                 val imageUrl = "$basefinURL/jtvimage/$logoUrl"
                 GlideImage(
                     model = imageUrl,
-                    contentDescription = channel.channel_name ?: "Channel",
+                    contentDescription = channel.channel_name,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(80.dp),
                     contentScale = ContentScale.Fit
                 )
                 Text(
-                    text = channel.channel_name ?: "Channel",
+                    text = channel.channel_name,
                     fontSize = 12.sp,
                     modifier = Modifier.padding(8.dp)
                 )

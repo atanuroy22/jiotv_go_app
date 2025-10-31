@@ -5,61 +5,87 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat.startActivity
-import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
-import com.bumptech.glide.integration.compose.GlideImage
-import com.skylake.skytv.jgorunner.activities.ChannelInfo
-import com.skylake.skytv.jgorunner.data.SkySharedPref
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.content.edit
+import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
+import com.bumptech.glide.integration.compose.GlideImage
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import com.skylake.skytv.jgorunner.activities.ChannelInfo
+import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
+import kotlinx.coroutines.delay
 
 @SuppressLint("MutableCollectionMutableState")
 @OptIn(ExperimentalGlideComposeApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun Main_Layout(context: Context, reloadTrigger: Int ) {
-    val scope = rememberCoroutineScope()
+fun Main_Layout(context: Context, reloadTrigger: Int) {
+    rememberCoroutineScope()
     val channelsResponse = remember { mutableStateOf<ChannelResponse?>(null) }
     val filteredChannels = remember { mutableStateOf<List<Channel>>(emptyList()) }
     val preferenceManager = SkySharedPref.getInstance(context)
     val localPORT by remember {
-        mutableIntStateOf(preferenceManager.myPrefs.jtvGoServerPort ?: 8080)
+        mutableIntStateOf(preferenceManager.myPrefs.jtvGoServerPort)
     }
     val basefinURL = "http://localhost:$localPORT"
     var fetched by remember { mutableStateOf(false) }
 
     var selectedChannel by remember { mutableStateOf<Channel?>(null) }
     var epgData by remember { mutableStateOf<EpgProgram?>(null) }
+    var isEpgLoading by remember { mutableStateOf(false) }
+    var epgError by remember { mutableStateOf(false) }
+    var showLoading by remember { mutableStateOf(false) }
 
-    val focusRequester = remember { FocusRequester() }
+    remember { FocusRequester() }
     val categoryMap = mapOf(
-        "Reset" to null,
+        "All" to null,
         "Entertainment" to 5,
         "Movies" to 6,
         "Kids" to 7,
@@ -77,18 +103,20 @@ fun Main_Layout(context: Context, reloadTrigger: Int ) {
 
     val savedCategoryIds = preferenceManager.myPrefs.filterCI
         ?.split(",")?.mapNotNull { it.toIntOrNull() }?.toMutableSet() ?: mutableSetOf()
-    var selectedCategoryIds by remember { mutableStateOf(savedCategoryIds) }
+//    var selectedCategoryIds by remember { mutableStateOf(savedCategoryIds) }
+    var selectedCategoryIds by rememberSaveable { mutableStateOf(savedCategoryIds.toSet()) }
 
     val sortedCategories = remember(selectedCategoryIds) {
-        val resetCategoryName = "Reset"
+        val allCategoryName = "All"
         val allCategoryNames = categoryMap.keys.toList()
-        val otherCategoryNames = allCategoryNames.filter { it != resetCategoryName }
+        val otherCategoryNames = allCategoryNames.filter { it != allCategoryName }
         val (selectedOtherCategories, unselectedOtherCategories) = otherCategoryNames.partition { categoryName ->
             val categoryId = categoryMap[categoryName]
             categoryId != null && selectedCategoryIds.contains(categoryId)
         }
-        listOf(resetCategoryName) + selectedOtherCategories + unselectedOtherCategories
+        listOf(allCategoryName) + selectedOtherCategories + unselectedOtherCategories
     }
+
 
     // Helper functions for enhanced autoplay
     suspend fun fetchFromBackend(): List<Channel> {
@@ -105,47 +133,75 @@ fun Main_Layout(context: Context, reloadTrigger: Int ) {
                     ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
 
                 val filtered = when {
-                    categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(response)
+                    categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
+                        response
+                    )
+
                     categories.isNullOrEmpty() -> ChannelUtils.filterChannels(
                         response,
-                        languageIds = languages?.mapNotNull { it.toIntOrNull() }?.takeIf { it.isNotEmpty() }
+                        languageIds = languages?.mapNotNull { it.toIntOrNull() }
+                            ?.takeIf { it.isNotEmpty() }
                     )
+
                     languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
                         response,
-                        categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
+                        categoryIds = categories.mapNotNull { it.toIntOrNull() }
+                            .takeIf { it.isNotEmpty() }
                     )
+
                     else -> ChannelUtils.filterChannels(
                         response,
-                        categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() },
-                        languageIds = languages.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
+                        categoryIds = categories.mapNotNull { it.toIntOrNull() }
+                            .takeIf { it.isNotEmpty() },
+                        languageIds = languages.mapNotNull { it.toIntOrNull() }
+                            .takeIf { it.isNotEmpty() }
                     )
                 }
-                filteredChannels.value = filtered ?: emptyList()
-                filtered ?: emptyList()
+                filteredChannels.value = filtered
+                filtered
             } ?: emptyList()
-        } catch (e: Exception) { emptyList() }
+        } catch (_: Exception) {
+            emptyList()
+        }
     }
 
     suspend fun watchdogAutoplay(channels: List<Channel>) {
         repeat(5) {
             if (preferenceManager.myPrefs.currChannelUrl.isNullOrEmpty()) {
-                val channelsToUse = if (channels.isEmpty()) fetchFromBackend() else channels
+                val channelsToUse = channels.ifEmpty { fetchFromBackend() }
                 if (channelsToUse.isNotEmpty()) {
                     try {
                         val firstChannel = channelsToUse.first()
-                        startActivity(context, Intent(context, ExoPlayJet::class.java).apply {
+                        val intent = Intent(context, ExoPlayJet::class.java).apply {
                             putExtra("zone", "TV")
-                            putParcelableArrayListExtra("channel_list_data", ArrayList(channelsToUse.map { ch ->
-                                ChannelInfo(ch.channel_url ?: "", "http://localhost:$localPORT/jtvimage/${ch.logoUrl ?: ""}", ch.channel_name ?: "")
-                            }))
+                            putParcelableArrayListExtra(
+                                "channel_list_data",
+                                ArrayList(channelsToUse.map { ch ->
+                                    ChannelInfo(
+                                        ch.channel_url,
+                                        "http://localhost:$localPORT/jtvimage/${ch.logoUrl}",
+                                        ch.channel_name
+                                    )
+                                })
+                            )
                             putExtra("current_channel_index", 0)
                             putExtra("video_url", firstChannel.channel_url)
-                            putExtra("logo_url", "http://localhost:$localPORT/jtvimage/${firstChannel.logoUrl}")
+                            putExtra(
+                                "logo_url",
+                                "http://localhost:$localPORT/jtvimage/${firstChannel.logoUrl}"
+                            )
                             putExtra("ch_name", firstChannel.channel_name)
-                        }, null)
+                        }
+
+                        if (context !is Activity) {
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+
                         AppStartTracker.shouldPlayChannel = true
                         return
-                    } catch (_: Exception) {}
+                    } catch (_: Exception) {
+                    }
                 }
             }
             kotlinx.coroutines.delay(2000)
@@ -163,10 +219,9 @@ fun Main_Layout(context: Context, reloadTrigger: Int ) {
             try {
                 cachedChannels = Gson().fromJson(cachedJson, ChannelResponse::class.java)
                 channelsResponse.value = cachedChannels
-            } catch (e: Exception) {
-                with(sharedPref.edit()) {
+            } catch (_: Exception) {
+                sharedPref.edit {
                     remove("channels_json")
-                    apply()
                 }
                 useCache = false
             }
@@ -181,22 +236,31 @@ fun Main_Layout(context: Context, reloadTrigger: Int ) {
                 ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
 
             val filtered = when {
-                categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(cachedChannels)
+                categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
+                    cachedChannels
+                )
+
                 categories.isNullOrEmpty() -> ChannelUtils.filterChannels(
                     cachedChannels,
-                    languageIds = languages?.mapNotNull { it.toIntOrNull() }?.takeIf { it.isNotEmpty() }
+                    languageIds = languages?.mapNotNull { it.toIntOrNull() }
+                        ?.takeIf { it.isNotEmpty() }
                 )
+
                 languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
                     cachedChannels,
-                    categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
+                    categoryIds = categories.mapNotNull { it.toIntOrNull() }
+                        .takeIf { it.isNotEmpty() }
                 )
+
                 else -> ChannelUtils.filterChannels(
                     cachedChannels,
-                    categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() },
-                    languageIds = languages.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
+                    categoryIds = categories.mapNotNull { it.toIntOrNull() }
+                        .takeIf { it.isNotEmpty() },
+                    languageIds = languages.mapNotNull { it.toIntOrNull() }
+                        .takeIf { it.isNotEmpty() }
                 )
             }
-            filteredChannels.value = filtered ?: emptyList()
+            filteredChannels.value = filtered
             fetched = true
         } else {
             var attempts = 0
@@ -208,9 +272,8 @@ fun Main_Layout(context: Context, reloadTrigger: Int ) {
                     channelsResponse.value = response
                     if (response != null) {
                         val responseJsonString = Gson().toJson(response)
-                        with(sharedPref.edit()) {
+                        sharedPref.edit {
                             putString("channels_json", responseJsonString)
-                            apply()
                         }
                         val categories = preferenceManager.myPrefs.filterCI
                             ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
@@ -218,25 +281,34 @@ fun Main_Layout(context: Context, reloadTrigger: Int ) {
                             ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
 
                         val filtered = when {
-                            categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(response)
+                            categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
+                                response
+                            )
+
                             categories.isNullOrEmpty() -> ChannelUtils.filterChannels(
                                 response,
-                                languageIds = languages?.mapNotNull { it.toIntOrNull() }?.takeIf { it.isNotEmpty() }
+                                languageIds = languages?.mapNotNull { it.toIntOrNull() }
+                                    ?.takeIf { it.isNotEmpty() }
                             )
+
                             languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
                                 response,
-                                categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
+                                categoryIds = categories.mapNotNull { it.toIntOrNull() }
+                                    .takeIf { it.isNotEmpty() }
                             )
+
                             else -> ChannelUtils.filterChannels(
                                 response,
-                                categoryIds = categories.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() },
-                                languageIds = languages.mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }
+                                categoryIds = categories.mapNotNull { it.toIntOrNull() }
+                                    .takeIf { it.isNotEmpty() },
+                                languageIds = languages.mapNotNull { it.toIntOrNull() }
+                                    .takeIf { it.isNotEmpty() }
                             )
                         }
-                        filteredChannels.value = filtered ?: emptyList()
+                        filteredChannels.value = filtered
                         success = true
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     // ignore, retry
                 }
                 if (!success) {
@@ -251,27 +323,39 @@ fun Main_Layout(context: Context, reloadTrigger: Int ) {
             if (channelsForAutoplay.isEmpty()) {
                 channelsForAutoplay = fetchFromBackend()
             }
-            
+
             if (!AppStartTracker.shouldPlayChannel && channelsForAutoplay.isNotEmpty()) {
                 val firstChannel = channelsForAutoplay.first()
                 val intent = Intent(context, ExoPlayJet::class.java).apply {
                     putExtra("zone", "TV")
-                    putParcelableArrayListExtra("channel_list_data", ArrayList(
-                        channelsForAutoplay.map { ch ->
-                            ChannelInfo(
-                                ch.channel_url ?: "",
-                                "http://localhost:$localPORT/jtvimage/${ch.logoUrl ?: ""}",
-                                ch.channel_name ?: ""
-                            )
-                        }
-                    ))
+                    putParcelableArrayListExtra(
+                        "channel_list_data",
+                        ArrayList(
+                            channelsForAutoplay.map { ch ->
+                                ChannelInfo(
+                                    ch.channel_url,
+                                    "http://localhost:$localPORT/jtvimage/${ch.logoUrl}",
+                                    ch.channel_name
+                                )
+                            }
+                        )
+                    )
                     putExtra("current_channel_index", 0)
-                    putExtra("video_url", firstChannel.channel_url ?: "")
-                    putExtra("logo_url", "http://localhost:$localPORT/jtvimage/${firstChannel.logoUrl ?: ""}")
-                    putExtra("ch_name", firstChannel.channel_name ?: "")
+                    putExtra("video_url", firstChannel.channel_url)
+                    putExtra(
+                        "logo_url",
+                        "http://localhost:$localPORT/jtvimage/${firstChannel.logoUrl}"
+                    )
+                    putExtra("ch_name", firstChannel.channel_name)
                 }
+
                 kotlinx.coroutines.delay(1000)
-                startActivity(context, intent, null)
+
+                if (context !is Activity) {
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+
 
                 //Recent Channels
                 val recentChannelsJson = preferenceManager.myPrefs.recentChannels
@@ -315,33 +399,59 @@ fun Main_Layout(context: Context, reloadTrigger: Int ) {
                 categoryIds = selectedCategoryIds.takeIf { it.isNotEmpty() }?.toList(),
                 languageIds = languages
             )
-            filteredChannels.value = filtered ?: emptyList()
+            filteredChannels.value = filtered
         }
     }
 
     // Fetch EPG data for selected channel
     LaunchedEffect(selectedChannel) {
-        selectedChannel?.let { channel ->
-            val epgURLc = "$basefinURL/epg/${channel.channel_id ?: ""}/0"
-            Log.d("NANOdix",epgURLc)
-            epgData = ChannelUtils.fetchEpg(epgURLc)
-        } ?: run {
+        if (selectedChannel != null) {
+            isEpgLoading = true
+            epgError = false
+            val epgURL = "$basefinURL/epg/${selectedChannel!!.channel_id}/0"
+            Log.d("EPG_FETCH", epgURL)
+
+            try {
+                val fetchedEpg = ChannelUtils.fetchEpg(epgURL)
+                if (fetchedEpg != null) {
+                    epgData = fetchedEpg
+                } else {
+                    epgData = null
+                    epgError = true
+                }
+            } catch (e: Exception) {
+                epgData = null
+                epgError = true
+            } finally {
+                isEpgLoading = false
+            }
+        } else {
             epgData = null
+            epgError = false
+            isEpgLoading = false
+        }
+    }
+
+    LaunchedEffect(fetched) {
+        if (!fetched) {
+            delay(100)
+            if (!fetched) showLoading = true
+        } else {
+            showLoading = false
         }
     }
 
     // UI: Loading state
-    if (!fetched) {
+    if (!fetched && showLoading) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxSize()
         ) {
-//            CircularWavyProgressIndicator(modifier = Modifier.size(60.dp))
             ContainedLoadingIndicator(modifier = Modifier.size(100.dp))
         }
     }
     // UI: Empty state
-    else if (filteredChannels.value.isNullOrEmpty()) {
+    else if (fetched && filteredChannels.value.isEmpty()) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxSize()
@@ -403,32 +513,36 @@ fun Main_Layout(context: Context, reloadTrigger: Int ) {
 
                 FilterChip(
                     onClick = {
-                        if (categoryName == "Reset") {
-                            selectedCategoryIds = mutableSetOf()
+                        if (categoryName == "All") {
+                            selectedCategoryIds = emptySet()
                         } else if (categoryId != null) {
-                            val newSelection = if (isSelected) {
-                                (selectedCategoryIds - categoryId).toMutableSet()
+                            selectedCategoryIds = if (isSelected) {
+                                selectedCategoryIds - categoryId
                             } else {
-                                (selectedCategoryIds + categoryId).toMutableSet()
+                                selectedCategoryIds + categoryId
                             }
-                            selectedCategoryIds = newSelection
                         }
                         val updatedCI = selectedCategoryIds.joinToString(",")
                         preferenceManager.myPrefs.filterCI = updatedCI
                         preferenceManager.savePreferences()
                     },
-                    label = { Text(categoryName ?: "Unknown") },
-                    selected = isSelected,
+                    label = { Text(categoryName) },
+                    selected = if (categoryName == "All") {
+                        selectedCategoryIds.isEmpty()
+                    } else {
+                        isSelected
+                    },
                     leadingIcon = when {
-                        categoryName == "Reset" -> {
+                        categoryName == "All" && selectedCategoryIds.isEmpty() -> {
                             {
                                 Icon(
-                                    imageVector = Icons.Filled.Refresh,
-                                    contentDescription = "Reset icon",
+                                    imageVector = Icons.Filled.Done,
+                                    contentDescription = "All selected icon",
                                     modifier = Modifier.size(FilterChipDefaults.IconSize)
                                 )
                             }
                         }
+
                         isSelected -> {
                             {
                                 Icon(
@@ -438,62 +552,110 @@ fun Main_Layout(context: Context, reloadTrigger: Int ) {
                                 )
                             }
                         }
+
                         else -> null
-                    },
+                    }
                 )
             }
         }
 
         // EPG CARD (null-safe)
-        epgData?.let { epg ->
+        if (isEpgLoading || epgData != null || epgError) {
             Column(
                 modifier = Modifier
                     .padding(horizontal = 12.dp, vertical = 4.dp)
                     .fillMaxWidth()
             ) {
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
                     shape = RoundedCornerShape(16.dp)
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(start = 8.dp, end = 12.dp)
-                        ) {
-                            Text(
-                                text = epg.channel_name ?: "Unknown Channel",
-                                style = TextStyle(fontSize = 14.sp)
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = epg.showname ?: "No Program Info",
-                                maxLines = 1,
-                                style = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = epg.description ?: "No description available",
-                                style = TextStyle(fontSize = 13.sp),
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        epg.episodePoster?.let { poster ->
-                            GlideImage(
-                                model = "$basefinURL/jtvposter/$poster",
-                                contentDescription = null,
+                    when {
+                        isEpgLoading -> {
+                            Box(
                                 modifier = Modifier
-                                    .height(90.dp)
-                                    .clip(RoundedCornerShape(12.dp)),
-                                contentScale = ContentScale.Fit
-                            )
+                                    .fillMaxWidth()
+                                    .height(100.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Loading EPG...",
+                                    style = TextStyle(
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color.Gray
+                                    )
+                                )
+                            }
+                        }
+
+                        epgError -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(100.dp)
+                                    .padding(12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "No EPG available",
+                                    style = TextStyle(
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color.Gray
+                                    )
+                                )
+                            }
+                        }
+
+                        epgData != null -> {
+                            val epg = epgData!!
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(start = 8.dp, end = 12.dp)
+                                        .heightIn(max = 110.dp)
+                                ) {
+                                    Text(
+                                        text = epg.channel_name,
+                                        style = TextStyle(fontSize = 14.sp)
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = epg.showname,
+                                        maxLines = 1,
+                                        style = TextStyle(
+                                            fontSize = 22.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = epg.description,
+                                        style = TextStyle(fontSize = 13.sp),
+                                        maxLines = 3,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                GlideImage(
+                                    model = "$basefinURL/jtvposter/${epg.episodePoster}",
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .height(90.dp)
+                                        .clip(RoundedCornerShape(12.dp)),
+                                    contentScale = ContentScale.Fit
+                                )
+                            }
                         }
                     }
                 }
@@ -502,7 +664,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int ) {
 
         ChannelGridMain(
             context = context,
-            filteredChannels = filteredChannels.value ?: emptyList(),
+            filteredChannels = filteredChannels.value,
             selectedChannelSetter = { selectedChannel = it },
             localPORT = localPORT,
             preferenceManager = preferenceManager
@@ -511,3 +673,4 @@ fun Main_Layout(context: Context, reloadTrigger: Int ) {
 
     }
 }
+

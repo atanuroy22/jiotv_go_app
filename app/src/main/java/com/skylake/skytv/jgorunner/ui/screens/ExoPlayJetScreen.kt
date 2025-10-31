@@ -6,14 +6,12 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.res.Configuration
-import android.net.Uri
 import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.LinearLayout
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
@@ -85,6 +83,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -118,6 +117,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Calendar
 
 const val TAG = "ExoJetScreen"
 
@@ -220,7 +220,6 @@ fun ExoPlayJetScreen(
         showNumericOverlay = false
     }
 
-
     val exoPlayer = remember {
         initializePlayer(
             getCurrentVideoUrl = { channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl },
@@ -307,7 +306,7 @@ fun ExoPlayJetScreen(
         retryCountRef.value = 0
         isBuffering = true
         val currentUrl = channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
-        exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl)))
+        exoPlayer.setMediaItem(MediaItem.fromUri(currentUrl.toUri()))
         exoPlayer.prepare()
         exoPlayer.playWhenReady = true
 
@@ -397,7 +396,8 @@ fun ExoPlayJetScreen(
     }
 
     LaunchedEffect(currentIndex) {
-        val channelId = channelList?.getOrNull(currentIndex)?.videoUrl?.let { extractChannelIdFromPlayUrl(it) }
+        val channelId =
+            channelList?.getOrNull(currentIndex)?.videoUrl?.let { extractChannelIdFromPlayUrl(it) }
         currentProgramName = channelId?.let { epgCache[it]?.second }
     }
 
@@ -417,10 +417,12 @@ fun ExoPlayJetScreen(
 
                 showChannelPanel = false
             }
+
             isControllerVisible -> {
 
                 exoPlayerView?.hideController()
             }
+
             else -> {
                 val act = (context as? Activity)
                 val pm = context.packageManager
@@ -452,6 +454,7 @@ fun ExoPlayJetScreen(
             .focusRequester(focusRequester)
             .focusable()
             .onPreviewKeyEvent { event ->
+                val isOkKey = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter
                 if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft) {
                     if (isControllerVisible) {
                         return@onPreviewKeyEvent false
@@ -462,7 +465,6 @@ fun ExoPlayJetScreen(
                     }
                 }
 
-                // --- Key Num Entry ---
                 if (event.type == KeyEventType.KeyDown) {
                     val digit = when (event.key) {
                         Key.Zero -> 0
@@ -478,75 +480,71 @@ fun ExoPlayJetScreen(
                         else -> null
                     }
                     if (digit != null) {
-                        if (!(numericBuffer.isEmpty() && digit == 0)) { // avoid leading zero
-                            if (numericBuffer.length < 4) {
-                                numericBuffer += digit.toString()
-                                showNumericOverlay = true
-                                numericJob?.cancel()
-                                numericJob = scope.launch {
-                                    delay(1200)
-                                    commitNumericEntryLocal(channelList)
-                                }
+                        if (!(numericBuffer.isEmpty() && digit == 0) && numericBuffer.length < 4) {
+                            numericBuffer += digit.toString()
+                            showNumericOverlay = true
+                            numericJob?.cancel()
+                            numericJob = scope.launch {
+                                delay(1200)
+                                commitNumericEntryLocal(channelList)
                             }
                         }
                         return@onPreviewKeyEvent true
+                    }
+                }
+
+                if (event.type == KeyEventType.KeyUp && isOkKey) {
+                    if (showChannelPanel) {
+                        if (!channelList.isNullOrEmpty()) {
+                            currentIndex = panelSelectedIndex.coerceIn(0, channelList.size - 1)
+                            showChannelPanel = false
+                        }
+                        return@onPreviewKeyEvent true
+                    }
+
+                    if (isControllerVisible) {
+                        return@onPreviewKeyEvent false
+                    } else {
+                        val androidKeyEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DPAD_CENTER)
+                        val handled = exoPlayerView?.dispatchKeyEvent(androidKeyEvent) == true
+                        return@onPreviewKeyEvent handled
                     }
                 }
 
                 if (event.type == KeyEventType.KeyUp) {
-                    if (isControllerVisible) {
-                        return@onPreviewKeyEvent false
-                    } else {
-                        if (numericBuffer.isNotEmpty() && (event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter)) {
-                            numericJob?.cancel()
-                            commitNumericEntryLocal(channelList)
-                            return@onPreviewKeyEvent true
-                        }
-                    }
-                    if (event.key == Key.Menu || event.key == Key.DirectionLeft) {
-                        panelSelectedIndex = currentIndex
-                        showChannelPanel = channelList?.isNotEmpty() == true
-                        return@onPreviewKeyEvent true
-                    }
                     if (showChannelPanel && (event.key == Key.DirectionRight || event.key == Key.Back)) {
                         showChannelPanel = false
                         return@onPreviewKeyEvent true
                     }
-                    if (showChannelPanel) {
-                        when (event.key) {
-                            Key.DirectionUp -> {
-                                if (!channelList.isNullOrEmpty()) {
-                                    panelSelectedIndex = (panelSelectedIndex - 1 + channelList.size) % channelList.size
-                                }
-                                return@onPreviewKeyEvent true
-                            }
-                            Key.DirectionDown -> {
-                                if (!channelList.isNullOrEmpty()) {
-                                    panelSelectedIndex = (panelSelectedIndex + 1) % channelList.size
-                                }
-                                return@onPreviewKeyEvent true
-                            }
-                            Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
-                                if (!channelList.isNullOrEmpty()) {
-                                    currentIndex = panelSelectedIndex.coerceIn(0, channelList.size - 1)
-                                    showChannelPanel = false
-                                }
-                                return@onPreviewKeyEvent true
-                            }
-                            else -> {}
-                        }
-                    }
-
-                    return@onPreviewKeyEvent handleTVRemoteKey(
-                        event = event,
-                        tvNAV = tvNAV,
-                        channelList = channelList,
-                        currentIndexState = { currentIndex },
-                        onChannelChange = { currentIndex = it }
-                    )
                 }
-                false
+
+                if (showChannelPanel && event.type == KeyEventType.KeyUp) {
+                    when (event.key) {
+                        Key.DirectionUp -> {
+                            if (!channelList.isNullOrEmpty()) {
+                                panelSelectedIndex = (panelSelectedIndex - 1 + channelList.size) % channelList.size
+                            }
+                            return@onPreviewKeyEvent true
+                        }
+                        Key.DirectionDown -> {
+                            if (!channelList.isNullOrEmpty()) {
+                                panelSelectedIndex = (panelSelectedIndex + 1) % channelList.size
+                            }
+                            return@onPreviewKeyEvent true
+                        }
+                        else -> {}
+                    }
+                }
+
+                return@onPreviewKeyEvent handleTVRemoteKey(
+                    event = event,
+                    tvNAV = tvNAV,
+                    channelList = channelList,
+                    currentIndexState = { currentIndex },
+                    onChannelChange = { currentIndex = it }
+                )
             }
+
 
     ) {
         val currentResizeMode = resizeModes[resizeModeIndex].first
@@ -578,7 +576,9 @@ fun ExoPlayJetScreen(
                     // Inject resize btn
                     post {
                         try {
-                            val controller = findViewById<View>(androidx.media3.ui.R.id.exo_controller) as? ViewGroup ?: return@post
+                            val controller =
+                                findViewById<View>(androidx.media3.ui.R.id.exo_controller) as? ViewGroup
+                                    ?: return@post
                             var targetBar: ViewGroup? = null
                             val candidateIds = listOf(
                                 androidx.media3.ui.R.id.exo_basic_controls,
@@ -587,7 +587,9 @@ fun ExoPlayJetScreen(
                             )
                             for (cid in candidateIds) {
                                 val v = controller.findViewById<View>(cid)
-                                if (v is ViewGroup) { targetBar = v; break }
+                                if (v is ViewGroup) {
+                                    targetBar = v; break
+                                }
                             }
                             if (targetBar == null) {
                                 fun deepest(group: ViewGroup): ViewGroup {
@@ -696,9 +698,17 @@ fun ExoPlayJetScreen(
                 }
             },
             modifier = when {
-                currentResizeMode == RESIZE_MODE_FILL -> Modifier.fillMaxSize().align(Alignment.Center)
-                isDefaultMode -> Modifier.aspectRatio(16f / 9f).align(Alignment.Center)
-                else -> Modifier.fillMaxWidth().aspectRatio(aspectForModifier).align(Alignment.Center)
+                currentResizeMode == RESIZE_MODE_FILL -> Modifier
+                    .fillMaxSize()
+                    .align(Alignment.Center)
+
+                isDefaultMode -> Modifier
+                    .aspectRatio(16f / 9f)
+                    .align(Alignment.Center)
+                else -> Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(aspectForModifier)
+                    .align(Alignment.Center)
             }
         )
 
@@ -783,7 +793,9 @@ fun ExoPlayJetScreen(
                     panelSelectedIndex = currentIndex
                     showChannelPanel = channelList?.isNotEmpty() == true && !showChannelPanel
                 },
-                modifier = Modifier.align(Alignment.TopEnd).padding(0.dp)
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(0.dp)
             ) {
                 Icon(
                     imageVector = Icons.Filled.AutoAwesomeMotion,
@@ -902,7 +914,8 @@ fun ExoPlayJetScreen(
             try {
                 preferenceManager.myPrefs.currChannelUrl = ""
                 preferenceManager.savePreferences()
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            }
         }
     }
 }
@@ -918,16 +931,13 @@ fun EpgText(
     val epg = channelId?.let { epgCache[it]?.second }
     if (!epg.isNullOrBlank()) {
         Text(
-            text = epg ?: "",
+            text = epg,
             color = Color.White.copy(alpha = 0.7f),
             fontSize = 13.sp,
             maxLines = 1
         )
     }
 }
-
-
-
 
 
 suspend fun fetchCurrentProgram(basefinURL: String, channelId: String): String? {
@@ -961,7 +971,11 @@ fun ChannelInfoOverlay(
                             modifier = Modifier.size(60.dp),
                             shape = RoundedCornerShape(16.dp),
                             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.DarkGray.copy(alpha = 0.5f))
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color.DarkGray.copy(
+                                    alpha = 0.5f
+                                )
+                            )
                         ) {
                             AsyncImage(
                                 model = channel.logoUrl,
@@ -1058,10 +1072,10 @@ fun CurrentTimeOverlay(visible: Boolean) {
 
 @SuppressLint("DefaultLocale")
 fun getCurrentFormattedTime(): String {
-    val cal = java.util.Calendar.getInstance()
-    val hour = cal.get(java.util.Calendar.HOUR)
-    val minute = cal.get(java.util.Calendar.MINUTE)
-    val amPm = if (cal.get(java.util.Calendar.AM_PM) == java.util.Calendar.AM) "AM" else "PM"
+    val cal = Calendar.getInstance()
+    val hour = cal.get(Calendar.HOUR)
+    val minute = cal.get(Calendar.MINUTE)
+    val amPm = if (cal.get(Calendar.AM_PM) == Calendar.AM) "AM" else "PM"
     return String.format("%02d:%02d %s", if (hour == 0) 12 else hour, minute, amPm)
 }
 
@@ -1071,17 +1085,19 @@ fun initializePlayer(
     context: Context,
     retryCountRef: MutableState<Int>
 ): ExoPlayer {
-    val httpDataSourceFactory = DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true)
-    val mediaSourceFactory = DefaultMediaSourceFactory(context).setDataSourceFactory(httpDataSourceFactory)
+    val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+        .setAllowCrossProtocolRedirects(true)
+//        .setUserAgent(userAgent) //Future Ref
+    val mediaSourceFactory =
+        DefaultMediaSourceFactory(context).setDataSourceFactory(httpDataSourceFactory)
 
     val player = ExoPlayer.Builder(context).setMediaSourceFactory(mediaSourceFactory).build()
-    var resumePosition: Long = 0L
-    val maxRetries = 5
+    var resumePosition: Long
     retryCountRef.value = 0
 
     fun prepareAndPlay(seekToPosition: Long = 0L) {
         val mediaItem = MediaItem.Builder()
-            .setUri(Uri.parse(getCurrentVideoUrl()))
+            .setUri(getCurrentVideoUrl().toUri())
             .setMimeType(MimeTypes.APPLICATION_M3U8)
             .build()
         player.setMediaItem(mediaItem)
@@ -1092,31 +1108,7 @@ fun initializePlayer(
         player.playWhenReady = true
     }
 
-//    fun prepareAndPlay() {
-//        val mediaItem = MediaItem.Builder()
-//            .setUri(Uri.parse(getCurrentVideoUrl()))
-//            .setMimeType(MimeTypes.APPLICATION_M3U8)
-//            .build()
-//        player.setMediaItem(mediaItem)
-//        player.prepare()
-//        player.playWhenReady = true
-//    }
-
     prepareAndPlay()
-
-//    player.addListener(object : Player.Listener {
-//        override fun onPlayerError(error: PlaybackException) {
-//            if (retryCountRef.value < maxRetries) {
-//                retryCountRef.value++
-//                Log.d(TAG, "Retrying playback: attempt ${retryCountRef.value}")
-//                player.stop()
-//                prepareAndPlay()
-//            } else {
-//                Toast.makeText(context, "Playback failed after $maxRetries attempts", Toast.LENGTH_SHORT).show()
-//                Log.e(TAG, "Playback permanently failed.")
-//            }
-//        }
-//    })
 
     // Always Retry
     player.addListener(object : Player.Listener {
@@ -1153,14 +1145,20 @@ fun handleTVRemoteKey(
     val newIndex = when (tvNAV) {
         "0" -> when (event.key) {
             Key.ChannelUp -> (currentIndex + 1) % (channelList?.size ?: return false)
-            Key.ChannelDown -> if (currentIndex - 1 < 0) (channelList?.size ?: 1) - 1 else currentIndex - 1
+            Key.ChannelDown -> if (currentIndex - 1 < 0) (channelList?.size
+                ?: 1) - 1 else currentIndex - 1
+
             else -> return false
         }
+
         "1" -> when (event.key) {
             Key.DirectionUp -> (currentIndex + 1) % (channelList?.size ?: return false)
-            Key.DirectionDown -> if (currentIndex - 1 < 0) (channelList?.size ?: 1) - 1 else currentIndex - 1
+            Key.DirectionDown -> if (currentIndex - 1 < 0) (channelList?.size
+                ?: 1) - 1 else currentIndex - 1
+
             else -> return false
         }
+
         else -> return false
     }
 

@@ -26,7 +26,7 @@ import java.util.Locale
 
 class WebPlayerActivity : ComponentActivity() {
     companion object {
-        private const val TAG = "WebPlayerActivity"
+        private const val TAG = "WebTVActivity"
         private const val DEFAULT_URL_TEMPLATE = "http://localhost:%d"
     }
 
@@ -73,7 +73,11 @@ class WebPlayerActivity : ComponentActivity() {
             }
         }
 
-        url = String.format(Locale.getDefault(), DEFAULT_URL_TEMPLATE, savedPortNumber) + extraFilterUrl
+        url = String.format(
+            Locale.getDefault(),
+            DEFAULT_URL_TEMPLATE,
+            savedPortNumber
+        ) + extraFilterUrl
 
         Log.d("DIX", url!!)
 
@@ -138,7 +142,8 @@ class WebPlayerActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.insetsController?.let { controller ->
                 controller.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
-                controller.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                controller.systemBarsBehavior =
+                    WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             }
         } else {
             @Suppress("deprecation")
@@ -301,19 +306,19 @@ class WebPlayerActivity : ComponentActivity() {
                             currentChannelName = jsonResult.getString("channelName")
 
                             Log.d(
-                               TAG,
+                                TAG,
                                 "Channel Clicked: $currentChannelName (Play ID: $currentPlayId)"
                             )
                             saveRecentChannel(currentPlayId, currentLogoUrl, currentChannelName)
                         } catch (e: JSONException) {
                             Log.d(
-                               TAG,
+                                TAG,
                                 "JSON parsing error: " + e.message
                             )
                         }
                     } else {
                         Log.d(
-                           TAG,
+                            TAG,
                             "No channel data extracted."
                         )
                     }
@@ -342,8 +347,7 @@ class WebPlayerActivity : ComponentActivity() {
         }
 
 
-
-    override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
+        override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
             if (prefManager.myPrefs.darkMODE) {
                 setDarkTheme()
             }
@@ -406,8 +410,6 @@ class WebPlayerActivity : ComponentActivity() {
 
             view.evaluateJavascript(script, null)
         }
-
-
 
 
         fun moveSearchInput(view: WebView) {
@@ -567,6 +569,7 @@ class WebPlayerActivity : ComponentActivity() {
             )
 
             if (formattedPlayId != null) {
+                Log.d(TAG,"injectTVChannel:null")
 //                injectTVChannel(channel.channelName, formattedPlayId, channel.logoUrl)
             }
         }

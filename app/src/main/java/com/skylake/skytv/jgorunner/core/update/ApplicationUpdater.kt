@@ -15,7 +15,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.cthing.versionparser.semver.SemanticVersion
 import org.json.JSONObject
 import java.net.URL
 

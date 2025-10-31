@@ -13,8 +13,11 @@ import android.view.WindowInsets
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.annotation.RequiresApi
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.core.content.IntentCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.graphics.drawable.IconCompat
@@ -33,6 +36,7 @@ import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.receivers.PipActionReceiver
 import android.content.pm.PackageManager
 
+@SuppressLint("MutableCollectionMutableState")
 class ExoPlayJet : ComponentActivity() {
 
     private val TAG: String = "ExoJetPack"
@@ -55,7 +59,7 @@ class ExoPlayJet : ComponentActivity() {
     }
 
     @RequiresApi(Build.VERSION_CODES.R)
-    @SuppressLint("WrongConstant")
+    @SuppressLint("WrongConstant", "ObsoleteSdkInt")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 

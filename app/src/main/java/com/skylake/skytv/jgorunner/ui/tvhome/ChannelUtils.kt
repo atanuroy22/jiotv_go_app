@@ -2,6 +2,7 @@ package com.skylake.skytv.jgorunner.ui.tvhome
 
 import android.content.Context
 import android.util.Log
+import androidx.core.content.edit
 import com.google.gson.Gson
 import kotlinx.coroutines.*
 import java.net.HttpURLConnection
@@ -28,11 +29,8 @@ object ChannelUtils {
                     if (save2pref) {
                         val responseJsonString = Gson().toJson(response)
                         val sharedPref = context?.getSharedPreferences("channel_cache", Context.MODE_PRIVATE)
-                        if (sharedPref != null) {
-                            with(sharedPref.edit()) {
-                                putString("channels_json", responseJsonString)
-                                apply()
-                            }
+                        sharedPref?.edit {
+                            putString("channels_json", responseJsonString)
                         }
                     }
 
