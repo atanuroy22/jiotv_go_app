@@ -1,8 +1,6 @@
 package com.skylake.skytv.jgorunner.core.execution
 
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import com.google.android.gms.cast.MediaInfo
 import com.google.android.gms.cast.MediaLoadRequestData
@@ -11,24 +9,22 @@ import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.media.RemoteMediaClient
 import com.skylake.skytv.jgorunner.data.SkySharedPref
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 fun castMediaPlayer(context: Context, videoUrl: String) {
-    val TAG = "MediaPlayer-DIX"
-    val castSession: CastSession? = CastContext.getSharedInstance(context).sessionManager.currentCastSession
+    val tag = "MediaPlayer-DIX"
+    val castSession: CastSession? =
+        CastContext.getSharedInstance(context).sessionManager.currentCastSession
     val remoteMediaClient: RemoteMediaClient? = castSession?.remoteMediaClient
     val prefManager = SkySharedPref.getInstance(context)
 
-    val currentChannelName1 = prefManager.myPrefs.castChannelName?.takeIf { it.isNotEmpty() } ?: "Streaming"
+    val currentChannelName =
+        prefManager.myPrefs.castChannelName?.takeIf { it.isNotEmpty() } ?: "Streaming"
 
-    Log.d(TAG, currentChannelName1)
+    Log.d(tag, currentChannelName)
 
     if (remoteMediaClient != null) {
         val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE).apply {
-            putString(MediaMetadata.KEY_TITLE, currentChannelName1)
+            putString(MediaMetadata.KEY_TITLE, currentChannelName)
         }
 
         val mediaInfo = MediaInfo.Builder(videoUrl)

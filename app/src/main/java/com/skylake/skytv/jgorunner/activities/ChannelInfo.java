@@ -20,7 +20,7 @@ public class ChannelInfo implements Parcelable {
         channelName = in.readString();
     }
 
-    public static final Creator<ChannelInfo> CREATOR = new Creator<ChannelInfo>() {
+    public static final Creator<ChannelInfo> CREATOR = new Creator<>() {
         @Override
         public ChannelInfo createFromParcel(Parcel in) {
             return new ChannelInfo(in);

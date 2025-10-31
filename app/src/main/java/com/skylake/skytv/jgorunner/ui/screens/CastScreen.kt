@@ -218,7 +218,7 @@ private class CustomWebViewClient(
     private var currentChannelName: String? = null
 
     @Deprecated("Deprecated in Java")
-    override fun shouldOverrideUrlLoading(view: WebView, url: String, ): Boolean {
+    override fun shouldOverrideUrlLoading(view: WebView, url: String ): Boolean {
         if (url.contains("/play/")) {
             initURL = view.url
             Log.d(TAG, "Saving initURL: $initURL")
@@ -291,7 +291,6 @@ private class CustomWebViewClient(
                      val updatedUrl = ensureM3U8Suffix(newPlayerURL).replace("localhost", ipAddress)
                      Log.d(TAG2, updatedUrl)
                      castMediaPlayer(context, updatedUrl)
-
 
                  } else {
                     Log.d(TAG,"Not connected to any device")

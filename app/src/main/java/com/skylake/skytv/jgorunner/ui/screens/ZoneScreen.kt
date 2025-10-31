@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.res.Configuration
 import android.util.Log
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Animatable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterAlt
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tv
@@ -30,14 +30,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -58,12 +55,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.data.SkySharedPref
-import com.skylake.skytv.jgorunner.ui.tvhome.components.TvScreenMenu
 import com.skylake.skytv.jgorunner.ui.tvhome.Main_Layout
-import com.skylake.skytv.jgorunner.ui.tvhome.Recent_Layout
 import com.skylake.skytv.jgorunner.ui.tvhome.Main_Layout_3rd
-import com.skylake.skytv.jgorunner.ui.tvhome.depreciated.SearchTabLayout
-import com.skylake.skytv.jgorunner.ui.tvhome.depreciated.SearchTabLayoutTV
+import com.skylake.skytv.jgorunner.ui.tvhome.Recent_Layout
+import com.skylake.skytv.jgorunner.ui.tvhome.components.TvScreenMenu
+import com.skylake.skytv.jgorunner.ui.tvhome.SearchTabLayout
+import com.skylake.skytv.jgorunner.utils.HandleTvBackKey
+import com.skylake.skytv.jgorunner.utils.RememberBackPressManager
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 
@@ -76,13 +75,13 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
 
     var showModeDialog by remember { mutableStateOf(false) }
 
-    var reloadChannelsTrigger by remember { mutableStateOf(0) }
+    var reloadChannelsTrigger by remember { mutableIntStateOf(0) }
 
 
     val tabs = listOf(
         TabItem("TV", Icons.Default.Tv),
-        TabItem("Recent", Icons.Default.Star)
-//        TabItem("Search", Icons.Default.Search)
+        TabItem("Recent", Icons.Default.Star),
+        TabItem("Search", Icons.Default.Search)
     )
 
     val isRemoteNavigation =
@@ -101,32 +100,34 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
     // Snackbar state
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
-    var exitPressTime by remember { mutableLongStateOf(0L) }
 
     var firstLaunch by remember { mutableStateOf(true) }
 
     // Back press handler
-    BackHandler {
-        val now = System.currentTimeMillis()
-        if (now - exitPressTime < 2000) {
-            onNavigate("Home")
-        } else {
-            exitPressTime = now
-            coroutineScope.launch {
-                val result = snackbarHostState.showSnackbar(
-                    message = "Press back again to exit",
-                    actionLabel = "Exit",
-                    duration = SnackbarDuration.Short
-                )
-                if (result == SnackbarResult.ActionPerformed) {
-                    onNavigate("Home")
-                }
-            }
-        }
+    HandleTvBackKey {
+        onNavigate("Home")
     }
 
+    RememberBackPressManager(
+        timeoutMs = 2000L,
+        onExit = { onNavigate("Home") },
+        showHint = {
+            snackbarHostState.currentSnackbarData?.dismiss()
+            val job = coroutineScope.launch {
+                snackbarHostState.showSnackbar(
+                    "Press back again to exit",
+                    duration = SnackbarDuration.Indefinite
+                )
+            }
+            delay(2000L)
+            snackbarHostState.currentSnackbarData?.dismiss()
+            job.cancel()
+        }
+    )
+
     // UI Glow Effect
-    val glowColors = listOf(Color.Red, Color.Green, Color.Blue, Color.Yellow, Color.Cyan, Color.Magenta)
+    val glowColors =
+        listOf(Color.Red, Color.Green, Color.Blue, Color.Yellow, Color.Cyan, Color.Magenta)
     val glowColor = remember { Animatable(glowColors[Random.nextInt(glowColors.size)]) }
     val customFontFamily = FontFamily(Font(R.font.chakrapetch_bold))
 
@@ -143,7 +144,9 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
 
             // Top Row
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -169,7 +172,10 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
                     )
                 )
 
-                IconButton(onClick = { onNavigate("SettingsTV") }, modifier = Modifier.size(24.dp)) {
+                IconButton(
+                    onClick = { onNavigate("SettingsTV") },
+                    modifier = Modifier.size(24.dp)
+                ) {
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "Settings Icon",
@@ -180,7 +186,8 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
             }
 
             if (preferenceManager.myPrefs.customPlaylistSupport &&
-                !preferenceManager.myPrefs.showPLAYLIST) {
+                !preferenceManager.myPrefs.showPLAYLIST
+            ) {
 
                 Main_Layout_3rd(context, reloadTrigger = reloadChannelsTrigger, layoutModeOverride = layoutModeSelection)
 
@@ -230,7 +237,7 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
                     when (selectedTabIndex) {
                         0 -> Main_Layout(context, reloadTrigger = reloadChannelsTrigger, layoutModeOverride = layoutModeSelection)
                         1 -> Recent_Layout(context)
-                        2 -> if (isRemoteNavigation) SearchTabLayoutTV(context, tabFocusRequester) else SearchTabLayout(context, tabFocusRequester)
+                        2 -> SearchTabLayout(context, tabFocusRequester)
                     }
                 }
             }
@@ -249,7 +256,8 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
             layoutModeSelection = "Default"
         },
         onSelectionsMade = { selectedQualities, selectedLayout, selectedCategories, _, selectedLanguages, _ ->
-            Log.d("ZoneScreen", "Layout: $selectedLayout, Qualities: $selectedQualities, Categories: $selectedCategories, Languages: $selectedLanguages")
+            Log.d("ZoneScreen",
+            "Layout: $selectedLayout, Qualities: $selectedQualities, Categories: $selectedCategories, Languages: $selectedLanguages")
             Toast.makeText(context, "Refreshing Channels", Toast.LENGTH_LONG).show()
             selectedTabIndex = savedTabIndex
 

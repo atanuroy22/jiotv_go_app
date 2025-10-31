@@ -10,18 +10,19 @@ import android.view.WindowInsets
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.annotation.RequiresApi
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.core.content.IntentCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.ui.screens.ExoPlayJetScreen
 import com.skylake.skytv.jgorunner.ui.theme.JGOTheme
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.core.content.IntentCompat
 
+@SuppressLint("MutableCollectionMutableState")
 class ExoPlayJet : ComponentActivity() {
 
     private val TAG: String = "ExoJetPack"
@@ -31,10 +32,10 @@ class ExoPlayJet : ComponentActivity() {
     private var channelNameState by mutableStateOf("HANA4k")
     private var signatureFallbackState by mutableStateOf("0x0")
     private var channelListState by mutableStateOf<ArrayList<ChannelInfo>?>(null)
-    private var currentChannelIndexState by mutableStateOf(-1)
+    private var currentChannelIndexState by mutableIntStateOf(-1)
 
     @RequiresApi(Build.VERSION_CODES.R)
-    @SuppressLint("WrongConstant")
+    @SuppressLint("WrongConstant", "ObsoleteSdkInt")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 

@@ -30,20 +30,15 @@ import androidx.media3.ui.PlayerView;
 import com.skylake.skytv.jgorunner.R;
 import com.skylake.skytv.jgorunner.data.SkySharedPref;
 
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 public class ExoplayerActivity extends ComponentActivity {
 
@@ -99,10 +94,6 @@ public class ExoplayerActivity extends ComponentActivity {
         setupPlayer(formattedUrl);
 
         hideControlsAfterDelay();
-
-//        videoUrl = videoUrl.replace(".m3u8", "");
-//        videoUrl = videoUrl.replace("live", "mpd");
-//        scrapeAndLogUrls(videoUrl);
 
     }
 
@@ -255,10 +246,6 @@ public class ExoplayerActivity extends ComponentActivity {
                 Request request = new Request.Builder().url(mpdUrl).build();
 
                 try (Response response = client.newCall(request).execute()) {
-                    if (response.body() == null) {
-                        Log.e(TAG_MPD, "MPD response body is null");
-                        return;
-                    }
                     String mpdContent = response.body().string();
                     Log.d(TAG_MPD, "MPD URL: " + mpdUrl);
                     Log.d(TAG_MPD, "MPD Content: " + mpdContent);

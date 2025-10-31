@@ -9,7 +9,7 @@ on:
     branches:
       - main
     paths:
-      - "app/version.gradle"  
+      - "app/version.gradle"
   workflow_dispatch:
 
 jobs:
@@ -19,40 +19,42 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      # Set Repository Name As Env Variable
-      - name: 📦 Set repository name as env variable
-        run: echo "repository_name=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')" >> $GITHUB_ENV
+      # Set repo name as env variable (for reference/logging)
+      - name: Set repository name as env variable
+        run: |
+          echo "repository_name=$(basename ${{ github.repository }})" >> $GITHUB_ENV
 
-      # Set date today
-      - name: 📅 Set var
-        run: echo "date_today=$(date +%Y%m%d)" >> $GITHUB_ENV
+      # Date today in YYYYMMDD format
+      - name: Set build date var
+        run: |
+          echo "date_today=$(date +%Y%m%d)" >> $GITHUB_ENV
 
       # Extract versionName from version.gradle
-      - name: 🔍 Extract version name from version.gradle
+      - name: Extract version name from version.gradle
         run: |
-          version_name=$(grep "appVersionName" ${{ env.main_project_module }}/version.gradle | awk -F'=' '{print $2}' | tr -d ' "')
-          echo "version_name=$version_name" >> $GITHUB_ENV    
+          version_name=$(grep appVersionName ${{ env.main_project_module }}/version.gradle | awk -F'=' '{print $2}' | tr -d ' "')
+          echo "version_name=$version_name" >> $GITHUB_ENV
 
-      - name: ☕ Set Up JDK
+      - name: Set Up JDK
         uses: actions/setup-java@v3
         with:
           distribution: 'zulu'
           java-version: '18'
           cache: 'gradle'
 
-      - name: 🔧 Change wrapper permissions
+      - name: Change permissions for gradlew
         run: chmod +x ./gradlew
 
-      # Run Build Project
-      - name: 🏗️ Build gradle project
+      # Build all modules
+      - name: Build gradle project
         run: ./gradlew build
 
-      # Create APK Release
-      - name: 📲 Build apk release project (APK) - ${{ env.main_project_module }} module
-        run: ./gradlew assembleRelease
+      # Assemble release APK for main module
+      - name: Build release APK
+        run: ./gradlew :${{ env.main_project_module }}:assembleRelease
 
-      # Sign APK Release
-      - name: ✍️ Sign app APK Release
+      # Sign APK
+      - name: Sign APK release
         uses: r0adkll/sign-android-release@v1
         id: sign_app
         with:
@@ -62,19 +64,21 @@ jobs:
           keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
           keyPassword: ${{ secrets.KEY_PASSWORD }}
         env:
-          BUILD_TOOLS_VERSION: "35.0.0"
-        
-      # Rename APK file
-      - name: 📝 Rename APK
-        run: mv ${{ env.main_project_module }}/build/outputs/apk/release/app-release-unsigned-signed.apk ${{ env.main_project_module }}/build/outputs/apk/release/${{ env.app_name }}-v${{ env.version_name }}-release.apk
-      
-      # GitHub release
-      - name: 🚀 Upload APK to Release
+          BUILD_TOOLS_VERSION: "36.0.0"
+
+      # Rename the signed APK
+      - name: Rename APK with version and app name
+        run: |
+          mv ${{ env.main_project_module }}/build/outputs/apk/release/app-release-unsigned-signed.apk \
+            ${{ env.main_project_module }}/build/outputs/apk/release/${{ env.app_name }}-v${{ env.version_name }}-release.apk
+
+      # Upload to GitHub Release
+      - name: Upload APK to release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: "v${{ env.version_name }}"
           name: "v${{ env.version_name }}"
-          files: ${{ env.main_project_module }}/build/outputs/apk/release/${{ env.app_name }}-v${{ env.version_name }}-release.apk  # New file path
+          files: ${{ env.main_project_module }}/build/outputs/apk/release/${{ env.app_name }}-v${{ env.version_name }}-release.apk
           generate_release_notes: true
           draft: false
           prerelease: false

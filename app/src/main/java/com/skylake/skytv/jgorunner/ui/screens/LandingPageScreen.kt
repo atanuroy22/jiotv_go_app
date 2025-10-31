@@ -60,7 +60,6 @@ import com.skylake.skytv.jgorunner.ui.tvhome.components.TvScreenMenu
 import com.skylake.skytv.jgorunner.ui.tvhome.Main_Layout
 import com.skylake.skytv.jgorunner.ui.tvhome.Main_Layout_3rd
 import com.skylake.skytv.jgorunner.ui.tvhome.Recent_Layout
-import com.skylake.skytv.jgorunner.ui.tvhome.depreciated.Recent_LayoutTV
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 
@@ -212,7 +211,7 @@ fun LandingPageScreen(context: Context, onNavigate: (String) -> Unit, onExit: ()
                     Main_Layout(context, reloadTrigger = 0, layoutModeOverride = layoutModeSelection)
                 }
             }
-            1 -> if (isRemoteNavigation) Recent_LayoutTV(context) else Recent_Layout(context)
+            1 -> Recent_Layout(context)
 //            2 -> if (isRemoteNavigation) SearchTabLayoutTV(context, tabFocusRequester) else SearchTabLayout(context, tabFocusRequester)
         }
     }
