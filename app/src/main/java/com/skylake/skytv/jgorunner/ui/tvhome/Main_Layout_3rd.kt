@@ -363,7 +363,6 @@ fun Main_Layout_3rd(context: Context,reloadTrigger: Int,layoutModeOverride: Stri
                     ChannelGridTV(
                         context = context,
                         channels = filteredChannels,
-                        selectedChannel = selectedChannel,
                         onSelectedChannelChanged = { channel -> selectedChannel = channel }
                     )
                 }
