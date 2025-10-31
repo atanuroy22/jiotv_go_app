@@ -27,9 +27,6 @@ import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.ui.screens.ExoPlayJetScreen
 import com.skylake.skytv.jgorunner.ui.theme.JGOTheme
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.core.content.IntentCompat
 import android.graphics.drawable.Icon
 import android.util.Rational
 import com.skylake.skytv.jgorunner.R

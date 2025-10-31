@@ -33,6 +33,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat.startActivity
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import com.google.gson.Gson
@@ -83,8 +84,44 @@ fun ChannelGridTV(
                                 putParcelableArrayListExtra("channel_list_data", channelInfoList)
                                 putExtra("current_channel_index", currentIndex)
                                 addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
                             startActivity(context, intent, null)
+
+                            // Update recent channels
+                            val recentChannelsJson = preferenceManager.myPrefs.recentChannels
+                            val type = object : TypeToken<List<Channel>>() {}.type
+                            val recentChannels: MutableList<Channel> =
+                                if (!recentChannelsJson.isNullOrEmpty())
+                                    Gson().fromJson(recentChannelsJson, type) ?: mutableListOf()
+                                else
+                                    mutableListOf()
+
+                            val clickedAsChannel = Channel(
+                                channel_id = extractChannelIdFromPlayUrl(channel.url).toString(),
+                                channel_url = channel.url,
+                                logoUrl = channel.logo ?: "",
+                                channel_name = channel.name,
+                                channelCategoryId = 0,
+                                channelLanguageId = 0,
+                                isHD = true,
+                            )
+
+                            val existingIndex =
+                                recentChannels.indexOfFirst { it.channel_id == clickedAsChannel.channel_id }
+
+                            if (existingIndex != -1) {
+                                val existingChannel = recentChannels[existingIndex]
+                                recentChannels.removeAt(existingIndex)
+                                recentChannels.add(0, existingChannel)
+                            } else {
+                                recentChannels.add(0, clickedAsChannel)
+                                if (recentChannels.size > 25) {
+                                    recentChannels.removeAt(recentChannels.size - 1)
+                                }
+                            }
+                            preferenceManager.myPrefs.recentChannels = Gson().toJson(recentChannels)
+                            preferenceManager.savePreferences()
                         },
                         onLongClick = {
                             if (PlayerCommandBus.isInPipMode) {
@@ -100,54 +137,12 @@ fun ChannelGridTV(
                                     putParcelableArrayListExtra("channel_list_data", channelInfoList)
                                     putExtra("current_channel_index", currentIndex)
                                     addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                    if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 }
                                 startActivity(context, intent, null)
                             }
                         }
                     ),
-
-                        if (context !is Activity) {
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                        context.startActivity(intent)
-
-                        // Recent Channels
-                        val recentChannelsJson = preferenceManager.myPrefs.recentChannels
-                        val type = object : TypeToken<List<Channel>>() {}.type
-                        val recentChannels: MutableList<Channel> =
-                            if (!recentChannelsJson.isNullOrEmpty())
-                                Gson().fromJson(recentChannelsJson, type) ?: mutableListOf()
-                            else
-                                mutableListOf()
-
-                        val clickedAsChannel = Channel(
-                            channel_id = extractChannelIdFromPlayUrl(channel.url).toString(),
-                            channel_url = channel.url,
-                            logoUrl = channel.logo ?: "",
-                            channel_name = channel.name,
-                            channelCategoryId= 0,
-                            channelLanguageId= 0,
-                            isHD= true,
-                        )
-
-                        val existingIndex =
-                            recentChannels.indexOfFirst { it.channel_id == clickedAsChannel.channel_id }
-
-                        if (existingIndex != -1) {
-                            val existingChannel = recentChannels[existingIndex]
-                            recentChannels.removeAt(existingIndex)
-                            recentChannels.add(0, existingChannel)
-                        } else {
-                            recentChannels.add(0, clickedAsChannel)
-                            if (recentChannels.size > 25) {
-                                recentChannels.removeAt(recentChannels.size - 1)
-                            }
-                        }
-                        preferenceManager.myPrefs.recentChannels = Gson().toJson(recentChannels)
-                        preferenceManager.savePreferences()
-
-
-                    },
                 border = if (isFocused) BorderStroke(4.dp, Color(0xFFFFD700)) else null,
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
