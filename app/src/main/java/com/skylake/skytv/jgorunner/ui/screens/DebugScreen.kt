@@ -3,7 +3,6 @@ package com.skylake.skytv.jgorunner.ui.screens
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.animation.Animatable
@@ -35,6 +34,7 @@ import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Api
 import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.LogoDev
+import androidx.compose.material.icons.filled.PictureInPicture
 import androidx.compose.material.icons.filled.PlayCircleOutline
 import androidx.compose.material.icons.filled.Terrain
 import androidx.compose.material.icons.filled.Tv
@@ -68,6 +68,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
 import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.activities.CastActivity
 import com.skylake.skytv.jgorunner.core.update.DownloadModelNew
@@ -126,7 +127,6 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
     var showPreReleaseBinaryDialog by remember { mutableStateOf(false) }
     var downloadProgress by remember { mutableStateOf<DownloadModelNew?>(null) }
     var showRestartDialog by remember { mutableStateOf(false) }
-
 
 
     // Update shared preference when switch states change
@@ -241,9 +241,11 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
                 title = "Experimental Features",
                 subtitle = if (isSwitchForExp) "Enabled experimental features" else "Disabled experimental features",
                 isChecked = isSwitchForExp,
-                onCheckedChange = { isChecked -> isSwitchForExp = isChecked
+                onCheckedChange = { isChecked ->
+                    isSwitchForExp = isChecked
                     val status = if (isSwitchForExp) "enabled" else "disabled"
-                    Toast.makeText(context, "Experimental features $status", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Experimental features $status", Toast.LENGTH_SHORT)
+                        .show()
                 })
         }
 
@@ -301,7 +303,7 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
             item {
                 val enablePip = remember { mutableStateOf(preferenceManager.myPrefs.enablePip) }
                 DebugSwitchItem(
-                    icon = Icons.Default.PlayCircleOutline,
+                    icon = Icons.Default.PictureInPicture,
                     title = "Picture-in-Picture",
                     subtitle = if (enablePip.value) "Enabled: PiP button, Back-to-PiP, auto-PiP" else "Disabled: no PiP UI or actions",
                     isChecked = enablePip.value,
@@ -314,11 +316,12 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
                             try {
                                 PlayerCommandBus.requestStopPlayback()
                                 PlayerCommandBus.requestClosePip()
-                            } catch (_: Exception) { /* no-op */ }
+                            } catch (_: Exception) { /* no-op */
+                            }
                         }
                         Toast.makeText(
                             context,
-                            "PiP ${if (checked) "enabled" else "disabled"}",
+                            "Picture-in-Picture Mode ${if (checked) "enabled" else "disabled"}",
                             Toast.LENGTH_SHORT
                         ).show()
                     }
@@ -346,8 +349,8 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
                         Log.d("DIX", "PREBin Updater")
                         showPreReleaseBinaryDialog = true
                     },
-                    enabled=true,
-                    isChecked= isUsingPreRelease
+                    enabled = true,
+                    isChecked = isUsingPreRelease
                 )
             }
 
@@ -358,14 +361,18 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
 
     if (showPreReleaseBinaryDialog) {
         PreReleaseBinary(
-            isVisible = showPreReleaseBinaryDialog,
+            isVisible = true,
             onDismiss = { showPreReleaseBinaryDialog = false },
             onConfirm = { ctx, selectedRelease ->
                 CoroutineScope(Dispatchers.Main).launch {
                     val success = performSelectedBinaryUpdate(ctx, selectedRelease) { status ->
                         downloadProgress = status
                     }
-                    if (preferenceManager.myPrefs.jtvGoBinaryVersion?.contains("develop", ignoreCase = true) == true) {
+                    if (preferenceManager.myPrefs.jtvGoBinaryVersion?.contains(
+                            "develop",
+                            ignoreCase = true
+                        ) == true
+                    ) {
                         preferenceManager.myPrefs.preRelease = true
                         applySettings()
                         isUsingPreRelease = preferenceManager.myPrefs.preRelease
@@ -373,7 +380,11 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
                         preferenceManager.myPrefs.preRelease = false
                         applySettings()
                     }
-                    Toast.makeText(ctx, if (success) {"Download complete" } else "Download failed", Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        ctx, if (success) {
+                            "Download complete"
+                        } else "Download failed", Toast.LENGTH_LONG
+                    ).show()
 
                     downloadProgress = null
                 }
@@ -447,7 +458,6 @@ fun restartAppFast(context: Context) {
 }
 
 
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun RowScope.Button1(context: Context, onNavigate: (String) -> Unit) {
@@ -491,8 +501,6 @@ fun RowScope.Button1(context: Context, onNavigate: (String) -> Unit) {
 }
 
 
-
-
 @Composable
 fun RowScope.Button2(context: Context, onNavigate: (String) -> Unit) {
     val colorPRIME = MaterialTheme.colorScheme.primary
@@ -502,7 +510,7 @@ fun RowScope.Button2(context: Context, onNavigate: (String) -> Unit) {
 
     Button(
         onClick = {
-            handleButton2Click(context,onNavigate)
+            handleButton2Click(context, onNavigate)
         },
         modifier = Modifier
             .weight(1f)
@@ -586,7 +594,7 @@ fun RowScope.Button5(context: Context, onNavigate: (String) -> Unit) {
     Button(
         onClick = {
             handleButton5Click(context, onNavigate)
-                  },
+        },
         modifier = Modifier
             .weight(1f)
             .padding(8.dp)
@@ -719,30 +727,6 @@ fun DebugSwitchItem(
     }
 }
 
-@Composable
-fun DebugItem(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    modifier: Modifier = Modifier,
-    onClick2: () -> Unit
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable { onClick2() }
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(24.dp))
-        Spacer(modifier = Modifier.width(16.dp))
-        Column {
-            Text(text = title, fontWeight = FontWeight.Bold)
-            Text(text = subtitle, fontSize = 12.sp, color = Color.Gray)
-        }
-        Spacer(modifier = Modifier.weight(1f))
-    }
-}
 
 @Composable
 fun DebugItemCust(
@@ -785,12 +769,12 @@ fun handleButton2Click(context: Context, onNavigate: (String) -> Unit) {
 }
 
 fun handleButton3Click(context: Context) {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://bit.ly/3Uc1usW"))
+    val intent = Intent(Intent.ACTION_VIEW, "https://bit.ly/3Uc1usW".toUri())
     context.startActivity(intent)
 }
 
 fun handleButton4Click(context: Context) {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://bit.ly/JTV-GO-Server"))
+    val intent = Intent(Intent.ACTION_VIEW, "https://bit.ly/JTV-GO-Server".toUri())
     context.startActivity(intent)
 }
 

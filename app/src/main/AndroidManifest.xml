@@ -209,7 +209,7 @@
         <!-- Receiver for PiP playback actions -->
         <receiver
             android:name=".receivers.PipActionReceiver"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="com.skylake.skytv.jgorunner.PIP_PREV" />
                 <action android:name="com.skylake.skytv.jgorunner.PIP_TOGGLE" />
