@@ -57,7 +57,7 @@ import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
-import com.skylake.skytv.jgorunner.ui.tvhome.CardChannelLayoutM3U
+import com.skylake.skytv.jgorunner.ui.tvhome.components.M3UChannelGridScreen
 import com.skylake.skytv.jgorunner.ui.screens.restartAppV1
 import com.skylake.skytv.jgorunner.ui.tvhome.components.TvScreenMenu
 
@@ -354,7 +354,7 @@ fun Main_Layout_3rd(context: Context,reloadTrigger: Int,layoutModeOverride: Stri
                 }
 
                 if (layoutMode.equals("CardUI(TV)", ignoreCase = true)) {
-                    CardChannelLayoutM3U(
+                    M3UChannelGridScreen(
                         context = context,
                         channels = filteredChannels,
                         selectedChannelSetter = { selectedChannel = it }

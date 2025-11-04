@@ -61,7 +61,7 @@ import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
-import com.skylake.skytv.jgorunner.ui.tvhome.CardChannelLayout
+import com.skylake.skytv.jgorunner.ui.tvhome.components.ChannelGridScreen
 import kotlinx.coroutines.delay
 
 @SuppressLint("MutableCollectionMutableState")
@@ -665,7 +665,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int, layoutModeOverride: String
 
         val nonNullChannels = filteredChannels.value ?: emptyList()
         if (layoutMode.equals("CardUI(TV)", ignoreCase = true)) {
-            CardChannelLayout(
+            ChannelGridScreen(
                 context = context,
                 filteredChannels = nonNullChannels,
                 categoryMap = categoryMap,
