@@ -4,6 +4,8 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
+import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
@@ -26,6 +28,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
+import com.skylake.skytv.jgorunner.data.SkySharedPref
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -86,7 +89,7 @@ fun HandleTvBackKey(onBack: () -> Unit) {
     Box(
         modifier = Modifier
             .onPreviewKeyEvent { keyEvent ->
-                if (keyEvent.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_BACK &&
+                if (keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_BACK &&
                     keyEvent.type == KeyEventType.KeyUp
                 ) {
                     onBack()
@@ -113,4 +116,20 @@ object DeviceUtils {
             baseFlags or PendingIntent.FLAG_IMMUTABLE
         } else baseFlags
     }
+}
+
+
+fun withQuality(context: Context, chURL: String, logIT: Boolean = false): String {
+    val skyPREF = SkySharedPref.getInstance(context).myPrefs
+    var videoUrl = chURL
+
+    logIT.takeIf { it }?.let { Log.d("wQTY", "input = $videoUrl") }
+    when (skyPREF.filterQX?.lowercase()) {
+        "low" -> videoUrl = videoUrl.replace("/live/", "/live/low/")
+        "high" -> videoUrl = videoUrl.replace("/live/", "/live/high/")
+        "medium" -> videoUrl = videoUrl.replace("/live/", "/live/medium/")
+    }
+    logIT.takeIf { it }?.let { Log.d("wQTY", "output = $videoUrl") }
+
+    return videoUrl
 }

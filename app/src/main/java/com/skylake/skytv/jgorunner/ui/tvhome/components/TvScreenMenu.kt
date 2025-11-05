@@ -751,17 +751,30 @@ fun MultiSelectDropdown(
             options.forEach { option ->
                 val isChecked = selectedOptions.contains(option)
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Checkbox(
                         checked = isChecked,
-                        onCheckedChange = { checked ->
+                        onCheckedChange = {
                             val mutableSelected = selectedOptions.toMutableList()
-                            if (checked) {
-                                if (!mutableSelected.contains(option)) mutableSelected.add(option)
-                            } else {
-                                mutableSelected.remove(option)
+
+                            when (option) {
+                                "All Languages" -> {
+                                    mutableSelected.clear()
+                                    mutableSelected.add("All Languages")
+                                }
+
+                                else -> {
+                                    if (isChecked) {
+                                        mutableSelected.remove(option)
+                                    } else {
+                                        mutableSelected.remove("All Languages")
+                                        mutableSelected.add(option)
+                                    }
+                                }
                             }
                             onOptionsSelected(mutableSelected)
                         }
@@ -772,6 +785,7 @@ fun MultiSelectDropdown(
         }
     }
 }
+
 
 @Composable
 fun MultiSelectDropdown2(
