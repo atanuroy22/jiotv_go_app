@@ -4,8 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Build
-import androidx.annotation.RequiresApi
+import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -62,11 +61,10 @@ import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.tvhome.Channel
+import com.skylake.skytv.jgorunner.ui.tvhome.EpgProgram
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import java.time.LocalDate
 
-@RequiresApi(Build.VERSION_CODES.O)
+
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
 fun ChannelGridScreen(
@@ -75,7 +73,8 @@ fun ChannelGridScreen(
     categoryMap: Map<String, Int?>,
     selectedChannelSetter: (Channel) -> Unit,
     localPORT: Int,
-    preferenceManager: SkySharedPref
+    preferenceManager: SkySharedPref,
+    epgData: EpgProgram?
 ) {
     val basefinURL = remember(localPORT) { "http://localhost:$localPORT" }
     val categories = remember(categoryMap) {
@@ -132,13 +131,13 @@ fun ChannelGridScreen(
                 onCategoryFocused = { focusedId -> lastFocusedCategoryId = focusedId },
                 selectedChannelId = selectedChannelId,
                 onChannelSelected = { channelId -> selectedChannelId = channelId },
-                isFirstCategory = index == 0
+                isFirstCategory = index == 0,
+                epgData = epgData
             )
         }
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
 fun CategoryRow(
@@ -154,7 +153,8 @@ fun CategoryRow(
     onCategoryFocused: (Int?) -> Unit,
     selectedChannelId: String?,
     onChannelSelected: (String) -> Unit,
-    isFirstCategory: Boolean
+    isFirstCategory: Boolean,
+    epgData: EpgProgram?
 ) {
     if (channels.isEmpty()) return
     val baseCardWidth = 120.dp
@@ -165,7 +165,7 @@ fun CategoryRow(
     val isTvDevice = remember {
         context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
     }
-    val coroutineScope = rememberCoroutineScope()
+    rememberCoroutineScope()
     val listState = rememberLazyListState()
     var lastFocusedIndex by rememberSaveable(categoryId) { mutableIntStateOf(0) }
     val focusRequesters = remember(channels.size) { List(channels.size) { FocusRequester() } }
@@ -197,9 +197,6 @@ fun CategoryRow(
                     if (isFocused) {
                         lastFocusedIndex = index
                         onCategoryFocused(categoryId)
-                        coroutineScope.launch {
-                            listState.animateScrollToItem(index)
-                        }
                     }
                 }
 
@@ -210,12 +207,23 @@ fun CategoryRow(
                     }
                 }
 
+
+                val epgForChannel =
+                    if (epgData?.channel_name == channel.channel_name) epgData else null
+                val programName = epgForChannel?.showname
+                val programInfo = epgForChannel?.description
+
                 ChannelCard(
                     modifier = Modifier
                         .focusRequester(focusRequesters[index])
                         .width(if (isFocused) focusedCardWidth else baseCardWidth)
                         .height(cardHeight)
-                        .onFocusChanged { focusState -> isFocused = focusState.isFocused }
+                        .onFocusChanged { focusState ->
+                            isFocused = focusState.isFocused
+                            if (isFocused) {
+                                selectedChannelSetter(channel)
+                            }
+                        }
                         .focusable()
                         .onPreviewKeyEvent { event ->
                             if (event.type == KeyEventType.KeyDown) {
@@ -230,7 +238,9 @@ fun CategoryRow(
                                     }
 
                                     Key.DirectionRight -> {
-                                        if (index < channels.lastIndex) {
+                                        if (index == channels.lastIndex && !isFirstCategory) {
+                                            true
+                                        } else if (index < channels.lastIndex) {
                                             focusRequesters[index + 1].requestFocus()
                                             true
                                         } else false
@@ -255,8 +265,8 @@ fun CategoryRow(
                     channel = channel,
                     basefinURL = basefinURL,
                     isHighlighted = isTvDevice && isFocused,
-                    programName = if (isFocused) "Demo Program Name" else null,
-                    programDate = if (isFocused) "Today, ${LocalDate.now()}" else null,
+                    programName = programName,
+                    programInfo = programInfo,
                     onClick = {
                         selectedChannelSetter(channel)
                         handleChannelPlay(
@@ -281,7 +291,7 @@ private fun ChannelCard(
     basefinURL: String,
     isHighlighted: Boolean,
     programName: String? = null,
-    programDate: String? = null,
+    programInfo: String? = null,
     onClick: () -> Unit
 ) {
     val goldenColor = Color(0xFFFFD700)
@@ -357,22 +367,21 @@ private fun ChannelCard(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                Column(verticalArrangement = Arrangement.Center) {
+                Column(verticalArrangement = Arrangement.Top) {
                     Text(
                         text = programName,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    if (programDate != null) {
-                        Text(
-                            text = programDate,
-                            fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = programInfo ?: "",
+                        fontSize = 10.sp,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }

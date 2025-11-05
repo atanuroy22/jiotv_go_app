@@ -179,9 +179,6 @@ fun M3UCategoryRow(
                     if (isFocused) {
                         currentFocusedIndex = index
                         onCategoryFocused(categoryName)
-                        coroutineScope.launch {
-                            listState.animateScrollToItem(index)
-                        }
                     }
                 }
 
@@ -218,11 +215,14 @@ fun M3UCategoryRow(
                                     }
 
                                     Key.DirectionRight -> {
-                                        if (index < channels.lastIndex) {
+                                        if (index == channels.lastIndex && !isFirstCategory) {
+                                            true
+                                        } else if (index < channels.lastIndex) {
                                             focusRequesters[index + 1].requestFocus()
                                             true
                                         } else false
                                     }
+
 
                                     else -> false
                                 }
