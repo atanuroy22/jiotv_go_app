@@ -1,5 +1,9 @@
 package com.skylake.skytv.jgorunner.utils
 
+import android.app.PendingIntent
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
@@ -92,4 +96,21 @@ fun HandleTvBackKey(onBack: () -> Unit) {
                 }
             }
     )
+}
+
+object DeviceUtils {
+    fun isTvDevice(context: Context): Boolean {
+        val pm: PackageManager = context.packageManager
+        return try {
+            pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun pendingIntentFlags(baseFlags: Int = 0): Int {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            baseFlags or PendingIntent.FLAG_IMMUTABLE
+        } else baseFlags
+    }
 }

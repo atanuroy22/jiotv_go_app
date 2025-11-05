@@ -53,6 +53,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.skylake.skytv.jgorunner.data.SkySharedPref
+import com.skylake.skytv.jgorunner.services.player.PlayerCommandBus
 import com.skylake.skytv.jgorunner.ui.tvhome.M3UChannelExp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -722,6 +723,11 @@ fun TvScreenMenu(
                                 myPrefs.startTvAutoDelayTime = startTvAutoDelayTime
                                 savePreferences()
                             }
+                            // Stop playback and close PiP when saving from TV screen menu
+                            try {
+                                PlayerCommandBus.requestStopPlayback()
+                                PlayerCommandBus.requestClosePip()
+                            } catch (_: Exception) { /* no-op */ }
                             onDismiss()
                         },
                         shape = MaterialTheme.shapes.medium
