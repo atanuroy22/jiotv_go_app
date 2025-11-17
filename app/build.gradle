@@ -31,6 +31,10 @@ android {
         }
     }
 
+    tasks.withType(JavaCompile).configureEach {
+        options.compilerArgs << "-Xlint:deprecation"
+    }
+
     buildTypes {
         release {
             minifyEnabled true
@@ -122,5 +126,7 @@ dependencies {
 //----------------------------------------------------------
     implementation libs.androidx.glance.appwidget
     implementation libs.androidx.glance.material3
+//----------------------------------------------------------
+    implementation libs.confettikit
 //----------------------------------------------------------
 }
