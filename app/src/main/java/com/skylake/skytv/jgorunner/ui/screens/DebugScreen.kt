@@ -71,6 +71,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.activities.CastActivity
+import com.skylake.skytv.jgorunner.activities.setup_wizard.SetupWizardActivity
 import com.skylake.skytv.jgorunner.core.update.DownloadModelNew
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.LandingPage
@@ -824,7 +825,7 @@ fun handleButton6Click(context: Context) {
 //    intent.putExtra("current_channel_index", 0)
 //    context.startActivity(intent)
 
-    val intent = Intent(context, LandingPage::class.java)
+    val intent = Intent(context, SetupWizardActivity::class.java)
     context.startActivity(intent)
 //
 }

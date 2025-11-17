@@ -15,6 +15,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.ui.screens.LandingPageExoTest
+import com.skylake.skytv.jgorunner.ui.screens.LandingPageScreen
 import com.skylake.skytv.jgorunner.ui.theme.JGOTheme
 
 class LandingPage : ComponentActivity() {
@@ -49,13 +50,13 @@ class LandingPage : ComponentActivity() {
 
         setContent {
             JGOTheme(themeOverride = prefManager.myPrefs.darkMODE) {
-//                LandingPageScreen(
-//                    context = this@LandingPage,
-//                    onNavigate = { title -> currentScreen = title },
-//                    onExit
-//                )
+                LandingPageScreen(
+                    context = this@LandingPage,
+                    onNavigate = { title -> currentScreen = title },
+                    onExit
+                )
 
-                LandingPageExoTest()
+//                LandingPageExoTest()
             }
         }
     }

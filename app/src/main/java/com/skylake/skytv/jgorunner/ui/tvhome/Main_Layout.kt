@@ -62,7 +62,9 @@ import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 import com.skylake.skytv.jgorunner.ui.tvhome.components.ChannelGridScreen
+import com.skylake.skytv.jgorunner.utils.withQuality
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @SuppressLint("MutableCollectionMutableState")
 @OptIn(ExperimentalGlideComposeApi::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -84,6 +86,9 @@ fun Main_Layout(context: Context, reloadTrigger: Int, layoutModeOverride: String
     var isEpgLoading by remember { mutableStateOf(false) }
     var epgError by remember { mutableStateOf(false) }
     var showLoading by remember { mutableStateOf(false) }
+    var reloadAttemptCount by rememberSaveable { mutableIntStateOf(0) }
+    var waitingDots by remember { mutableStateOf("") }
+    val coroutineScope = rememberCoroutineScope()
 
     remember { FocusRequester() }
     val categoryMap = mapOf(
@@ -180,7 +185,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int, layoutModeOverride: String
                                 "channel_list_data",
                                 ArrayList(channelsToUse.map { ch ->
                                     ChannelInfo(
-                                        ch.channel_url,
+                                        withQuality(context, ch.channel_url),
                                         "http://localhost:$localPORT/jtvimage/${ch.logoUrl}",
                                         ch.channel_name
                                     )
@@ -335,7 +340,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int, layoutModeOverride: String
                         ArrayList(
                             channelsForAutoplay.map { ch ->
                                 ChannelInfo(
-                                    ch.channel_url,
+                                    withQuality(context, ch.channel_url),
                                     "http://localhost:$localPORT/jtvimage/${ch.logoUrl}",
                                     ch.channel_name
                                 )
@@ -404,6 +409,21 @@ fun Main_Layout(context: Context, reloadTrigger: Int, layoutModeOverride: String
         }
     }
 
+    LaunchedEffect(fetched, filteredChannels.value, reloadAttemptCount) {
+        if (fetched && filteredChannels.value.isEmpty() && reloadAttemptCount < 2) {
+            waitingDots = ""
+            for (i in 1..6) {
+                waitingDots += "."
+                delay(300)
+            }
+            reloadAttemptCount++
+            showLoading = true
+            val fetchedChannels = fetchFromBackend()
+            filteredChannels.value = fetchedChannels
+            showLoading = false
+        }
+    }
+
     // Fetch EPG data for selected channel
     LaunchedEffect(selectedChannel) {
         if (selectedChannel != null) {
@@ -420,7 +440,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int, layoutModeOverride: String
                     epgData = null
                     epgError = true
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 epgData = null
                 epgError = true
             } finally {
@@ -464,6 +484,8 @@ fun Main_Layout(context: Context, reloadTrigger: Int, layoutModeOverride: String
                     color = Color.Red
                 )
                 Spacer(modifier = Modifier.height(16.dp))
+                Text(text = waitingDots, style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold))
+                Spacer(modifier = Modifier.height(10.dp))
                 Text(
                     text = "Try the following steps:",
                     style = TextStyle(fontSize = 16.sp)
@@ -476,6 +498,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int, layoutModeOverride: String
                 Spacer(modifier = Modifier.height(24.dp))
                 ElevatedCard(
                     onClick = {
+                        reloadAttemptCount++
                         (context as? Activity)?.let { activity ->
                             val intent = activity.intent
                             activity.finish()
