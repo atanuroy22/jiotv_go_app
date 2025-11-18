@@ -123,7 +123,7 @@ fun FavouriteLayout(context: Context) {
     ) {
         // Title line
         Text(
-            text = "Favourite Channels",
+            text = "JioTV Favourite Channels",
             fontSize = 18.sp,
             modifier = Modifier.padding(top = 8.dp)
         )
