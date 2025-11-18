@@ -1,7 +1,6 @@
 package com.skylake.skytv.jgorunner.core.data
 
 import android.content.Context
-import android.util.Log
 import com.google.gson.Gson
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import java.io.File

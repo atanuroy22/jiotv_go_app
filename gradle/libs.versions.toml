@@ -1,41 +1,46 @@
 [versions]
-accompanistSystemuicontroller = "0.30.1"
-agp = "8.7.2"
-coilCompose = "2.4.0"
-compose = "1.0.0-beta01"
+accompanistSystemuicontroller = "0.36.0"
+agp = "8.13.0"
+coilCompose = "2.7.0"
+compiler = "5.0.5"
+compose = "1.0.0-beta08"
+confettikit = "0.6.0"
 coreSplashscreen = "1.0.1"
-customview = "1.1.0"
-customviewPoolingcontainer = "1.0.0"
+customview = "1.2.0"
+customviewPoolingcontainer = "1.1.0"
 exoplayer = "2.19.1"
 exoplayerDrm = "2.18.0"
 ffmpegKitFull = "5.1"
 ffmpegKitFullGpl = "6.0-2"
-jsoup = "1.13.1"
-kotlin = "1.9.0"
-kotlinReflect = "1.9.25"
-coreKtx = "1.13.1"
+glanceAppwidget = "1.1.1"
+glanceMaterial3 = "1.1.1"
+glide = "5.0.5"
+jsoup = "1.21.2"
+kotlin = "2.2.21"
+kotlinReflect = "2.2.0"
+coreKtx = "1.17.0"
 junit = "4.13.2"
-junitVersion = "1.2.1"
-espressoCore = "3.6.1"
-lifecycleRuntimeKtx = "2.8.7"
-activityCompose = "1.9.3"
-composeBom = "2024.11.00"
-media3Datasource = "1.5.1"
+junitVersion = "1.3.0"
+espressoCore = "3.7.0"
+lifecycleRuntimeKtx = "2.9.4"
+activityCompose = "1.11.0"
+composeBom = "2025.10.01"
+media3Datasource = "1.8.0"
 media3DatasourceOkhttp = "1.8.0"
-media3Exoplayer = "1.5.1"
-media3ExoplayerDash = "1.5.1"
-media3Ui = "1.5.1"
-mediarouter = "1.7.0"
+media3Exoplayer = "1.8.0"
+media3ExoplayerDash = "1.8.0"
+media3Ui = "1.8.0"
+mediarouter = "1.8.1"
 nanohttpd = "2.3.1"
 playServicesCastFramework = "22.0.0"
 tvFoundation = "1.0.0-alpha12"
 tvMaterial = "1.1.0-alpha01"
 versionParser = "5.0.0"
-okhttp = "4.12.0"
+okhttp = "5.3.0"
 ketch = "2.0.2"
-gson = "2.11.0"
-media3ExoplayerHls = "1.5.1"
-appcompat = "1.7.0"
+gson = "2.13.2"
+media3ExoplayerHls = "1.8.0"
+appcompat = "1.7.1"
 material3Jvmstubs = "1.5.0-alpha01"
 
 [libraries]
@@ -44,6 +49,8 @@ androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = 
 androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "coreSplashscreen" }
 androidx-customview = { group = "androidx.customview", name = "customview", version.ref = "customview" }
 androidx-customview-poolingcontainer = { module = "androidx.customview:customview-poolingcontainer", version.ref = "customviewPoolingcontainer" }
+androidx-glance-material3 = { module = "androidx.glance:glance-material3", version.ref = "glanceMaterial3" }
+androidx-glance-appwidget = { module = "androidx.glance:glance-appwidget", version.ref = "glanceAppwidget" }
 androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
 androidx-media3-datasource = { module = "androidx.media3:media3-datasource", version.ref = "media3Datasource" }
 androidx-media3-datasource-okhttp = { module = "androidx.media3:media3-datasource-okhttp", version.ref = "media3DatasourceOkhttp" }
@@ -55,11 +62,14 @@ androidx-tv-foundation = { module = "androidx.tv:tv-foundation", version.ref = "
 androidx-tv-material = { module = "androidx.tv:tv-material", version.ref = "tvMaterial" }
 arthenica-ffmpeg-kit-full = { module = "com.arthenica:ffmpeg-kit-full" }
 coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coilCompose" }
+compiler = { module = "com.github.bumptech.glide:compiler", version.ref = "compiler" }
 compose = { module = "com.github.bumptech.glide:compose", version.ref = "compose" }
+confettikit = { module = "io.github.vinceglb:confettikit", version.ref = "confettikit" }
 exoplayer = { module = "com.google.android.exoplayer:exoplayer", version.ref = "exoplayer" }
 exoplayer-drm = { module = "com.google.android.exoplayer:exoplayer-drm", version.ref = "exoplayerDrm" }
 ffmpeg-kit-full = { module = "com.arthenica:ffmpeg-kit-full", version.ref = "ffmpegKitFull" }
 ffmpeg-kit-full-gpl = { module = "com.arthenica:ffmpeg-kit-full-gpl", version.ref = "ffmpegKitFullGpl" }
+glide = { module = "com.github.bumptech.glide:glide", version.ref = "glide" }
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
@@ -88,4 +98,5 @@ androidx-material3-jvmstubs = { group = "androidx.compose.material3", name = "ma
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 jetbrains-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 

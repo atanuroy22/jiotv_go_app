@@ -62,6 +62,38 @@ class SkySharedPref(context: Context) {
         editor.apply() // Apply changes asynchronously
     }
 
+    // Save all preferences
+    fun savePreferencesQuick() {
+        SharedPrefStructure::class.memberProperties.forEach { property ->
+            val annotation = property.findAnnotation<SharedPrefKey>()
+            if (annotation != null) {
+                // Make the property accessible (in case it's private)
+                property.isAccessible = true
+
+                // Get the value of the property
+                val value = myPrefs.let {
+                    property.get(it)
+                }
+
+                // If the value is null, skip saving
+                if (value != null) {
+                    when (value) {
+                        is String -> editor.putString(annotation.key, value)
+                        is Boolean -> editor.putBoolean(annotation.key, value)
+                        is Int -> editor.putInt(annotation.key, value)
+                        is Float -> editor.putFloat(annotation.key, value)
+                        is Long -> editor.putLong(annotation.key, value)
+                        else -> {
+                            Log.e("SkySharedPref", "Unsupported type: ${value::class.java}")
+                            // Log the unsupported type and skip it
+                        }
+                    }
+                }
+            }
+        }
+        editor.commit()  // Apply changes synchronously
+    }
+
 
     // Read data from SharedPreferences using annotated keys
     private fun readFromSharedPreferences(): SharedPrefStructure {
@@ -90,7 +122,10 @@ class SkySharedPref(context: Context) {
                     try {
                         property.setter.call(instance, value)
                     } catch (e: Exception) {
-                        Log.e("SkySharedPref", "Error setting value for ${property.name}: ${e.message}")
+                        Log.e(
+                            "SkySharedPref",
+                            "Error setting value for ${property.name}: ${e.message}"
+                        )
                     }
                 }
             }
@@ -160,14 +195,22 @@ class SkySharedPref(context: Context) {
         @SharedPrefKey("preRelease") var preRelease: Boolean = false,
         @SharedPrefKey("epgDebug") var epgDebug: Boolean = false,
         @SharedPrefKey("lastSelectedCategoriesExp") var lastSelectedCategoriesExp: String? = "",
+        @SharedPrefKey("setupPending") var setupPending: Boolean = true,
+        @SharedPrefKey("enable_pip") var enablePip: Boolean = true,
 
         // Widget-specific preferences
         @SharedPrefKey("widget_show_logs") var widgetShowLogs: Boolean = false,
-        @SharedPrefKey("widget_logs") var widgetLogs: String? = ""
+        @SharedPrefKey("widget_logs") var widgetLogs: String? = "",
+
+        // Binary fetch cache
+        @SharedPrefKey("lastFetchTimeRelease") var lastFetchTimeRelease: Long = 0L,
+        @SharedPrefKey("cachedReleaseName") var cachedReleaseName: String? = null,
+        @SharedPrefKey("cachedReleaseVersion") var cachedReleaseVersion: String? = null,
+        @SharedPrefKey("cachedReleaseUrl") var cachedReleaseUrl: String? = null,
+        @SharedPrefKey("cachedReleaseSize") var cachedReleaseSize: Long = 0L,
 
 
-
-    )
+        )
 
 
     // Annotation class to define the key for SharedPreferences

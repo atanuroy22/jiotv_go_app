@@ -1,4 +1,6 @@
 <resources>
     <string name="app_name">JTV-GO Server</string>
     <string name="app_id">com.skylake.skytv.jgorunner</string>
+    <string name="widget_v1">JTV-Go Quick Start [with Logs] </string>
+    <string name="widget_v2">JTV-Go Quick Start Material</string>
 </resources>

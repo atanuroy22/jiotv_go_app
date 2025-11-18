@@ -1,11 +1,9 @@
 package com.skylake.skytv.jgorunner.ui.screens
 
 import android.app.Activity
-import android.app.Dialog
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import android.widget.EditText
 import android.widget.Toast
 import androidx.compose.animation.Animatable
 import androidx.compose.foundation.focusable
@@ -20,10 +18,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -42,6 +39,9 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
@@ -51,13 +51,13 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.skylake.skytv.jgorunner.R
-import com.skylake.skytv.jgorunner.data.SkySharedPref
-import androidx.compose.ui.input.key.*
-import androidx.compose.ui.text.input.*
 import com.skylake.skytv.jgorunner.activities.MainActivity
+import com.skylake.skytv.jgorunner.data.SkySharedPref
+import com.skylake.skytv.jgorunner.utils.CustButton
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -108,7 +108,8 @@ fun LoginScreen(context: Context) {
         phoneNumberFocusRequester.requestFocus()
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier =
+        Modifier.fillMaxSize()) {
 
         Column(
             modifier = Modifier
@@ -123,28 +124,27 @@ fun LoginScreen(context: Context) {
                 fontSize = 24.sp,
                 fontFamily = customFontFamily,
                 color = MaterialTheme.colorScheme.onBackground,
-                style = if (true) {
-                    TextStyle(
-                        shadow = Shadow(
-                            color = glowColor.value,
-                            blurRadius = 30f,
-                            offset = Offset(0f, 0f)
-                        )
+                style = TextStyle(
+                    shadow = Shadow(
+                        color = glowColor.value,
+                        blurRadius = 30f,
+                        offset = Offset(0f, 0f)
                     )
-                } else {
-                    TextStyle.Default
-                },
+                ),
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
 
             if (!isUrlAvailable) {
-                Text(text = "Server is not started, Login function will not work", color = Color.Red)
+                Text(
+                    text = "Server is not started, Login function will not work",
+                    color = Color.Red
+                )
             }
 
             // Tab layout to switch between OTP and Password
-            var selectedTabIndex by remember { mutableStateOf(0) }
-            TabRow(selectedTabIndex = selectedTabIndex) {
+            var selectedTabIndex by remember { mutableIntStateOf(0) }
+            PrimaryTabRow(selectedTabIndex = selectedTabIndex) {
                 Tab(
                     selected = selectedTabIndex == 0,
                     onClick = {
@@ -193,7 +193,13 @@ fun LoginScreen(context: Context) {
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Button(onClick = { sendOtp(context, phoneNumber.text, basefinURL) }) {
+                CustButton(onClick = {
+                    sendOtp(
+                        context,
+                        phoneNumber.text,
+                        basefinURL
+                    )
+                }) {
                     Text("Send OTP")
                 }
 
@@ -204,7 +210,14 @@ fun LoginScreen(context: Context) {
                     onValueChange = { otpCode = it },
                     label = { Text("OTP Code") },
                     keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { verifyOtp(context, phoneNumber.text, otpCode.text, basefinURL) }),
+                    keyboardActions = KeyboardActions(onDone = {
+                        verifyOtp(
+                            context,
+                            phoneNumber.text,
+                            otpCode.text,
+                            basefinURL
+                        )
+                    }),
                     modifier = Modifier
                         .focusRequester(otpCodeFocusRequester)
                         .focusable()
@@ -221,7 +234,14 @@ fun LoginScreen(context: Context) {
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Button(onClick = { verifyOtp(context, phoneNumber.text, otpCode.text, basefinURL) }) {
+                CustButton(onClick = {
+                    verifyOtp(
+                        context,
+                        phoneNumber.text,
+                        otpCode.text,
+                        basefinURL
+                    )
+                }) {
                     Text("Verify OTP")
                 }
 
@@ -255,7 +275,14 @@ fun LoginScreen(context: Context) {
                     label = { Text("Password") },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { login(context, phoneNumber.text, password.text, basefinURL) }),
+                    keyboardActions = KeyboardActions(onDone = {
+                        login(
+                            context,
+                            phoneNumber.text,
+                            password.text,
+                            basefinURL
+                        )
+                    }),
                     modifier = Modifier
                         .focusRequester(passwordFocusRequester)
                         .focusable()
@@ -272,7 +299,14 @@ fun LoginScreen(context: Context) {
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Button(onClick = { login(context, phoneNumber.text, password.text, basefinURL) }) {
+                CustButton(onClick = {
+                    login(
+                        context,
+                        phoneNumber.text,
+                        password.text,
+                        basefinURL
+                    )
+                }) {
                     Text("Login")
                 }
             }
@@ -296,6 +330,7 @@ private fun handleKeyEvent(
                     return true
                 }
             }
+
             Key.DirectionUp -> {
                 if (cursorPosition == 0) {
                     // Cursor is at the start of the field, move focus to the previous field
@@ -350,15 +385,18 @@ private fun sendOtp(context: Context, phoneNumber: String, baseURL: String) {
     }
 }
 
-    // Handle the OTP sending response
-    private fun handleSendOtpResponse(context: Context, result: String?) {
-        if (result != null) {
-            Toast.makeText(context, "OTP Sent: $result", Toast.LENGTH_SHORT).show()
+// Handle the OTP sending response
+private fun handleSendOtpResponse(context: Context, result: String?) {
+    if (result != null) {
+        if (result.contains("true", ignoreCase = true)) {
+            Toast.makeText(context, "OTP Sent: Successfully", Toast.LENGTH_SHORT).show()
         } else {
-            Toast.makeText(context, "Failed to send OTP", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "OTP Sent: $result", Toast.LENGTH_SHORT).show()
         }
+    } else {
+        Toast.makeText(context, "Failed to send OTP", Toast.LENGTH_SHORT).show()
     }
-
+}
 
 
 private fun verifyOtp(context: Context, phoneNumber: String, otpCode: String, baseURL: String) {
@@ -397,7 +435,8 @@ private fun verifyOtp(context: Context, phoneNumber: String, otpCode: String, ba
                 }
             }
         }
-        Toast.makeText(context, "Verifying OTP: $otpCode for $phoneNumber", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "Verifying OTP: $otpCode for $phoneNumber", Toast.LENGTH_SHORT)
+            .show()
     } else {
         Toast.makeText(context, "Please enter the OTP", Toast.LENGTH_SHORT).show()
     }
@@ -424,46 +463,48 @@ private fun handleVerifyOtpResponse(context: Context, result: String?) {
 
 private fun login(context: Context, phoneNumber: String, password: String, baseURL: String) {
     if (phoneNumber.isNotBlank() && password.isNotBlank()) {
-            Thread {
-                try {
-                    val url = URL("$baseURL/login")
-                    val conn = url.openConnection() as HttpURLConnection
-                    conn.requestMethod = "POST"
-                    conn.setRequestProperty("Content-Type", "application/json; utf-8")
-                    conn.setRequestProperty("Accept", "application/json")
-                    conn.doOutput = true
+        Thread {
+            try {
+                val url = URL("$baseURL/login")
+                val conn = url.openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("Content-Type", "application/json; utf-8")
+                conn.setRequestProperty("Accept", "application/json")
+                conn.doOutput = true
 
-                    val jsonInputString = "{\"username\": \"$phoneNumber\", \"password\": \"$password\"}"
+                val jsonInputString =
+                    "{\"username\": \"$phoneNumber\", \"password\": \"$password\"}"
 
-                    conn.outputStream.use { os ->
-                        val input = jsonInputString.toByteArray(Charsets.UTF_8)
-                        os.write(input, 0, input.size)
+                conn.outputStream.use { os ->
+                    val input = jsonInputString.toByteArray(Charsets.UTF_8)
+                    os.write(input, 0, input.size)
+                }
+
+                val responseCode = conn.responseCode
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+                    (context as Activity).runOnUiThread {
+                        handleVerifyPasswordResponse(context, "success")
                     }
-
-                    val responseCode = conn.responseCode
-                    if (responseCode == HttpURLConnection.HTTP_OK) {
-                        (context as Activity).runOnUiThread {
-                            handleVerifyPasswordResponse(context, "success")
-                        }
-                    } else {
-                        (context as Activity).runOnUiThread {
-                            handleVerifyPasswordResponse(context, "failure")
-                        }
-                    }
-
-                    conn.disconnect()
-
-                } catch (e: Exception) {
-                    e.printStackTrace()
+                } else {
                     (context as Activity).runOnUiThread {
                         handleVerifyPasswordResponse(context, "failure")
                     }
                 }
-            }.start()
+
+                conn.disconnect()
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+                (context as Activity).runOnUiThread {
+                    handleVerifyPasswordResponse(context, "failure")
+                }
+            }
+        }.start()
 
         Toast.makeText(context, "Logging in with $phoneNumber", Toast.LENGTH_SHORT).show()
     } else {
-        Toast.makeText(context, "Please enter your phone number and password", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "Please enter your phone number and password", Toast.LENGTH_SHORT)
+            .show()
     }
 }
 
@@ -473,7 +514,8 @@ private fun handleVerifyPasswordResponse(context: Context, result: String) {
         val intent = Intent(context, MainActivity::class.java)
         context.startActivity(intent)
     } else {
-        Toast.makeText(context, "Login failed! Please check your credentials.", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "Login failed! Please check your credentials.", Toast.LENGTH_SHORT)
+            .show()
     }
 }
 
@@ -482,8 +524,9 @@ private fun isUrlAvailable(url: String, onResult: (Boolean) -> Unit) {
     executorService.execute {
         try {
             val connection = URL(url).openConnection() as HttpURLConnection
-            connection.requestMethod = "HEAD" // We just want to check if the URL is available, no need for full content
-            connection.connectTimeout = 5000 // Set a timeout in case the server is slow
+            connection.requestMethod =
+                "HEAD"
+            connection.connectTimeout = 5000
             connection.readTimeout = 5000
 
             val responseCode = connection.responseCode
@@ -493,5 +536,3 @@ private fun isUrlAvailable(url: String, onResult: (Boolean) -> Unit) {
         }
     }
 }
-
-
