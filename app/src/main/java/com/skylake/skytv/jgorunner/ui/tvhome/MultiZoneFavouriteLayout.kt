@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.skylake.skytv.jgorunner.services.player.PlayerCommandBus
 
 /**
  * Wrapper layout exposing zone UI for switching between JioTV and M3U favourites.
@@ -54,7 +55,17 @@ fun MultiZoneFavouriteLayout(
             listOf("JIO", "M3U").forEach { zone ->
                 val selected = zone == activeZone
                 OutlinedButton(
-                    onClick = { activeZone = zone },
+                    onClick = {
+                        if (zone != activeZone) {
+                            try {
+                                PlayerCommandBus.requestStopPlayback()
+                                PlayerCommandBus.requestClosePip()
+                            } catch (_: Exception) {
+                                // best-effort stop; ignore errors
+                            }
+                        }
+                        activeZone = zone
+                    },
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = if (selected) Color(0xFF2962FF).copy(alpha = 0.18f) else Color.Transparent,
                         contentColor = if (selected) Color(0xFF2962FF) else Color.Unspecified

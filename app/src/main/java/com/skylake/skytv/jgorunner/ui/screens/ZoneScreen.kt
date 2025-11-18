@@ -89,7 +89,6 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
 
     val hasRecentTab = preferenceManager.myPrefs.showRecentTab
     val hasFavouriteTab = preferenceManager.myPrefs.showFavouriteTab
-    val hasSearchTab = preferenceManager.myPrefs.showSearchTab
     val usingCustomPlaylist =
         preferenceManager.myPrefs.customPlaylistSupport && !preferenceManager.myPrefs.showPLAYLIST
 
@@ -122,13 +121,11 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
                 }
             )
         }
-        if (hasSearchTab) {
-            add(
-                TabItem("Search", Icons.Default.Search) {
-                    SearchTabLayout(context, tabFocusRequester)
-                }
-            )
-        }
+        add(
+            TabItem("Search", Icons.Default.Search) {
+                SearchTabLayout(context, tabFocusRequester)
+            }
+        )
     }
 
     val isRemoteNavigation =
@@ -229,7 +226,7 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
                 }
             }
 
-            val hasExtraTabs = hasRecentTab || hasFavouriteTab || hasSearchTab
+            val hasExtraTabs = hasRecentTab || hasFavouriteTab
 
             if (!hasExtraTabs) {
                 if (usingCustomPlaylist) {

@@ -80,7 +80,6 @@ fun TvScreenMenu(
     var customUrl by remember { mutableStateOf(preferenceManager.myPrefs.custURL ?: "") }
     var showRecentTab by remember { mutableStateOf(preferenceManager.myPrefs.showRecentTab) }
     var showFavouriteTab by remember { mutableStateOf(preferenceManager.myPrefs.showFavouriteTab) }
-    var showSearchTab by remember { mutableStateOf(preferenceManager.myPrefs.showSearchTab) }
     var startTvAutomatically by remember { mutableStateOf(preferenceManager.myPrefs.startTvAutomatically) }
     var startTvAutoDelay by remember { mutableStateOf(preferenceManager.myPrefs.startTvAutoDelay) }
     var startTvAutoDelayTime by remember { mutableIntStateOf(preferenceManager.myPrefs.startTvAutoDelayTime) }
@@ -530,22 +529,6 @@ fun TvScreenMenu(
                     Text(text = "Show Favourite Channels")
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Checkbox(
-                        checked = showSearchTab,
-                        onCheckedChange = { checked ->
-                            showSearchTab = checked
-                        }
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "Show Search Tab")
-                }
-
 ///////////////////////////////
 
                 Row(
@@ -728,7 +711,6 @@ fun TvScreenMenu(
                             showPlaylist = false // Reset playlist selection
                             showRecentTab = false
                             showFavouriteTab = false
-                            showSearchTab = false
                             preferenceManager.apply {
                                 myPrefs.selectedScreenTV = "0"
                                 myPrefs.filterQX = "auto"
@@ -738,7 +720,6 @@ fun TvScreenMenu(
                                 myPrefs.showPLAYLIST = false
                                 myPrefs.showRecentTab = false
                                 myPrefs.showFavouriteTab = false
-                                myPrefs.showSearchTab = false
                                 myPrefs.favouriteChannels = ""
                                 myPrefs.startTvAutomatically = false
                                 myPrefs.startTvAutoDelay = false
@@ -771,7 +752,6 @@ fun TvScreenMenu(
                                 }
                                 myPrefs.showRecentTab = showRecentTab
                                 myPrefs.showFavouriteTab = showFavouriteTab
-                                myPrefs.showSearchTab = showSearchTab
                                 myPrefs.startTvAutomatically = startTvAutomatically
                                 myPrefs.startTvAutoDelay = startTvAutoDelay
                                 myPrefs.startTvAutoDelayTime = startTvAutoDelayTime
