@@ -122,6 +122,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 
+// Tracks last persisted channel URL across recompositions so we don't spam prefs
+private var lastPersistedChannelUrl: String? = null
+
 const val TAG = "ExoJetScreen"
 
 @RequiresApi(Build.VERSION_CODES.O)

@@ -182,6 +182,7 @@ class SkySharedPref(context: Context) {
         @SharedPrefKey("showPLAYLIST") var showPLAYLIST: Boolean = false,
         @SharedPrefKey("showRecentTab") var showRecentTab: Boolean = false,
         @SharedPrefKey("showFavouriteTab") var showFavouriteTab: Boolean = false,
+        @SharedPrefKey("showSearchTab") var showSearchTab: Boolean = false,
         @SharedPrefKey("favouriteChannels") var favouriteChannels: String? = "",
         @SharedPrefKey("startTvAutomatically") var startTvAutomatically: Boolean = false,
         @SharedPrefKey("startTvAutoDelay") var startTvAutoDelay: Boolean = false,

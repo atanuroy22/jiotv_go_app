@@ -59,9 +59,8 @@ import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.ui.tvhome.Main_Layout
 import com.skylake.skytv.jgorunner.ui.tvhome.Recent_Layout
-import com.skylake.skytv.jgorunner.ui.tvhome.FavouriteLayout
 import com.skylake.skytv.jgorunner.ui.tvhome.Main_Layout_3rd
-import com.skylake.skytv.jgorunner.ui.tvhome.Recent_Layout
+import com.skylake.skytv.jgorunner.ui.tvhome.MultiZoneFavouriteLayout
 import com.skylake.skytv.jgorunner.ui.tvhome.components.TvScreenMenu
 import com.skylake.skytv.jgorunner.ui.tvhome.SearchTabLayout
 import com.skylake.skytv.jgorunner.utils.HandleTvBackKey
@@ -75,7 +74,11 @@ import kotlin.random.Random
 @Composable
 fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
 
-    data class TabItem(val text: String, val icon: ImageVector)
+    data class TabItem(
+        val text: String,
+        val icon: ImageVector,
+        val content: @Composable () -> Unit
+    )
 
     var showModeDialog by remember { mutableStateOf(false) }
 
@@ -84,20 +87,49 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
 
     val preferenceManager = SkySharedPref.getInstance(context)
 
-    val baseTabs = mutableListOf(
-        TabItem("TV", Icons.Default.Tv),
-        TabItem("Recent", Icons.Default.Star),
-        TabItem("Search", Icons.Default.Search)
-    )
-    if (preferenceManager.myPrefs.showRecentTab) {
-        baseTabs.add(TabItem("Recent", Icons.Default.Star))
+    val hasRecentTab = preferenceManager.myPrefs.showRecentTab
+    val hasFavouriteTab = preferenceManager.myPrefs.showFavouriteTab
+    val hasSearchTab = preferenceManager.myPrefs.showSearchTab
+    val usingCustomPlaylist =
+        preferenceManager.myPrefs.customPlaylistSupport && !preferenceManager.myPrefs.showPLAYLIST
+
+    val tabFocusRequester = remember { FocusRequester() }
+
+    val tabs = buildList {
+        add(
+            TabItem("TV", Icons.Default.Tv) {
+                if (usingCustomPlaylist) {
+                    Main_Layout_3rd(context, reloadTrigger = reloadChannelsTrigger)
+                } else {
+                    Main_Layout(context, reloadTrigger = reloadChannelsTrigger)
+                }
+            }
+        )
+        if (hasRecentTab) {
+            add(
+                TabItem("Recent", Icons.Default.Star) {
+                    Recent_Layout(context)
+                }
+            )
+        }
+        if (hasFavouriteTab) {
+            add(
+                TabItem("Favourite", Icons.Default.Favorite) {
+                    MultiZoneFavouriteLayout(
+                        context = context,
+                        startWithM3U = usingCustomPlaylist
+                    )
+                }
+            )
+        }
+        if (hasSearchTab) {
+            add(
+                TabItem("Search", Icons.Default.Search) {
+                    SearchTabLayout(context, tabFocusRequester)
+                }
+            )
+        }
     }
-    if (preferenceManager.myPrefs.showFavouriteTab) {
-        baseTabs.add(TabItem("Favourite", Icons.Default.Favorite))
-    }
-    // Always append Search tab (no preference gating to avoid missing key)
-    // baseTabs.add(TabItem("Search", Icons.Default.Search))
-    val tabs = baseTabs.toList()
 
     val isRemoteNavigation =
         context.resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK ==
@@ -108,7 +140,6 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
     val savedTabIndex = preferenceManager.myPrefs.selectedScreenTV?.toIntOrNull() ?: 0
     val initialIndex = if (savedTabIndex in tabs.indices) savedTabIndex else 0
     var selectedTabIndex by remember { mutableIntStateOf(initialIndex) }
-    val tabFocusRequester = remember { FocusRequester() }
 
     // Snackbar state
     val snackbarHostState = remember { SnackbarHostState() }
@@ -198,16 +229,14 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
                 }
             }
 
-            if (preferenceManager.myPrefs.customPlaylistSupport &&
-                !preferenceManager.myPrefs.showPLAYLIST
-            ) {
+            val hasExtraTabs = hasRecentTab || hasFavouriteTab || hasSearchTab
 
-                Main_Layout_3rd(context, reloadTrigger = reloadChannelsTrigger)
-
-            } else if (!preferenceManager.myPrefs.showRecentTab && !preferenceManager.myPrefs.showFavouriteTab) {
-
-                Main_Layout(context, reloadTrigger = reloadChannelsTrigger)
-
+            if (!hasExtraTabs) {
+                if (usingCustomPlaylist) {
+                    Main_Layout_3rd(context, reloadTrigger = reloadChannelsTrigger)
+                } else {
+                    Main_Layout(context, reloadTrigger = reloadChannelsTrigger)
+                }
             } else {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -246,18 +275,7 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
                         }
                     }
 
-                    // Tab Content
-                    val hasRecent = preferenceManager.myPrefs.showRecentTab
-                    val hasFav = preferenceManager.myPrefs.showFavouriteTab
-                    when (selectedTabIndex) {
-                        0 -> Main_Layout(context, reloadTrigger = reloadChannelsTrigger)
-                        // If only favourite enabled it will be index 1
-                        1 -> if (hasRecent) {Recent_Layout(context)} else if (hasFav) {FavouriteLayout(context)} else {Recent_Layout(context)}
-                        2 -> if (hasRecent && hasFav) {FavouriteLayout(context)} else if (isRemoteNavigation){ SearchTabLayoutTV(context, tabFocusRequester)} else {SearchTabLayout(context, tabFocusRequester)}
-                        3 -> if (isRemoteNavigation) SearchTabLayoutTV(context, tabFocusRequester) else SearchTabLayout(context, tabFocusRequester)
-                        // 1 -> Recent_Layout(context)
-                        // 2 -> SearchTabLayout(context, tabFocusRequester)
-                    }
+                    tabs.getOrNull(selectedTabIndex)?.content?.invoke()
                 }
             }
 

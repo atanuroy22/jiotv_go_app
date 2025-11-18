@@ -80,6 +80,7 @@ fun TvScreenMenu(
     var customUrl by remember { mutableStateOf(preferenceManager.myPrefs.custURL ?: "") }
     var showRecentTab by remember { mutableStateOf(preferenceManager.myPrefs.showRecentTab) }
     var showFavouriteTab by remember { mutableStateOf(preferenceManager.myPrefs.showFavouriteTab) }
+    var showSearchTab by remember { mutableStateOf(preferenceManager.myPrefs.showSearchTab) }
     var startTvAutomatically by remember { mutableStateOf(preferenceManager.myPrefs.startTvAutomatically) }
     var startTvAutoDelay by remember { mutableStateOf(preferenceManager.myPrefs.startTvAutoDelay) }
     var startTvAutoDelayTime by remember { mutableIntStateOf(preferenceManager.myPrefs.startTvAutoDelayTime) }
@@ -167,23 +168,33 @@ fun TvScreenMenu(
                 }
 
                 // --- TV Start Page Selection  ---
-                val startScreenTV = mapOf(
-                    "All Channels" to 0,
-                    "Recent Channels" to 1
-                )
-                val startOptionsTV = startScreenTV.keys.toList()
+                val startTabMappings = buildList {
+                    add("All Channels" to 0)
+                    if (showRecentTab) {
+                        add("Recent Channels" to 1)
+                    }
+                    if (showFavouriteTab) {
+                        val favIndex = if (showRecentTab) 2 else 1
+                        add("Favourite Channels" to favIndex)
+                    }
+                }
+                val startScreenTV = startTabMappings.toMap()
+                val startOptionsTV = startTabMappings.map { it.first }
                 var selectedScreenTV by remember {
                     mutableIntStateOf(
                         preferenceManager.myPrefs.selectedScreenTV?.toIntOrNull() ?: 0
                     )
                 }
-                // Clamp if Recent removed or invalid
-                // if (!showRecentTab && selectedScreenTV == 1) selectedScreenTV = 0
                 var screenDropdownExpanded by remember { mutableStateOf(false) }
-                val selectedScreenLabel =
-                    startScreenTV.entries.find { it.value == selectedScreenTV }?.key
-                        ?: startOptionsTV[0]
-                if (showRecentTab) {
+                val resolvedScreenEntry =
+                    startScreenTV.entries.find { it.value == selectedScreenTV }
+                        ?: startTabMappings.firstOrNull()?.let { defaultEntry ->
+                            selectedScreenTV = defaultEntry.second
+                            startScreenTV.entries.find { it.value == selectedScreenTV }
+                        }
+                val selectedScreenLabel = resolvedScreenEntry?.key ?: startOptionsTV.first()
+
+                if (startOptionsTV.size > 1) {
                     DropdownSelection2(
                         title = "Select TV start page",
                         options = startOptionsTV,
@@ -502,7 +513,8 @@ fun TvScreenMenu(
                         Text(text = "Show Recent Channels")
                     }
 
-                Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -517,6 +529,21 @@ fun TvScreenMenu(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(text = "Show Favourite Channels")
                 }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Checkbox(
+                        checked = showSearchTab,
+                        onCheckedChange = { checked ->
+                            showSearchTab = checked
+                        }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "Show Search Tab")
                 }
 
 ///////////////////////////////
@@ -699,6 +726,9 @@ fun TvScreenMenu(
                             selectedLanguages.value.clear()
                             selectedLanguageInts.value.clear()
                             showPlaylist = false // Reset playlist selection
+                            showRecentTab = false
+                            showFavouriteTab = false
+                            showSearchTab = false
                             preferenceManager.apply {
                                 myPrefs.selectedScreenTV = "0"
                                 myPrefs.filterQX = "auto"
@@ -708,6 +738,7 @@ fun TvScreenMenu(
                                 myPrefs.showPLAYLIST = false
                                 myPrefs.showRecentTab = false
                                 myPrefs.showFavouriteTab = false
+                                myPrefs.showSearchTab = false
                                 myPrefs.favouriteChannels = ""
                                 myPrefs.startTvAutomatically = false
                                 myPrefs.startTvAutoDelay = false
@@ -740,6 +771,7 @@ fun TvScreenMenu(
                                 }
                                 myPrefs.showRecentTab = showRecentTab
                                 myPrefs.showFavouriteTab = showFavouriteTab
+                                myPrefs.showSearchTab = showSearchTab
                                 myPrefs.startTvAutomatically = startTvAutomatically
                                 myPrefs.startTvAutoDelay = startTvAutoDelay
                                 myPrefs.startTvAutoDelayTime = startTvAutoDelayTime
