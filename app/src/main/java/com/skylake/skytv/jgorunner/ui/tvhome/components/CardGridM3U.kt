@@ -206,21 +206,23 @@ fun M3UCategoryRow(
                                     }
 
                                     Key.DirectionLeft -> {
-                                        if (index == 0 && !isFirstCategory) {
-                                            true
-                                        } else if (index > 0) {
+                                        if (index > 0) {
                                             focusRequesters[index - 1].requestFocus()
                                             true
-                                        } else false
+                                        } else {
+                                            // At first channel, consume event to prevent focus leaving row
+                                            true
+                                        }
                                     }
 
                                     Key.DirectionRight -> {
-                                        if (index == channels.lastIndex && !isFirstCategory) {
-                                            true
-                                        } else if (index < channels.lastIndex) {
+                                        if (index < channels.lastIndex) {
                                             focusRequesters[index + 1].requestFocus()
                                             true
-                                        } else false
+                                        } else {
+                                            // At last channel, consume event to prevent focus leaving row
+                                            true
+                                        }
                                     }
 
 
