@@ -55,7 +55,8 @@ import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.launch
-// AppStartTracker and autoplay removed for FavouriteLayout; retaining background fetch only
+import android.app.Activity
+import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
@@ -114,6 +115,44 @@ fun FavouriteLayout(context: Context) {
                     }
                 }
             } catch (_: Exception) {}
+        }
+    }
+
+    // Autoplay first favourite channel when favourite tab is default
+    LaunchedEffect(visibleFavourites) {
+        if (preferenceManager.myPrefs.startTvAutomatically &&
+            !AppStartTracker.shouldPlayChannel &&
+            visibleFavourites.isNotEmpty()
+        ) {
+            val firstChannel = visibleFavourites.first()
+            val port = preferenceManager.myPrefs.jtvGoServerPort ?: 8080
+
+            val intent = Intent(context, ExoPlayJet::class.java).apply {
+                putExtra("zone", "TV")
+                putParcelableArrayListExtra(
+                    "channel_list_data",
+                    ArrayList(visibleFavourites.map { ch ->
+                        ChannelInfo(
+                            ch.channel_url,
+                            "http://localhost:$port/jtvimage/${ch.logoUrl}",
+                            ch.channel_name
+                        )
+                    })
+                )
+                putExtra("current_channel_index", 0)
+                putExtra("video_url", firstChannel.channel_url)
+                putExtra("logo_url", "http://localhost:$port/jtvimage/${firstChannel.logoUrl}")
+                putExtra("ch_name", firstChannel.channel_name)
+            }
+
+            kotlinx.coroutines.delay(1000)
+
+            if (context !is Activity) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+
+            AppStartTracker.shouldPlayChannel = true
         }
     }
 

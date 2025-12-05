@@ -57,6 +57,8 @@ import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import android.util.Log
+import android.app.Activity
+import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
 /**
  * M3U Favourite Layout
@@ -102,6 +104,39 @@ fun M3UFavouriteLayout(context: Context) {
     }
 
     val visibleFavourites = favouriteChannels
+
+    // Autoplay first M3U favourite channel when favourite tab is default
+    LaunchedEffect(visibleFavourites) {
+        if (preferenceManager.myPrefs.startTvAutomatically &&
+            !AppStartTracker.shouldPlayChannel &&
+            visibleFavourites.isNotEmpty()
+        ) {
+            val firstChannel = visibleFavourites.first()
+
+            val intent = Intent(context, ExoPlayJet::class.java).apply {
+                putExtra("zone", "TV")
+                putParcelableArrayListExtra(
+                    "channel_list_data",
+                    ArrayList(visibleFavourites.map { ch ->
+                        ChannelInfo(ch.url, ch.logo ?: "", ch.name)
+                    })
+                )
+                putExtra("current_channel_index", 0)
+                putExtra("video_url", firstChannel.url)
+                putExtra("logo_url", firstChannel.logo ?: "")
+                putExtra("ch_name", firstChannel.name)
+            }
+
+            kotlinx.coroutines.delay(1000)
+
+            if (context !is Activity) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+
+            AppStartTracker.shouldPlayChannel = true
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize(),
