@@ -44,40 +44,26 @@ fun MultiZoneFavouriteLayout(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Zone selector row
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            listOf("JIO", "M3U").forEach { zone ->
-                val selected = zone == activeZone
-                OutlinedButton(
-                    onClick = {
-                        if (zone != activeZone) {
-                            try {
-                                PlayerCommandBus.requestStopPlayback()
-                                PlayerCommandBus.requestClosePip()
-                            } catch (_: Exception) {
-                                // best-effort stop; ignore errors
-                            }
-                        }
-                        activeZone = zone
-                    },
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = if (selected) Color(0xFF2962FF).copy(alpha = 0.18f) else Color.Transparent,
-                        contentColor = if (selected) Color(0xFF2962FF) else Color.Unspecified
-                    )
-                ) { Text(if (zone == "JIO") "JioTV" else "M3U", fontSize = 14.sp) }
-            }
-        }
-        Spacer(Modifier.height(4.dp))
         Surface(modifier = Modifier.weight(1f)) {
             when (activeZone) {
-                "M3U" -> M3UFavouriteLayout(context)
-                else -> FavouriteLayout(context)
+                "M3U" -> M3UFavouriteLayout(context) { zone ->
+                    if (zone != activeZone) {
+                        try {
+                            PlayerCommandBus.requestStopPlayback()
+                            PlayerCommandBus.requestClosePip()
+                        } catch (_: Exception) {}
+                    }
+                    activeZone = zone
+                }
+                else -> FavouriteLayout(context) { zone ->
+                    if (zone != activeZone) {
+                        try {
+                            PlayerCommandBus.requestStopPlayback()
+                            PlayerCommandBus.requestClosePip()
+                        } catch (_: Exception) {}
+                    }
+                    activeZone = zone
+                }
             }
         }
     }

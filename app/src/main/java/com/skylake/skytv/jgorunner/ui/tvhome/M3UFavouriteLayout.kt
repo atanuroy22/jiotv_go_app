@@ -13,11 +13,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -39,15 +41,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.DialogProperties
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import com.google.gson.Gson
@@ -68,7 +74,17 @@ import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
  */
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
-fun M3UFavouriteLayout(context: Context) {
+fun M3UFavouriteLayout(context: Context, onChangeZone: (String) -> Unit) {
+    val configuration = LocalConfiguration.current
+    val isCompact = configuration.screenWidthDp < 600
+    val headerGap = if (isCompact) 4.dp else 8.dp
+    val toggleFont = if (isCompact) 11.sp else 14.sp
+    val actionFont = if (isCompact) 11.sp else 14.sp
+    val titleFont = if (isCompact) 12.sp else 16.sp
+    val btnPadding = if (isCompact) PaddingValues(horizontal = 8.dp, vertical = 4.dp) else PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+    val minBtnHeight = if (isCompact) 30.dp else 40.dp
+    val rowHPad = if (isCompact) 12.dp else 16.dp
+    val rowVPad = if (isCompact) 6.dp else 8.dp
     val preferenceManager = SkySharedPref.getInstance(context)
     val gson = remember { Gson() }
 
@@ -80,8 +96,8 @@ fun M3UFavouriteLayout(context: Context) {
         val json = shared.getString(favKey, "")
         mutableStateOf(safeM3UChannelParse(json))
     }
-    var showAddDialog by remember { mutableStateOf(false) }
-    var showModifyDialog by remember { mutableStateOf(false) }
+    var showAddDialog by rememberSaveable { mutableStateOf(false) }
+    var showModifyDialog by rememberSaveable { mutableStateOf(false) }
 
     // Load full M3U channel list from preference manager (channelListJson); if absent remains empty
     var allChannels by remember { mutableStateOf<List<M3UChannelExp>>(emptyList()) }
@@ -142,38 +158,80 @@ fun M3UFavouriteLayout(context: Context) {
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "M3U Favourite Channels",
-            fontSize = 18.sp,
-            modifier = Modifier.padding(top = 8.dp)
-        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+                .padding(horizontal = rowHPad, vertical = rowVPad),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Button(onClick = {
-                if (loadingAllChannels) {
-                    Toast.makeText(context, "Loading channels...", Toast.LENGTH_SHORT).show()
-                } else if (allChannels.isEmpty()) {
-                    Toast.makeText(context, loadError ?: "No channels available", Toast.LENGTH_SHORT).show()
-                } else {
-                    showAddDialog = true
-                }
-            }) { Text(if (loadingAllChannels) "Loading" else "Add") }
-            OutlinedButton(onClick = {
-                if (favouriteChannels.isEmpty()) {
-                    Toast.makeText(context, "No favourites", Toast.LENGTH_SHORT).show()
-                } else {
-                    showModifyDialog = true
-                }
-            }) { Text("Modify") }
-            OutlinedButton(onClick = {
-                favouriteChannels = emptyList()
-                shared.edit().putString(favKey, "").apply()
-            }) { Text("Remove All") }
+            Row(horizontalArrangement = Arrangement.spacedBy(headerGap), verticalAlignment = Alignment.CenterVertically) {
+                // Zone toggle (left)
+                val selectedM3U = true
+                OutlinedButton(
+                    onClick = { onChangeZone("JIO") },
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color.Transparent,
+                        contentColor = Color.Unspecified
+                    ),
+                    contentPadding = btnPadding,
+                    modifier = Modifier.defaultMinSize(minWidth = 0.dp, minHeight = minBtnHeight)
+                ) { Text("JioTV", fontSize = toggleFont, maxLines = 1) }
+                OutlinedButton(
+                    onClick = { /* already M3U */ },
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color(0xFF2962FF).copy(alpha = 0.18f),
+                        contentColor = Color(0xFF2962FF)
+                    ),
+                    contentPadding = btnPadding,
+                    modifier = Modifier.defaultMinSize(minWidth = 0.dp, minHeight = minBtnHeight)
+                ) { Text("M3U", fontSize = toggleFont, maxLines = 1) }
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(headerGap),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Title placed near buttons per UX request
+                Text(
+                    text = "M3U FAV",
+                    fontSize = titleFont,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = if (isCompact) 56.dp else 96.dp)
+                )
+                Button(
+                    onClick = {
+                    if (loadingAllChannels) {
+                        Toast.makeText(context, "Loading channels...", Toast.LENGTH_SHORT).show()
+                    } else if (allChannels.isEmpty()) {
+                        Toast.makeText(context, loadError ?: "No channels available", Toast.LENGTH_SHORT).show()
+                    } else {
+                        showAddDialog = true
+                    }
+                },
+                    contentPadding = btnPadding,
+                    modifier = Modifier.defaultMinSize(minWidth = 0.dp, minHeight = minBtnHeight)
+                ) { Text(if (loadingAllChannels) "Loading" else "Add", fontSize = actionFont, maxLines = 1) }
+                OutlinedButton(
+                    onClick = {
+                    if (favouriteChannels.isEmpty()) {
+                        Toast.makeText(context, "No favourites", Toast.LENGTH_SHORT).show()
+                    } else {
+                        showModifyDialog = true
+                    }
+                },
+                    contentPadding = btnPadding,
+                    modifier = Modifier.defaultMinSize(minWidth = 0.dp, minHeight = minBtnHeight)
+                ) { Text("Modify", fontSize = actionFont, maxLines = 1) }
+                OutlinedButton(
+                    onClick = {
+                    favouriteChannels = emptyList()
+                    shared.edit().putString(favKey, "").apply()
+                },
+                    contentPadding = btnPadding,
+                    modifier = Modifier.defaultMinSize(minWidth = 0.dp, minHeight = minBtnHeight)
+                ) { Text("Clear", fontSize = actionFont, maxLines = 1) }
+            }
         }
 
         if (visibleFavourites.isEmpty()) {
@@ -261,27 +319,43 @@ private fun ModifyM3UFavouriteChannelsDialog(
     onDismiss: () -> Unit,
     onSelectionChanged: (List<M3UChannelExp>) -> Unit
 ) {
-    val selected = remember(favourites) { mutableStateOf(favourites.map { it.url }.toMutableSet()) }
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Modify M3U Favourite Channels", fontSize = 16.sp)
+    val selected = rememberSaveable(favourites) { mutableStateOf(favourites.map { it.url }.toMutableSet()) }
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .fillMaxWidth(0.90f)
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Modify M3U Fav Channels", fontSize = 16.sp)
+                    TextButton(onClick = onDismiss) { Text("Close") }
+                }
                 Spacer(Modifier.height(8.dp))
                 if (favourites.isEmpty()) {
                     Text("No favourite", fontSize = 12.sp)
                 } else {
+                    val cfg = LocalConfiguration.current
+                    val isCompact = cfg.screenWidthDp < 600
+                    val gridMaxH = if (isCompact) (cfg.screenHeightDp.dp * 0.8f) else 340.dp
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.heightIn(max = 420.dp)
+                        columns = GridCells.Adaptive(minSize = if (isCompact) 96.dp else 110.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxWidth().heightIn(max = gridMaxH)
                     ) {
                         items(favourites, key = { it.url }) { channel ->
                             val isChecked = selected.value.contains(channel.url)
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(148.dp)
+                                    .height(118.dp)
                                     .clickable {
                                         selected.value = selected.value.toMutableSet().apply {
                                             if (isChecked) remove(channel.url) else add(channel.url)
@@ -297,12 +371,12 @@ private fun ModifyM3UFavouriteChannelsDialog(
                                         contentDescription = channel.name,
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .height(88.dp),
+                                            .height(64.dp),
                                         contentScale = ContentScale.Fit
                                     )
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(top = 6.dp)
+                                        modifier = Modifier.padding(top = 2.dp)
                                     ) {
                                         Checkbox(
                                             checked = isChecked,
@@ -319,10 +393,19 @@ private fun ModifyM3UFavouriteChannelsDialog(
                                                 checkmarkColor = MaterialTheme.colorScheme.onPrimary
                                             ),
                                             modifier = Modifier
-                                                .size(24.dp)
+                                                .size(18.dp)
                                                 .focusable()
                                         )
-                                        Text(channel.name, fontSize = 10.sp)
+                                        Text(
+                                            channel.name,
+                                            fontSize = 9.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            softWrap = false,
+                                            modifier = Modifier
+                                                .padding(start = 4.dp)
+                                                .weight(1f, fill = false)
+                                        )
                                     }
                                 }
                             }
@@ -330,9 +413,6 @@ private fun ModifyM3UFavouriteChannelsDialog(
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                    TextButton(onClick = onDismiss) { Text("Close") }
-                }
             }
         }
     }
@@ -351,14 +431,27 @@ private fun AddM3UFavouriteChannelsDialog(
     val categories = remember(allChannels) {
         allChannels.mapNotNull { it.category }.distinct().sorted()
     }
-    var activeCategory by remember { mutableStateOf<String?>(null) }
-    val filteredChannels = allChannels.filter { activeCategory == null || it.category == activeCategory }
-    val selectedUrls = remember { mutableStateOf(alreadySelected.toMutableSet()) }
+    var activeCategory by rememberSaveable { mutableStateOf<String?>(null) }
+    val filteredChannels = allChannels.filter { (activeCategory == null || it.category == activeCategory) && !it.url.isNullOrBlank() }
+    val selectedUrls = rememberSaveable { mutableStateOf(alreadySelected.toMutableSet()) }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Select M3U Favourite Channels", fontSize = 16.sp)
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .fillMaxWidth(0.90f)
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Select M3U Fav Channels", fontSize = 16.sp)
+                    TextButton(onClick = onDismiss) { Text("Close") }
+                }
                 Spacer(Modifier.height(8.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     item {
@@ -389,18 +482,21 @@ private fun AddM3UFavouriteChannelsDialog(
                         fontSize = 12.sp
                     )
                 } else {
+                    val cfg = LocalConfiguration.current
+                    val isCompact = cfg.screenWidthDp < 600
+                    val gridMaxH = if (isCompact) (cfg.screenHeightDp.dp * 0.8f) else 340.dp
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.heightIn(max = 420.dp)
+                        columns = GridCells.Adaptive(minSize = if (isCompact) 96.dp else 110.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxWidth().heightIn(max = gridMaxH)
                     ) {
-                        items(filteredChannels, key = { it.url }) { channel ->
+                        items(filteredChannels, key = { it.url!! }) { channel ->
                             val isChecked = selectedUrls.value.contains(channel.url)
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(148.dp)
+                                    .height(118.dp)
                                     .clickable {
                                         selectedUrls.value = selectedUrls.value.toMutableSet().apply {
                                             if (isChecked) remove(channel.url) else add(channel.url)
@@ -416,12 +512,12 @@ private fun AddM3UFavouriteChannelsDialog(
                                         contentDescription = channel.name,
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .height(88.dp),
+                                            .height(64.dp),
                                         contentScale = ContentScale.Fit
                                     )
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(top = 6.dp)
+                                        modifier = Modifier.padding(top = 2.dp)
                                     ) {
                                         Checkbox(
                                             checked = isChecked,
@@ -438,10 +534,19 @@ private fun AddM3UFavouriteChannelsDialog(
                                                 checkmarkColor = MaterialTheme.colorScheme.onPrimary
                                             ),
                                             modifier = Modifier
-                                                .size(24.dp)
+                                                .size(18.dp)
                                                 .focusable()
                                         )
-                                        Text(channel.name, fontSize = 10.sp)
+                                        Text(
+                                            channel.name,
+                                            fontSize = 9.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            softWrap = false,
+                                            modifier = Modifier
+                                                .padding(start = 4.dp)
+                                                .weight(1f, fill = false)
+                                        )
                                     }
                                 }
                             }
@@ -449,9 +554,6 @@ private fun AddM3UFavouriteChannelsDialog(
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                    TextButton(onClick = onDismiss) { Text("Close") }
-                }
             }
         }
     }

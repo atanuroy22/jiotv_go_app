@@ -2,6 +2,7 @@ package com.skylake.skytv.jgorunner.ui.tvhome
 
 import android.content.Context
 import android.content.Intent
+import androidx.compose.ui.window.DialogProperties
 import android.widget.Toast
 import android.util.Log
 import androidx.compose.foundation.BorderStroke
@@ -13,10 +14,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -35,6 +39,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -42,9 +48,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.text.style.TextOverflow
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import com.google.gson.Gson
@@ -60,9 +68,20 @@ import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
-fun FavouriteLayout(context: Context) {
+fun FavouriteLayout(context: Context, onChangeZone: (String) -> Unit) {
+    val configuration = LocalConfiguration.current
+    val isCompact = configuration.screenWidthDp < 600
+    val headerGap = if (isCompact) 4.dp else 8.dp
+    val toggleFont = if (isCompact) 11.sp else 14.sp
+    val actionFont = if (isCompact) 11.sp else 14.sp
+    val titleFont = if (isCompact) 12.sp else 16.sp
+    val btnPadding = if (isCompact) PaddingValues(horizontal = 8.dp, vertical = 4.dp) else PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+    val minBtnHeight = if (isCompact) 30.dp else 40.dp
+    val rowHPad = if (isCompact) 12.dp else 16.dp
+    val rowVPad = if (isCompact) 6.dp else 8.dp
     val preferenceManager = SkySharedPref.getInstance(context)
     val gson = remember { Gson() }
+    val scope = rememberCoroutineScope()
     // Only JioTV favourites retained
     val jiotvFavKey = "favouriteChannelsJio"
     val shared = context.getSharedPreferences("favourites_store", Context.MODE_PRIVATE)
@@ -76,8 +95,8 @@ fun FavouriteLayout(context: Context) {
         val json = shared.getString(jiotvFavKey, "")
         mutableStateOf(safeChannelParse(json))
     }
-    var showAddDialog by remember { mutableStateOf(false) }
-    var showModifyDialog by remember { mutableStateOf(false) }
+    var showAddDialog by rememberSaveable { mutableStateOf(false) }
+    var showModifyDialog by rememberSaveable { mutableStateOf(false) }
 
     // Canonical full channel list (cache -> network)
     var allChannels by remember { mutableStateOf<List<Channel>>(emptyList()) }
@@ -160,41 +179,96 @@ fun FavouriteLayout(context: Context) {
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Title line
-        Text(
-            text = "JioTV Favourite Channels",
-            fontSize = 18.sp,
-            modifier = Modifier.padding(top = 8.dp)
-        )
-
-        // Buttons centered below title
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+                .padding(horizontal = rowHPad, vertical = rowVPad),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Button(onClick = {
-                if (loadingAllChannels) {
-                    Toast.makeText(context, "Loading channels...", Toast.LENGTH_SHORT).show()
-                } else if (allChannels.isEmpty()) {
-                    Toast.makeText(context, loadError ?: "No channels available", Toast.LENGTH_SHORT).show()
-                } else {
-                    showAddDialog = true
-                }
-            }) { Text(if (loadingAllChannels) "Loading" else "Add") }
-            OutlinedButton(onClick = {
-                if (favouriteChannels.isEmpty()) {
-                    Toast.makeText(context, "No favourites", Toast.LENGTH_SHORT).show()
-                } else {
-                    showModifyDialog = true
-                }
-            }) { Text("Modify") }
-            OutlinedButton(onClick = {
-                favouriteChannels = emptyList()
-                shared.edit().putString(jiotvFavKey, "").apply()
-            }) { Text("Remove All") }
+            Row(horizontalArrangement = Arrangement.spacedBy(headerGap), verticalAlignment = Alignment.CenterVertically) {
+                // Zone toggle (left)
+                OutlinedButton(
+                    onClick = { /* already JIO */ },
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color(0xFF2962FF).copy(alpha = 0.18f),
+                        contentColor = Color(0xFF2962FF)
+                    ),
+                    contentPadding = btnPadding,
+                    modifier = Modifier.defaultMinSize(minWidth = 0.dp, minHeight = minBtnHeight)
+                ) { Text("JioTV", fontSize = toggleFont, maxLines = 1) }
+                OutlinedButton(
+                    onClick = { onChangeZone("M3U") },
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color.Transparent,
+                        contentColor = Color.Unspecified
+                    ),
+                    contentPadding = btnPadding,
+                    modifier = Modifier.defaultMinSize(minWidth = 0.dp, minHeight = minBtnHeight)
+                ) { Text("M3U", fontSize = toggleFont, maxLines = 1) }
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(headerGap),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Title placed near buttons per UX request
+                Text(
+                    text = "Jio FAV",
+                    fontSize = titleFont,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = if (isCompact) 56.dp else 96.dp)
+                )
+                Button(
+                    onClick = {
+                    if (loadingAllChannels) {
+                        Toast.makeText(context, "Loading channels...", Toast.LENGTH_SHORT).show()
+                    } else if (allChannels.isEmpty()) {
+                        // Try a one-time reload if server just started or cache is empty
+                        scope.launch {
+                            loadingAllChannels = true
+                            try {
+                                val port = preferenceManager.myPrefs.jtvGoServerPort ?: 8080
+                                val reloaded = ChannelUtils.loadCanonicalChannels(context, port)
+                                allChannels = reloaded
+                                if (reloaded.isNotEmpty()) {
+                                    showAddDialog = true
+                                } else {
+                                    Toast.makeText(context, loadError ?: "No channels available", Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (_: Exception) {
+                                Toast.makeText(context, loadError ?: "No channels available", Toast.LENGTH_SHORT).show()
+                            } finally {
+                                loadingAllChannels = false
+                            }
+                        }
+                    } else {
+                        showAddDialog = true
+                    }
+                },
+                    contentPadding = btnPadding,
+                    modifier = Modifier.defaultMinSize(minWidth = 0.dp, minHeight = minBtnHeight)
+                ) { Text(if (loadingAllChannels) "Loading" else "Add", fontSize = actionFont, maxLines = 1) }
+                OutlinedButton(
+                    onClick = {
+                    if (favouriteChannels.isEmpty()) {
+                        Toast.makeText(context, "No favourites", Toast.LENGTH_SHORT).show()
+                    } else {
+                        showModifyDialog = true
+                    }
+                },
+                    contentPadding = btnPadding,
+                    modifier = Modifier.defaultMinSize(minWidth = 0.dp, minHeight = minBtnHeight)
+                ) { Text("Modify", fontSize = actionFont, maxLines = 1) }
+                OutlinedButton(
+                    onClick = {
+                    favouriteChannels = emptyList()
+                    shared.edit().putString(jiotvFavKey, "").apply()
+                },
+                    contentPadding = btnPadding,
+                    modifier = Modifier.defaultMinSize(minWidth = 0.dp, minHeight = minBtnHeight)
+                ) { Text("Clear", fontSize = actionFont, maxLines = 1) }
+            }
         }
 
         // Filters removed per user request
@@ -304,24 +378,40 @@ private fun ModifyFavouriteChannelsDialog(
 ) {
     val preferenceManager = SkySharedPref.getInstance(context)
     val selected = remember(favourites) { mutableStateOf(favourites.map { it.channel_id }.toMutableSet()) }
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .fillMaxWidth(0.9f)
+        ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("Modify Favourite Channels", fontSize = 16.sp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Modify Fav Channels", fontSize = 16.sp)
+                    TextButton(onClick = onDismiss) { Text("Close") }
+                }
                 Spacer(Modifier.height(8.dp))
                 if (favourites.isEmpty()) {
                     Text("No favourite", fontSize = 12.sp)
                 } else {
+                    val cfg = LocalConfiguration.current
+                    val isCompact = cfg.screenWidthDp < 600
+                    val gridMaxH = if (isCompact) (cfg.screenHeightDp.dp * 0.8f) else 340.dp
                     LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 140.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.heightIn(max = 420.dp)
+                        columns = GridCells.Adaptive(minSize = if (isCompact) 96.dp else 110.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.heightIn(max = gridMaxH)
                     ) {
                         items(favourites, key = { it.channel_id }) { channel ->
                             var isChecked by remember { mutableStateOf(selected.value.contains(channel.channel_id)) }
                             Card(
-                                modifier = Modifier.width(140.dp).height(140.dp).clickable {
+                                modifier = Modifier.fillMaxWidth().height(118.dp).clickable {
                                     isChecked = !isChecked
                                     if (isChecked) selected.value.add(channel.channel_id) else selected.value.remove(channel.channel_id)
                                     val finalList = favourites.filter { selected.value.contains(it.channel_id) }
@@ -334,7 +424,7 @@ private fun ModifyFavouriteChannelsDialog(
                                     GlideImage(
                                         model = logo,
                                         contentDescription = channel.channel_name,
-                                        modifier = Modifier.fillMaxWidth().height(80.dp),
+                                        modifier = Modifier.fillMaxWidth().height(64.dp),
                                         contentScale = ContentScale.Fit
                                     )
                                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -343,8 +433,17 @@ private fun ModifyFavouriteChannelsDialog(
                                             if (checked) selected.value.add(channel.channel_id) else selected.value.remove(channel.channel_id)
                                             val finalList = favourites.filter { selected.value.contains(it.channel_id) }
                                             onSelectionChanged(finalList)
-                                        })
-                                        Text(channel.channel_name, fontSize = 10.sp)
+                                        }, modifier = Modifier.size(18.dp))
+                                        Text(
+                                            channel.channel_name,
+                                            fontSize = 9.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            softWrap = false,
+                                            modifier = Modifier
+                                                .padding(start = 4.dp)
+                                                .weight(1f, fill = false)
+                                        )
                                     }
                                 }
                             }
@@ -352,9 +451,6 @@ private fun ModifyFavouriteChannelsDialog(
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                    TextButton(onClick = onDismiss) { Text("Close") }
-                }
             }
         }
     }
@@ -402,10 +498,23 @@ private fun AddFavouriteChannelsDialog(
     val filteredChannels = allChannels.filter { activeCategory == null || it.channelCategoryId == activeCategory }
     val selectedIds = remember { mutableStateOf(alreadySelected.toMutableSet()) }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Select Favourite Channels", fontSize = 16.sp)
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .fillMaxWidth(0.90f)
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Select Fav Channels", fontSize = 16.sp)
+                    TextButton(onClick = onDismiss) { Text("Close") }
+                }
                 Spacer(Modifier.height(8.dp))
                 // Category buttons row (includes 'All') with highlight
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -438,16 +547,19 @@ private fun AddFavouriteChannelsDialog(
                         fontSize = 12.sp
                     )
                 } else {
+                    val cfg = LocalConfiguration.current
+                    val isCompact = cfg.screenWidthDp < 600
+                    val gridMaxH = if (isCompact) (cfg.screenHeightDp.dp * 0.8f) else 340.dp
                     LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 140.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.heightIn(max = 420.dp)
+                        columns = GridCells.Adaptive(minSize = if (isCompact) 96.dp else 110.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxWidth().heightIn(max = gridMaxH)
                     ) {
                         items(filteredChannels, key = { it.channel_id }) { channel ->
                             var isChecked by remember { mutableStateOf(selectedIds.value.contains(channel.channel_id)) }
                             Card(
-                                modifier = Modifier.width(140.dp).height(140.dp).clickable {
+                                modifier = Modifier.fillMaxWidth().height(118.dp).clickable {
                                     isChecked = !isChecked
                                     if (isChecked) selectedIds.value.add(channel.channel_id) else selectedIds.value.remove(channel.channel_id)
                                     val finalList = allChannels.filter { selectedIds.value.contains(it.channel_id) }
@@ -460,7 +572,7 @@ private fun AddFavouriteChannelsDialog(
                                     GlideImage(
                                         model = logo,
                                         contentDescription = channel.channel_name,
-                                        modifier = Modifier.fillMaxWidth().height(80.dp),
+                                        modifier = Modifier.fillMaxWidth().height(64.dp),
                                         contentScale = ContentScale.Fit
                                     )
                                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -469,8 +581,17 @@ private fun AddFavouriteChannelsDialog(
                                             if (checked) selectedIds.value.add(channel.channel_id) else selectedIds.value.remove(channel.channel_id)
                                             val finalList = allChannels.filter { selectedIds.value.contains(it.channel_id) }
                                             onSelectionChanged(finalList)
-                                        })
-                                        Text(channel.channel_name, fontSize = 10.sp)
+                                        }, modifier = Modifier.size(18.dp))
+                                        Text(
+                                            channel.channel_name,
+                                            fontSize = 9.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            softWrap = false,
+                                            modifier = Modifier
+                                                .padding(start = 4.dp)
+                                                .weight(1f, fill = false)
+                                        )
                                     }
                                 }
                             }
@@ -478,9 +599,6 @@ private fun AddFavouriteChannelsDialog(
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                    TextButton(onClick = onDismiss) { Text("Close") }
-                }
             }
         }
     }
