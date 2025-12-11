@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Button
@@ -33,6 +34,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -65,6 +69,9 @@ import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.launch
 import android.app.Activity
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Edit
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
@@ -231,7 +238,7 @@ fun FavouriteLayout(context: Context, onChangeZone: (String) -> Unit) {
                         modifier = Modifier.widthIn(max = if (isCompact) 56.dp else 96.dp)
                     )
                 }
-                Button(
+                IconButton(
                     onClick = {
                     if (loadingAllChannels) {
                         Toast.makeText(context, "Loading channels...", Toast.LENGTH_SHORT).show()
@@ -258,10 +265,9 @@ fun FavouriteLayout(context: Context, onChangeZone: (String) -> Unit) {
                         showAddDialog = true
                     }
                 },
-                    contentPadding = btnPadding,
                     modifier = Modifier.defaultMinSize(minWidth = 0.dp, minHeight = minBtnHeight)
-                ) { Text(if (loadingAllChannels) "Loading" else "Add", fontSize = actionFont, maxLines = 1) }
-                OutlinedButton(
+                ) { Icon(Icons.Filled.Add, contentDescription = "Add favourites") }
+                IconButton(
                     onClick = {
                     if (favouriteChannels.isEmpty()) {
                         Toast.makeText(context, "No favourites", Toast.LENGTH_SHORT).show()
@@ -269,17 +275,8 @@ fun FavouriteLayout(context: Context, onChangeZone: (String) -> Unit) {
                         showModifyDialog = true
                     }
                 },
-                    contentPadding = btnPadding,
                     modifier = Modifier.defaultMinSize(minWidth = 0.dp, minHeight = minBtnHeight)
-                ) { Text("Modify", fontSize = actionFont, maxLines = 1) }
-                OutlinedButton(
-                    onClick = {
-                    favouriteChannels = emptyList()
-                    shared.edit().putString(jiotvFavKey, "").apply()
-                },
-                    contentPadding = btnPadding,
-                    modifier = Modifier.defaultMinSize(minWidth = 0.dp, minHeight = minBtnHeight)
-                ) { Text("Clear", fontSize = actionFont, maxLines = 1) }
+                ) { Icon(Icons.Filled.Edit, contentDescription = "Modify favourites") }
             }
         }
 
@@ -398,16 +395,37 @@ private fun ModifyFavouriteChannelsDialog(
                 .padding(horizontal = 12.dp, vertical = 8.dp)
                 .fillMaxWidth(0.9f)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Modify Fav Channels", fontSize = 16.sp)
-                    TextButton(onClick = onDismiss) { Text("Close") }
+                    TextButton(
+                        onClick = onDismiss,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        modifier = Modifier.defaultMinSize(minWidth = 0.dp, minHeight = 28.dp)
+                    ) { Text("Close") }
                 }
-                Spacer(Modifier.height(8.dp))
+                // Tighten the vertical gap above the red action button
+                Spacer(Modifier.height(0.dp))
+                Row(
+                    // Reduce side padding so the button sits closer to the header
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.Start,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Button(
+                        onClick = { onSelectionChanged(emptyList()) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError
+                        ),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        modifier = Modifier.fillMaxWidth().defaultMinSize(minWidth = 0.dp, minHeight = 26.dp)
+                    ) { Text("Remove all Favourite channels", fontSize = 12.sp) }
+                }
                 if (favourites.isEmpty()) {
                     Text("No favourite", fontSize = 12.sp)
                 } else {
@@ -507,7 +525,47 @@ private fun AddFavouriteChannelsDialog(
             .sortedBy { it.label }
     }
     var activeCategory by remember { mutableStateOf<Int?>(null) }
-    val filteredChannels = allChannels.filter { activeCategory == null || it.channelCategoryId == activeCategory }
+
+    // Language mapping similar to TvScreenMenu
+    val languageNameToId: Map<String, Int?> = mapOf(
+        "All Languages" to null,
+        "Hindi" to 1,
+        "Marathi" to 2,
+        "Punjabi" to 3,
+        "Urdu" to 4,
+        "Bengali" to 5,
+        "English" to 6,
+        "Malayalam" to 7,
+        "Tamil" to 8,
+        "Gujarati" to 9,
+        "Odia" to 10,
+        "Telugu" to 11,
+        "Bhojpuri" to 12,
+        "Kannada" to 13,
+        "Assamese" to 14,
+        "Nepali" to 15,
+        "French" to 16,
+        "Other" to 18
+    )
+    val languageIdToName: Map<Int, String> = languageNameToId
+        .filterValues { it != null }
+        .map { it.value!! to it.key }
+        .toMap()
+
+    data class Lang(val id: Int, val label: String)
+    val languages = remember(allChannels) {
+        allChannels.map { ch ->
+            val label = languageIdToName[ch.channelLanguageId] ?: "Lang ${ch.channelLanguageId}"
+            Lang(ch.channelLanguageId, label)
+        }.distinctBy { it.id }
+            .sortedBy { it.label }
+    }
+    var selectedLanguageIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
+
+    val filteredChannels = allChannels.filter {
+        (activeCategory == null || it.channelCategoryId == activeCategory) &&
+        (selectedLanguageIds.isEmpty() || selectedLanguageIds.contains(it.channelLanguageId))
+    }
     val selectedIds = remember { mutableStateOf(alreadySelected.toMutableSet()) }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -527,8 +585,76 @@ private fun AddFavouriteChannelsDialog(
                     Text("Select Fav Channels", fontSize = 16.sp)
                     TextButton(onClick = onDismiss) { Text("Close") }
                 }
+                Spacer(Modifier.height(2.dp))
+                // Unselect all currently selected favourites from this picker
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.Start,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Button(
+                        onClick = {
+                            selectedIds.value = mutableSetOf()
+                            onSelectionChanged(emptyList())
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError
+                        ),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                        modifier = Modifier.fillMaxWidth().defaultMinSize(minWidth = 0.dp, minHeight = 24.dp)
+                    ) { Text("Unselect all", fontSize = 12.sp) }
+                }
+                Spacer(Modifier.height(4.dp))
+                // Language selector as dropdown (dialog) with multi-select checkboxes
+                var showLanguagePicker by remember { mutableStateOf(false) }
+                OutlinedButton(onClick = { showLanguagePicker = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Languages")
+                }
+                if (showLanguagePicker) {
+                    Dialog(onDismissRequest = { showLanguagePicker = false }) {
+                        Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text("Select Languages", fontSize = 16.sp)
+                                Spacer(Modifier.height(8.dp))
+                                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 340.dp)) {
+                                    items(languages, key = { it.id }) { lang ->
+                                        val checked = selectedLanguageIds.contains(lang.id)
+                                        var focused by remember { mutableStateOf(false) }
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp, horizontal = 8.dp)
+                                                .onFocusChanged { focused = it.isFocused }
+                                                .focusable()
+                                                .clickable {
+                                                    selectedLanguageIds = if (checked) selectedLanguageIds - lang.id else selectedLanguageIds + lang.id
+                                                }
+                                        ) {
+                                            Checkbox(
+                                                checked = checked,
+                                                onCheckedChange = { isChecked ->
+                                                    selectedLanguageIds = if (isChecked) selectedLanguageIds + lang.id else selectedLanguageIds - lang.id
+                                                },
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Text(lang.label, modifier = Modifier.padding(start = 8.dp))
+                                        }
+                                    }
+                                }
+                                Spacer(Modifier.height(12.dp))
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                    TextButton(onClick = { selectedLanguageIds = emptySet() }) { Text("Clear") }
+                                    Spacer(Modifier.width(8.dp))
+                                    Button(onClick = { showLanguagePicker = false }) { Text("Done") }
+                                }
+                            }
+                        }
+                    }
+                }
                 Spacer(Modifier.height(8.dp))
-                // Category buttons row (includes 'All') with highlight
+                // Category buttons row (includes 'All') with highlight (now below languages)
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     item {
                         val selected = activeCategory == null
@@ -569,11 +695,12 @@ private fun AddFavouriteChannelsDialog(
                         modifier = Modifier.fillMaxWidth().heightIn(max = gridMaxH)
                     ) {
                         items(filteredChannels, key = { it.channel_id }) { channel ->
-                            var isChecked by remember { mutableStateOf(selectedIds.value.contains(channel.channel_id)) }
+                            val isChecked = selectedIds.value.contains(channel.channel_id)
                             Card(
                                 modifier = Modifier.fillMaxWidth().height(118.dp).clickable {
-                                    isChecked = !isChecked
-                                    if (isChecked) selectedIds.value.add(channel.channel_id) else selectedIds.value.remove(channel.channel_id)
+                                    val new = selectedIds.value.toMutableSet()
+                                    if (isChecked) new.remove(channel.channel_id) else new.add(channel.channel_id)
+                                    selectedIds.value = new
                                     val finalList = allChannels.filter { selectedIds.value.contains(it.channel_id) }
                                     onSelectionChanged(finalList)
                                 },
@@ -588,12 +715,17 @@ private fun AddFavouriteChannelsDialog(
                                         contentScale = ContentScale.Fit
                                     )
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Checkbox(checked = isChecked, onCheckedChange = { checked ->
-                                            isChecked = checked
-                                            if (checked) selectedIds.value.add(channel.channel_id) else selectedIds.value.remove(channel.channel_id)
-                                            val finalList = allChannels.filter { selectedIds.value.contains(it.channel_id) }
-                                            onSelectionChanged(finalList)
-                                        }, modifier = Modifier.size(18.dp))
+                                        Checkbox(
+                                            checked = isChecked,
+                                            onCheckedChange = { checked ->
+                                                val new = selectedIds.value.toMutableSet()
+                                                if (checked) new.add(channel.channel_id) else new.remove(channel.channel_id)
+                                                selectedIds.value = new
+                                                val finalList = allChannels.filter { selectedIds.value.contains(it.channel_id) }
+                                                onSelectionChanged(finalList)
+                                            },
+                                            modifier = Modifier.size(18.dp)
+                                        )
                                         Text(
                                             channel.channel_name,
                                             fontSize = 9.sp,

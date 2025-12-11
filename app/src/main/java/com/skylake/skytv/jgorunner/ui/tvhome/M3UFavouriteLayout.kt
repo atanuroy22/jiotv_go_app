@@ -33,6 +33,8 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -65,6 +67,9 @@ import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import android.util.Log
 import android.app.Activity
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Edit
 
 /**
  * M3U Favourite Layout
@@ -211,7 +216,7 @@ fun M3UFavouriteLayout(context: Context, onChangeZone: (String) -> Unit) {
                         modifier = Modifier.widthIn(max = if (isCompact) 56.dp else 96.dp)
                     )
                 }
-                Button(
+                IconButton(
                     onClick = {
                     if (loadingAllChannels) {
                         Toast.makeText(context, "Loading channels...", Toast.LENGTH_SHORT).show()
@@ -221,10 +226,9 @@ fun M3UFavouriteLayout(context: Context, onChangeZone: (String) -> Unit) {
                         showAddDialog = true
                     }
                 },
-                    contentPadding = btnPadding,
                     modifier = Modifier.defaultMinSize(minWidth = 0.dp, minHeight = minBtnHeight)
-                ) { Text(if (loadingAllChannels) "Loading" else "Add", fontSize = actionFont, maxLines = 1) }
-                OutlinedButton(
+                ) { Icon(Icons.Filled.Add, contentDescription = "Add favourites") }
+                IconButton(
                     onClick = {
                     if (favouriteChannels.isEmpty()) {
                         Toast.makeText(context, "No favourites", Toast.LENGTH_SHORT).show()
@@ -232,17 +236,8 @@ fun M3UFavouriteLayout(context: Context, onChangeZone: (String) -> Unit) {
                         showModifyDialog = true
                     }
                 },
-                    contentPadding = btnPadding,
                     modifier = Modifier.defaultMinSize(minWidth = 0.dp, minHeight = minBtnHeight)
-                ) { Text("Modify", fontSize = actionFont, maxLines = 1) }
-                OutlinedButton(
-                    onClick = {
-                    favouriteChannels = emptyList()
-                    shared.edit().putString(favKey, "").apply()
-                },
-                    contentPadding = btnPadding,
-                    modifier = Modifier.defaultMinSize(minWidth = 0.dp, minHeight = minBtnHeight)
-                ) { Text("Clear", fontSize = actionFont, maxLines = 1) }
+                ) { Icon(Icons.Filled.Edit, contentDescription = "Modify favourites") }
             }
         }
 
@@ -340,16 +335,37 @@ private fun ModifyM3UFavouriteChannelsDialog(
                 .padding(horizontal = 12.dp, vertical = 8.dp)
                 .fillMaxWidth(0.90f)
         ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Modify M3U Fav Channels", fontSize = 16.sp)
-                    TextButton(onClick = onDismiss) { Text("Close") }
+                    TextButton(
+                        onClick = onDismiss,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        modifier = Modifier.defaultMinSize(minWidth = 0.dp, minHeight = 28.dp)
+                    ) { Text("Close") }
                 }
-                Spacer(Modifier.height(8.dp))
+                // Tighten vertical gap between header and the red action button
+                Spacer(Modifier.height(0.dp))
+                Row(
+                    // Reduce side padding so the button sits closer to the header
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.Start,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Button(
+                        onClick = { onSelectionChanged(emptyList()) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError
+                        ),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        modifier = Modifier.fillMaxWidth().defaultMinSize(minWidth = 0.dp, minHeight = 26.dp)
+                    ) { Text("Remove all Favourite channels", fontSize = 12.sp) }
+                }
                 if (favourites.isEmpty()) {
                     Text("No favourite", fontSize = 12.sp)
                 } else {
@@ -424,7 +440,7 @@ private fun ModifyM3UFavouriteChannelsDialog(
                         }
                     }
                 }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(2.dp))
             }
         }
     }
@@ -464,7 +480,26 @@ private fun AddM3UFavouriteChannelsDialog(
                     Text("Select M3U Fav Channels", fontSize = 16.sp)
                     TextButton(onClick = onDismiss) { Text("Close") }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(2.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.Start,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Button(
+                        onClick = {
+                            selectedUrls.value = mutableSetOf()
+                            onSelectionChanged(emptyList())
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError
+                        ),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                        modifier = Modifier.fillMaxWidth().defaultMinSize(minWidth = 0.dp, minHeight = 24.dp)
+                    ) { Text("Unselect all", fontSize = 12.sp) }
+                }
+                Spacer(Modifier.height(4.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     item {
                         val selected = activeCategory == null
