@@ -206,19 +206,31 @@ fun FavouriteLayout(context: Context, onChangeZone: (String) -> Unit) {
                     contentPadding = btnPadding,
                     modifier = Modifier.defaultMinSize(minWidth = 0.dp, minHeight = minBtnHeight)
                 ) { Text("M3U", fontSize = toggleFont, maxLines = 1) }
+                OutlinedButton(
+                    onClick = { onChangeZone("MIX") },
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color.Transparent,
+                        contentColor = Color.Unspecified
+                    ),
+                    contentPadding = btnPadding,
+                    modifier = Modifier.defaultMinSize(minWidth = 0.dp, minHeight = minBtnHeight)
+                ) { Text("Mix", fontSize = toggleFont, maxLines = 1) }
             }
             Row(
                 horizontalArrangement = Arrangement.spacedBy(headerGap),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Title placed near buttons per UX request
-                Text(
-                    text = "Jio FAV",
-                    fontSize = titleFont,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = if (isCompact) 56.dp else 96.dp)
-                )
+                val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+                if (isLandscape) {
+                    Text(
+                        text = "Jio FAV",
+                        fontSize = titleFont,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = if (isCompact) 56.dp else 96.dp)
+                    )
+                }
                 Button(
                     onClick = {
                     if (loadingAllChannels) {

@@ -55,6 +55,15 @@ fun MultiZoneFavouriteLayout(
                     }
                     activeZone = zone
                 }
+                "MIX" -> MixFavouriteLayout(context) { zone ->
+                    if (zone != activeZone) {
+                        try {
+                            PlayerCommandBus.requestStopPlayback()
+                            PlayerCommandBus.requestClosePip()
+                        } catch (_: Exception) {}
+                    }
+                    activeZone = zone
+                }
                 else -> FavouriteLayout(context) { zone ->
                     if (zone != activeZone) {
                         try {
