@@ -176,6 +176,9 @@ fun TvScreenMenu(
                         preferenceManager.myPrefs.selectedScreenTV?.toIntOrNull() ?: 0
                     )
                 }
+                var selectedZoneTabTV by remember {
+                    mutableIntStateOf(preferenceManager.myPrefs.selectedZoneTabTV)
+                }
                 var screenDropdownExpanded by remember { mutableStateOf(false) }
                 val selectedScreenLabel =
                     startScreenTV.entries.find { it.value == selectedScreenTV }?.key
@@ -682,6 +685,7 @@ fun TvScreenMenu(
                             showPlaylist = false // Reset playlist selection
                             preferenceManager.apply {
                                 myPrefs.selectedScreenTV = "0"
+                                myPrefs.selectedZoneTabTV = 0
                                 myPrefs.filterQX = "auto"
                                 myPrefs.filterCI = ""
                                 myPrefs.filterLI = ""
@@ -710,6 +714,7 @@ fun TvScreenMenu(
                             )
                             preferenceManager.apply {
                                 myPrefs.selectedScreenTV = selectedScreenTV.toString()
+                                myPrefs.selectedZoneTabTV = selectedZoneTabTV
                                 myPrefs.selectedRemoteNavTV = selectedTvRemoteNavOption.toString()
                                 myPrefs.filterQX = selectedQuality
                                 myPrefs.filterCI = selectedCategoryInts.value.joinToString(",")

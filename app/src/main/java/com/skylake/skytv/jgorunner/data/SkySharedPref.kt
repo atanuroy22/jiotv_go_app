@@ -104,13 +104,19 @@ class SkySharedPref(context: Context) {
             annotation?.let { ann ->
                 property.isAccessible = true
 
+                val defaultValue = try {
+                    property.get(instance)
+                } catch (_: Exception) {
+                    null
+                }
+
                 // Retrieve value from SharedPreferences
                 val value = when (property.returnType.classifier) {
-                    String::class -> sharedPreferences.getString(ann.key, null)
-                    Boolean::class -> sharedPreferences.getBoolean(ann.key, false)
-                    Int::class -> sharedPreferences.getInt(ann.key, 0)
-                    Float::class -> sharedPreferences.getFloat(ann.key, 0f)
-                    Long::class -> sharedPreferences.getLong(ann.key, 0L)
+                    String::class -> sharedPreferences.getString(ann.key, defaultValue as? String)
+                    Boolean::class -> sharedPreferences.getBoolean(ann.key, (defaultValue as? Boolean) ?: false)
+                    Int::class -> sharedPreferences.getInt(ann.key, (defaultValue as? Int) ?: 0)
+                    Float::class -> sharedPreferences.getFloat(ann.key, (defaultValue as? Float) ?: 0f)
+                    Long::class -> sharedPreferences.getLong(ann.key, (defaultValue as? Long) ?: 0L)
                     else -> {
                         Log.w("SkySharedPref", "Unsupported type for key: ${ann.key}")
                         return@let // Skip unsupported types
@@ -174,12 +180,13 @@ class SkySharedPref(context: Context) {
         @SharedPrefKey("operationMODE") var operationMODE: Int = 999,
         @SharedPrefKey("darkMODE") var darkMODE: Boolean = false,
         @SharedPrefKey("selectedScreenTV") var selectedScreenTV: String? = "0",
+        @SharedPrefKey("selectedZoneTabTV") var selectedZoneTabTV: Int = 0,
         @SharedPrefKey("selectedRemoteNavTV") var selectedRemoteNavTV: String? = "0",
-        @SharedPrefKey("custURL") var custURL: String? = "",
+        @SharedPrefKey("custURL") var custURL: String? = "https://atanuroy22.github.io/iptv/output/all.m3u",
         @SharedPrefKey("channelListJson") var channelListJson: String? = "",
         @SharedPrefKey("expDebug") var expDebug: Boolean = false,
         @SharedPrefKey("last_selected_category_exp") var lastSelectedCategoryExp: String? = "All",
-        @SharedPrefKey("showPLAYLIST") var showPLAYLIST: Boolean = false,
+        @SharedPrefKey("showPLAYLIST") var showPLAYLIST: Boolean = true,
         @SharedPrefKey("showRecentTab") var showRecentTab: Boolean = false,
         @SharedPrefKey("startTvAutomatically") var startTvAutomatically: Boolean = false,
         @SharedPrefKey("startTvAutoDelay") var startTvAutoDelay: Boolean = false,
@@ -188,13 +195,14 @@ class SkySharedPref(context: Context) {
         @SharedPrefKey("currChannelLogo") var currChannelLogo: String? = "",
         @SharedPrefKey("currChannelUrl") var currChannelUrl: String? = "",
         @SharedPrefKey("unitHolder") var unitHolder: Int = 0,
-        @SharedPrefKey("customPlaylistSupport") var customPlaylistSupport: Boolean = false,
+        @SharedPrefKey("customPlaylistSupport") var customPlaylistSupport: Boolean = true,
+        @SharedPrefKey("home_iptv_enabled") var homeIptvEnabled: Boolean = true,
         @SharedPrefKey("genericTvIcon") var genericTvIcon: Boolean = false,
         @SharedPrefKey("preRelease") var preRelease: Boolean = false,
         @SharedPrefKey("epgDebug") var epgDebug: Boolean = false,
         @SharedPrefKey("lastSelectedCategoriesExp") var lastSelectedCategoriesExp: String? = "",
         @SharedPrefKey("setupPending") var setupPending: Boolean = true,
-        @SharedPrefKey("enable_pip") var enablePip: Boolean = true,
+        @SharedPrefKey("enable_pip") var enablePip: Boolean = false,
 
         // Widget-specific preferences
         @SharedPrefKey("widget_show_logs") var widgetShowLogs: Boolean = false,

@@ -11,7 +11,7 @@ import java.net.URL
 
 object BinaryUpdater {
     private const val TAG = "JTVGo::BinaryUpdater"
-    private const val LATEST_RELEASE_INFO_URL = "https://api.github.com/repos/JioTV-Go/jiotv_go/releases/latest"
+    private const val LATEST_RELEASE_INFO_URL = "https://api.github.com/repos/atanuroy22/jiotv_go/releases/latest"
     private const val RELEASE_NAME_PREFIX = "jiotv_go-android"
     private lateinit var sharedPref: SkySharedPref
 

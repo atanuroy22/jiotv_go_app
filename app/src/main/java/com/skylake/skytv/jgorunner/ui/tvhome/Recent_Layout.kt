@@ -100,20 +100,9 @@ fun Recent_Layout(context: Context) {
                                 val serverPort = SkySharedPref.getInstance(context).myPrefs.jtvGoServerPort
 
                                 val intent = Intent(context, ExoPlayJet::class.java).apply {
-                                    putExtra("video_url", "http://localhost:$serverPort/live/${channel.channel_id}")
                                     putExtra("zone", "TV")
-
-                                    val allChannelsData = ArrayList(
-                                        recentChannels.value.map { ch ->
-                                            val fullLogoUrl = "http://localhost:$serverPort/jtvimage/${ch.logoUrl}"
-                                            ChannelInfo(ch.channel_url, fullLogoUrl, ch.channel_name)
-                                        }
-                                    )
-                                    putParcelableArrayListExtra("channel_list_data", allChannelsData)
-
-                                    val currentChannelIndex = recentChannels.value.indexOf(channel)
-                                    putExtra("current_channel_index", currentChannelIndex)
-
+                                    putExtra("channel_list_kind", "jio")
+                                    putExtra("current_channel_index", -1)
                                     putExtra("video_url", channel.channel_url)
                                     putExtra("logo_url", "http://localhost:$serverPort/jtvimage/${channel.logoUrl}")
                                     putExtra("ch_name", channel.channel_name)

@@ -6,12 +6,15 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.LinearLayout
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.annotation.RequiresApi
@@ -112,6 +115,7 @@ import com.skylake.skytv.jgorunner.ui.tvhome.ChannelUtils
 import com.skylake.skytv.jgorunner.ui.tvhome.extractChannelIdFromPlayUrl
 import com.skylake.skytv.jgorunner.utils.DeviceUtils
 import com.skylake.skytv.jgorunner.utils.containsAnyId
+import com.skylake.skytv.jgorunner.utils.normalizePlaybackUrl
 import com.skylake.skytv.jgorunner.utils.setupCustomPlaybackLogic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -152,6 +156,7 @@ fun ExoPlayJetScreen(
     }
     val focusRequester = remember { FocusRequester() }
     var currentIndex by remember { mutableStateOf(currentChannelIndex) }
+    var overrideVideoUrl by remember { mutableStateOf<String?>(null) }
     var showChannelPanel by remember { mutableStateOf(false) }
     var panelSelectedIndex by remember { mutableStateOf(currentChannelIndex.coerceAtLeast(0)) }
     var currentProgramName by remember { mutableStateOf<String?>(null) }
@@ -225,7 +230,7 @@ fun ExoPlayJetScreen(
 
     val exoPlayer = remember {
         initializePlayer(
-            getCurrentVideoUrl = { channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl },
+            getCurrentVideoUrl = { overrideVideoUrl ?: channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl },
             context = context,
             retryCountRef = retryCountRef
         )
@@ -310,15 +315,39 @@ fun ExoPlayJetScreen(
     }
 
     LaunchedEffect(currentIndex) {
+        overrideVideoUrl = null
         retryCountRef.value = 0
         isBuffering = true
-        val currentUrl = channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
-        exoPlayer.setMediaItem(MediaItem.fromUri(currentUrl.toUri()))
-        exoPlayer.prepare()
-        exoPlayer.playWhenReady = true
+        try {
+            val currentUrlRaw = channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
+            val currentUrl = normalizePlaybackUrl(context, currentUrlRaw)
+            if (currentUrl.isBlank()) {
+                Toast.makeText(context, "Invalid stream URL", Toast.LENGTH_SHORT).show()
+                try {
+                    exoPlayer.stop()
+                    exoPlayer.clearMediaItems()
+                    exoPlayer.playWhenReady = false
+                } catch (_: Exception) {
+                }
+                return@LaunchedEffect
+            }
 
-        // そにー Hook
-        setupCustomPlaybackLogic(exoPlayer, currentUrl)
+            val mediaItem = buildMediaItemForPlaybackUrl(currentUrl)
+            exoPlayer.setMediaItem(mediaItem)
+            exoPlayer.prepare()
+            exoPlayer.playWhenReady = true
+
+            setupCustomPlaybackLogic(exoPlayer, currentUrl)
+        } catch (_: Exception) {
+            Toast.makeText(context, "Stream not supported", Toast.LENGTH_SHORT).show()
+            try {
+                exoPlayer.stop()
+                exoPlayer.clearMediaItems()
+                exoPlayer.playWhenReady = false
+            } catch (_: Exception) {
+            }
+            return@LaunchedEffect
+        }
 
         if (!PlayerCommandBus.isInPipMode) {
             showChannelOverlay = true
@@ -328,7 +357,7 @@ fun ExoPlayJetScreen(
     }
 
     // Expose player controls to PiP actions
-    DisposableEffect(Unit) {
+    DisposableEffect(channelList) {
         PlayerCommandBus.setHandlers(
             playPause = {
                 try {
@@ -346,6 +375,7 @@ fun ExoPlayJetScreen(
                 channelList?.let {
                     if (it.isNotEmpty()) {
                         val ni = (currentIndex + 1) % it.size
+                        overrideVideoUrl = null
                         currentIndex = ni
                         PlayerCommandBus.requestSwitch(index = ni)
                     }
@@ -355,6 +385,7 @@ fun ExoPlayJetScreen(
                 channelList?.let {
                     if (it.isNotEmpty()) {
                         val pi = if (currentIndex - 1 < 0) it.size - 1 else currentIndex - 1
+                        overrideVideoUrl = null
                         currentIndex = pi
                         PlayerCommandBus.requestSwitch(index = pi)
                     }
@@ -378,22 +409,46 @@ fun ExoPlayJetScreen(
     }
 
     // Respond to external switch requests (e.g., when a new channel is picked while in PiP)
-    DisposableEffect(Unit) {
+    DisposableEffect(channelList) {
         PlayerCommandBus.setOnSwitchRequest { url, index ->
             try {
                 var targetUrl: String? = null
                 if (index != null && !channelList.isNullOrEmpty() && index in channelList.indices) {
                     // Index switch has priority
+                    overrideVideoUrl = null
                     currentIndex = index
                     targetUrl = channelList[index].videoUrl
                 } else if (!url.isNullOrEmpty()) {
-                    targetUrl = url
-                    // If list contains this item, also advance the index to keep UI in sync
-                    val foundIdx = channelList?.indexOfFirst { it.videoUrl == url } ?: -1
-                    if (foundIdx >= 0) currentIndex = foundIdx
+                    val normalizedIncoming = normalizePlaybackUrl(context, url)
+                    val incomingId = extractChannelIdFromPlayUrl(normalizedIncoming)
+                    val foundIdx = if (incomingId != null && !channelList.isNullOrEmpty()) {
+                        channelList.indexOfFirst {
+                            val candidate = it.videoUrl ?: return@indexOfFirst false
+                            extractChannelIdFromPlayUrl(normalizePlaybackUrl(context, candidate)) == incomingId
+                        }
+                    } else {
+                        -1
+                    }
+                    if (foundIdx >= 0 && !channelList.isNullOrEmpty()) {
+                        overrideVideoUrl = null
+                        currentIndex = foundIdx
+                        targetUrl = channelList[foundIdx].videoUrl
+                    } else {
+                        overrideVideoUrl = url
+                        targetUrl = url
+                    }
                 }
                 if (!targetUrl.isNullOrEmpty()) {
-                    val mediaItem = MediaItem.fromUri(targetUrl.toUri())
+                    retryCountRef.value = 0
+                    isBuffering = true
+                    val finalUrl = normalizePlaybackUrl(context, targetUrl)
+                    if (finalUrl.isBlank()) return@setOnSwitchRequest
+                    val mediaItem = buildMediaItemForPlaybackUrl(finalUrl)
+                    try {
+                        exoPlayer.stop()
+                        exoPlayer.clearMediaItems()
+                    } catch (_: Exception) {
+                    }
                     exoPlayer.setMediaItem(mediaItem)
                     exoPlayer.prepare()
                     exoPlayer.playWhenReady = true
@@ -748,7 +803,7 @@ fun ExoPlayJetScreen(
                                 targetBar.addView(resizeButton)
                             }
 
-                            hookExoControllerButtons(findViewById(R.id.player_view),context)
+                            hookExoControllerButtons(this@apply, context)
                         } catch (e: Exception) {
                             Log.w(TAG, "Failed to position resize button: ${e.message}")
                         }
@@ -962,8 +1017,11 @@ fun ExoPlayJetScreen(
     // Also handle direct video URL changes (e.g., new intent while in PiP with no channel list/index)
     LaunchedEffect(videoUrl) {
         if (channelList.isNullOrEmpty() || currentIndex < 0) {
-            val url = channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
-            exoPlayer.setMediaItem(MediaItem.fromUri(url.toUri()))
+            val rawUrl = channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
+            val url = normalizePlaybackUrl(context, rawUrl)
+            if (url.isBlank()) return@LaunchedEffect
+            val mediaItem = buildMediaItemForPlaybackUrl(url)
+            exoPlayer.setMediaItem(mediaItem)
             exoPlayer.prepare()
             exoPlayer.playWhenReady = true
         }
@@ -1140,6 +1198,22 @@ fun getCurrentFormattedTime(): String {
     return String.format("%02d:%02d %s", if (hour == 0) 12 else hour, minute, amPm)
 }
 
+private fun buildMediaItemForPlaybackUrl(url: String): MediaItem {
+    val builder = MediaItem.Builder().setUri(url.toUri())
+    val mimeType = inferPlaybackMimeType(url)
+    if (!mimeType.isNullOrBlank()) builder.setMimeType(mimeType)
+    return builder.build()
+}
+
+private fun inferPlaybackMimeType(url: String): String? {
+    val cleaned = url.substringBefore('#').substringBefore('?').lowercase()
+    return when {
+        cleaned.endsWith(".m3u8") || cleaned.contains(".m3u8") -> MimeTypes.APPLICATION_M3U8
+        cleaned.endsWith(".mpd") || cleaned.contains(".mpd") -> MimeTypes.APPLICATION_MPD
+        else -> null
+    }
+}
+
 @UnstableApi
 fun initializePlayer(
     getCurrentVideoUrl: () -> String,
@@ -1155,12 +1229,12 @@ fun initializePlayer(
     val player = ExoPlayer.Builder(context).setMediaSourceFactory(mediaSourceFactory).build()
     var resumePosition: Long
     retryCountRef.value = 0
+    val retryHandler = Handler(Looper.getMainLooper())
 
     fun prepareAndPlay(seekToPosition: Long = 0L) {
-        val mediaItem = MediaItem.Builder()
-            .setUri(getCurrentVideoUrl().toUri())
-            .setMimeType(MimeTypes.APPLICATION_M3U8)
-            .build()
+        val normalizedUrl = normalizePlaybackUrl(context, getCurrentVideoUrl())
+        if (normalizedUrl.isBlank()) return
+        val mediaItem = buildMediaItemForPlaybackUrl(normalizedUrl)
         player.setMediaItem(mediaItem)
         player.prepare()
         if (seekToPosition > 0L) {
@@ -1174,18 +1248,36 @@ fun initializePlayer(
     // Always Retry
     player.addListener(object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
-            val currentUrl = getCurrentVideoUrl()
-            if (currentUrl.containsAnyId()) {
-                // そにー Resume
-                resumePosition = player.currentPosition
-                Log.d(TAG, "Retrying special channel from position $resumePosition")
-                player.stop()
-                prepareAndPlay(resumePosition)
-            } else {
-                Log.d(TAG, "Retrying normal channel from start")
-                player.stop()
-                prepareAndPlay()
+            val attempt = retryCountRef.value + 1
+            retryCountRef.value = attempt
+            if (attempt > 12) {
+                try {
+                    player.stop()
+                    player.clearMediaItems()
+                    player.playWhenReady = false
+                } catch (_: Exception) {
+                }
+                return
             }
+            val currentUrl = getCurrentVideoUrl()
+            val retryDelayMs = (attempt * 350L).coerceAtMost(2500L)
+            retryHandler.removeCallbacksAndMessages(null)
+            retryHandler.postDelayed(
+                {
+                    try {
+                        if (currentUrl.containsAnyId()) {
+                            resumePosition = player.currentPosition
+                            player.stop()
+                            prepareAndPlay(resumePosition)
+                        } else {
+                            player.stop()
+                            prepareAndPlay()
+                        }
+                    } catch (_: Exception) {
+                    }
+                },
+                retryDelayMs
+            )
         }
     })
 

@@ -230,7 +230,7 @@ suspend fun fetchGithubReleases(): List<String> = withContext(Dispatchers.IO) {
     try {
         val client = OkHttpClient()
         val request = Request.Builder()
-            .url("https://api.github.com/repos/JioTV-Go/jiotv_go/releases")
+            .url("https://api.github.com/repos/atanuroy22/jiotv_go/releases")
             .build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return@withContext emptyList()
@@ -257,7 +257,7 @@ suspend fun performSelectedBinaryUpdate(
     onDownloadStatusUpdate: (DownloadModelNew) -> Unit
 ): Boolean = withContext(Dispatchers.IO) {
     try {
-        val releasesResponse = URL("https://api.github.com/repos/JioTV-Go/jiotv_go/releases").readText()
+        val releasesResponse = URL("https://api.github.com/repos/atanuroy22/jiotv_go/releases").readText()
         val releasesArray = JSONArray(releasesResponse)
         var selectedRelease: JSONObject? = null
         var assetFileName = ""

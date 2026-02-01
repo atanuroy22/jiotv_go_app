@@ -3,6 +3,7 @@ package com.skylake.skytv.jgorunner.utils
 import android.app.PendingIntent
 import android.content.Context
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import android.view.KeyEvent
@@ -104,4 +105,73 @@ fun withQuality(context: Context, chURL: String, logIT: Boolean = false): String
     logIT.takeIf { it }?.let { Log.d("wQTY", "output = $videoUrl") }
 
     return videoUrl
+}
+
+fun normalizePlaybackUrl(context: Context, inputUrl: String): String {
+    val skyPref = SkySharedPref.getInstance(context).myPrefs
+    var url = inputUrl.trim().trim('`', '"', '\'')
+
+    if (url.isEmpty()) return url
+
+    val parsedForScheme = runCatching { Uri.parse(url) }.getOrNull()
+    if (parsedForScheme != null && parsedForScheme.scheme.isNullOrEmpty()) {
+        val base = "http://localhost:${skyPref.jtvGoServerPort}"
+        url = if (url.startsWith("/")) "$base$url" else "$base/$url"
+    }
+
+    val parsedForPlay = runCatching { Uri.parse(url) }.getOrNull()
+    val playPath = parsedForPlay?.encodedPath.orEmpty()
+    val playMatch = Regex(""".*/play/(\d+)$""").find(playPath)
+    if (playMatch != null) {
+        val id = playMatch.groupValues[1]
+        val livePath = "/live/$id.m3u8"
+        url = parsedForPlay?.buildUpon()?.encodedPath(livePath)?.build()?.toString() ?: url
+    }
+
+    val parsed = runCatching { Uri.parse(url) }.getOrNull()
+    val qFromUrl = parsed?.getQueryParameter("q")?.lowercase()
+    val qFromPref = skyPref.filterQX?.lowercase()
+    val effectiveQuality = qFromPref ?: qFromUrl
+
+    if (parsed != null && parsed.query?.isNotEmpty() == true) {
+        val builder = parsed.buildUpon().clearQuery()
+        val names = runCatching { parsed.queryParameterNames }.getOrNull().orEmpty()
+        for (name in names) {
+            if (name.equals("q", ignoreCase = true)) continue
+            val values = parsed.getQueryParameters(name)
+            if (values.isEmpty()) {
+                builder.appendQueryParameter(name, null)
+            } else {
+                values.forEach { v -> builder.appendQueryParameter(name, v) }
+            }
+        }
+        url = builder.build().toString()
+    }
+
+    if (!effectiveQuality.isNullOrEmpty()) {
+        val normalizedBase = url
+            .replace("/live/low/", "/live/", ignoreCase = true)
+            .replace("/live/medium/", "/live/", ignoreCase = true)
+            .replace("/live/high/", "/live/", ignoreCase = true)
+        url = when (effectiveQuality) {
+            "low" -> normalizedBase.replace("/live/", "/live/low/", ignoreCase = true)
+            "high" -> normalizedBase.replace("/live/", "/live/high/", ignoreCase = true)
+            "medium" -> normalizedBase.replace("/live/", "/live/medium/", ignoreCase = true)
+            else -> normalizedBase
+        }
+    }
+
+    val parsedAfterQuality = runCatching { Uri.parse(url) }.getOrNull()
+    val path = parsedAfterQuality?.encodedPath.orEmpty()
+    if (path.contains("/live/", ignoreCase = true) &&
+        !path.endsWith(".m3u8", ignoreCase = true) &&
+        !path.endsWith(".m3u", ignoreCase = true)
+    ) {
+        val newPath = if (path.endsWith("/")) path.dropLast(1) + ".m3u8" else "$path.m3u8"
+        url = parsedAfterQuality?.buildUpon()?.encodedPath(newPath)?.build()?.toString() ?: url
+    }
+
+    url = url.replace(".m3u8.m3u8", ".m3u8", ignoreCase = true)
+    url = url.replace("/.m3u8", ".m3u8", ignoreCase = true)
+    return url
 }

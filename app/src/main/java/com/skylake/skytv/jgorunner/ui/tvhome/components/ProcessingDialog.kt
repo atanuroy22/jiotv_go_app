@@ -112,22 +112,40 @@ fun parseM3Uexp(m3uContent: String): List<M3UChannelExp> {
     val channels = mutableListOf<M3UChannelExp>()
     var i = 0
     while (i < lines.size) {
-        val line = lines[i]
-        if (line.startsWith("#EXTINF")) {
-            val name = Regex(",\\s*(.+)$").find(line)?.groupValues?.get(1)?.trim() ?: ""
-            val logo = Regex("""tvg-logo="([^"]*)"""").find(line)?.groupValues?.get(1)
-            val category = Regex("""group-title="([^"]*)"""").find(line)?.groupValues?.get(1)
-
-            val url = lines.getOrNull(i + 1)?.trim() ?: ""
-
-            if (name.isNotEmpty() && url.isNotEmpty()) {
-                Log.d("parseM3Uexp", "Parsed channel: name=$name, url=$url, logo=$logo, category=$category")
-                channels.add(M3UChannelExp(name, url, logo, category))
-            }
-            i += 2
-        } else {
+        val line = lines[i].trim()
+        if (!line.startsWith("#EXTINF", ignoreCase = true)) {
             i++
+            continue
         }
+
+        val name = Regex(",\\s*(.+)$").find(line)?.groupValues?.get(1)?.trim().orEmpty()
+        val logo = Regex("""tvg-logo="([^"]*)"""", RegexOption.IGNORE_CASE).find(line)?.groupValues?.get(1)
+        val category = Regex("""group-title="([^"]*)"""", RegexOption.IGNORE_CASE).find(line)?.groupValues?.get(1)
+
+        var urlLineIndex: Int? = null
+        var j = i + 1
+        while (j < lines.size) {
+            val candidate = lines[j].trim()
+            if (candidate.isNotEmpty() && !candidate.startsWith("#")) {
+                urlLineIndex = j
+                break
+            }
+            j++
+        }
+
+        val url = urlLineIndex?.let { idx ->
+            lines[idx].trim().trim('`', '"', '\'')
+        }.orEmpty()
+
+        if (name.isNotEmpty() && url.isNotEmpty()) {
+            Log.d(
+                "parseM3Uexp",
+                "Parsed channel: name=$name, url=$url, logo=$logo, category=$category"
+            )
+            channels.add(M3UChannelExp(name, url, logo, category))
+        }
+
+        i = (urlLineIndex?.plus(1)) ?: (i + 1)
     }
     Log.d("parseM3Uexp", "Total channels parsed: ${channels.size}")
     return channels

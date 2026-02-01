@@ -142,15 +142,8 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int) {
 
             val intent = Intent(context, ExoPlayJet::class.java).apply {
                 putExtra("zone", "TV")
-                putParcelableArrayListExtra(
-                    "channel_list_data",
-                    ArrayList(
-                        filteredChannels.map { ch ->
-                            ChannelInfo(ch.url, ch.logo ?: "", ch.name)
-                        }
-                    )
-                )
-                putExtra("current_channel_index", 0)
+                putExtra("channel_list_kind", "m3u")
+                putExtra("current_channel_index", -1)
                 putExtra("video_url", firstChannel.url)
                 putExtra("logo_url", firstChannel.logo ?: "")
                 putExtra("ch_name", firstChannel.name)
