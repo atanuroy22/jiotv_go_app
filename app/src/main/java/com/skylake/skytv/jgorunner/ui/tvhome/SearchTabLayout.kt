@@ -166,8 +166,15 @@ fun SearchTabLayout(context: Context, focusRequester: FocusRequester) {
                                 }
                                 .clickable {
                                     Log.d("HT", channel.channel_name)
+                                    val serverPort =
+                                        SkySharedPref.getInstance(context).myPrefs.jtvGoServerPort
                                     val intent = Intent(context, ExoPlayJet::class.java).apply {
+                                        putExtra("zone", "TV")
+                                        putExtra("channel_list_kind", "jio")
+                                        putExtra("current_channel_index", -1)
                                         putExtra("video_url", channel.channel_url)
+                                        putExtra("logo_url", "http://localhost:$serverPort/jtvimage/${channel.logoUrl}")
+                                        putExtra("ch_name", channel.channel_name)
                                     }
                                     if (context !is Activity) {
                                         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

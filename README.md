@@ -78,3 +78,7 @@ All the core features you enjoyed in CustTermux are here in JTV-GO Server, with 
    - If you experience issues with channel playback, ensure the server is running and the network connection is stable.
    - Check for any firewall or security settings blocking the server’s port.
 
+build
+
+./gradlew.bat :app:assembleDebug :app:lintDebug :app:testDebugUnitTest
+.\gradlew.bat :app:assembleRelease

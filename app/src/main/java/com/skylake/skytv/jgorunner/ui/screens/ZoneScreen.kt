@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.Search
@@ -27,12 +28,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -53,17 +56,23 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.gson.Gson
 import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.ui.tvhome.Main_Layout
 import com.skylake.skytv.jgorunner.ui.tvhome.Main_Layout_3rd
 import com.skylake.skytv.jgorunner.ui.tvhome.Recent_Layout
 import com.skylake.skytv.jgorunner.ui.tvhome.components.TvScreenMenu
+import com.skylake.skytv.jgorunner.ui.tvhome.components.parseM3Uexp
 import com.skylake.skytv.jgorunner.ui.tvhome.SearchTabLayout
 import com.skylake.skytv.jgorunner.utils.HandleTvBackKey
 import com.skylake.skytv.jgorunner.utils.RememberBackPressManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import kotlin.random.Random
 
 @SuppressLint("NewApi")
@@ -78,12 +87,6 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
     var reloadChannelsTrigger by remember { mutableIntStateOf(0) }
 
 
-    val tabs = listOf(
-        TabItem("TV", Icons.Default.Tv),
-        TabItem("Recent", Icons.Default.Star),
-        TabItem("Search", Icons.Default.Search)
-    )
-
     val isRemoteNavigation =
         context.resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK ==
                 Configuration.UI_MODE_TYPE_TELEVISION
@@ -91,9 +94,27 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
     Log.d("ZoneScreen", "Running in TV Mode: $isRemoteNavigation")
 
     val preferenceManager = SkySharedPref.getInstance(context)
-    val savedTabIndex = preferenceManager.myPrefs.selectedScreenTV?.toIntOrNull() ?: 0
+    val savedTabIndex = preferenceManager.myPrefs.selectedZoneTabTV
 
-    var selectedTabIndex by remember { mutableIntStateOf(savedTabIndex) }
+    var iptvEnabled by remember { mutableStateOf(preferenceManager.myPrefs.homeIptvEnabled) }
+    val showRecentTab = remember(reloadChannelsTrigger) { preferenceManager.myPrefs.showRecentTab }
+    val customPlaylistSupport = remember(reloadChannelsTrigger) { preferenceManager.myPrefs.customPlaylistSupport }
+    val showIptvTab = iptvEnabled && customPlaylistSupport
+
+    val tabs = buildList {
+        add(TabItem("TV", Icons.Default.Tv))
+        if (showRecentTab) {
+            add(TabItem("Recent", Icons.Default.Star))
+            add(TabItem("Search", Icons.Default.Search))
+        }
+        if (showIptvTab) {
+            add(TabItem("IPTV", Icons.AutoMirrored.Filled.PlaylistPlay))
+        }
+    }
+
+    var selectedTabIndex by remember {
+        mutableIntStateOf(savedTabIndex.coerceIn(0, (tabs.size - 1).coerceAtLeast(0)))
+    }
     val tabFocusRequester = remember { FocusRequester() }
 
     // Snackbar state
@@ -130,6 +151,51 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
     val glowColor = remember { Animatable(glowColors[Random.nextInt(glowColors.size)]) }
     val customFontFamily = FontFamily(Font(R.font.chakrapetch_bold))
 
+    LaunchedEffect(iptvEnabled) {
+        preferenceManager.myPrefs.homeIptvEnabled = iptvEnabled
+        preferenceManager.savePreferences()
+    }
+
+    LaunchedEffect(selectedTabIndex) {
+        preferenceManager.myPrefs.selectedZoneTabTV = selectedTabIndex
+        preferenceManager.savePreferences()
+    }
+
+    LaunchedEffect(tabs.size) {
+        if (selectedTabIndex !in 0 until tabs.size) {
+            selectedTabIndex = 0
+        }
+    }
+
+    LaunchedEffect(showIptvTab) {
+        if (!showIptvTab) return@LaunchedEffect
+
+        val url = preferenceManager.myPrefs.custURL?.trim().orEmpty()
+        val existingJson = preferenceManager.myPrefs.channelListJson?.trim().orEmpty()
+        if (url.isBlank() || existingJson.isNotBlank()) return@LaunchedEffect
+
+        try {
+            val body = withContext(Dispatchers.IO) {
+                val client = OkHttpClient()
+                val request = Request.Builder().url(url).build()
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return@use null
+                    response.body?.string()
+                }
+            } ?: return@LaunchedEffect
+
+            if (!body.startsWith("#EXTM3U")) return@LaunchedEffect
+
+            val channels = parseM3Uexp(body)
+            if (channels.isEmpty()) return@LaunchedEffect
+
+            preferenceManager.myPrefs.channelListJson = Gson().toJson(channels)
+            preferenceManager.savePreferences()
+            reloadChannelsTrigger++
+        } catch (_: Exception) {
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { innerPadding ->
@@ -158,18 +224,36 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
                     )
                 }
 
-                Text(
-                    text = "JTV-GO",
-                    fontSize = 12.sp,
-                    fontFamily = customFontFamily,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    style = TextStyle(
-                        shadow = Shadow(
-                            color = glowColor.value,
-                            blurRadius = 30f
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "JioTV Go",
+                        fontSize = 12.sp,
+                        fontFamily = customFontFamily,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        style = TextStyle(
+                            shadow = Shadow(
+                                color = glowColor.value,
+                                blurRadius = 30f
+                            )
                         )
                     )
-                )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "IPTV",
+                            fontSize = 10.sp,
+                            fontFamily = customFontFamily,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Switch(
+                            checked = iptvEnabled,
+                            onCheckedChange = { iptvEnabled = it }
+                        )
+                    }
+                }
 
                 IconButton(
                     onClick = { onNavigate("SettingsTV") },
@@ -184,16 +268,8 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
                 }
             }
 
-            if (preferenceManager.myPrefs.customPlaylistSupport &&
-                !preferenceManager.myPrefs.showPLAYLIST
-            ) {
-
-                Main_Layout_3rd(context, reloadTrigger = reloadChannelsTrigger)
-
-            } else if (!preferenceManager.myPrefs.showRecentTab) {
-
+            if (tabs.size == 1) {
                 Main_Layout(context, reloadTrigger = reloadChannelsTrigger)
-
             } else {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -234,9 +310,13 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
 
                     // Tab Content
                     when (selectedTabIndex) {
-                        0 -> Main_Layout(context, reloadTrigger = reloadChannelsTrigger)
-                        1 -> Recent_Layout(context)
-                        2 -> SearchTabLayout(context, tabFocusRequester)
+                        else -> when (tabs[selectedTabIndex].text) {
+                            "TV" -> Main_Layout(context, reloadTrigger = reloadChannelsTrigger)
+                            "Recent" -> Recent_Layout(context)
+                            "Search" -> SearchTabLayout(context, tabFocusRequester)
+                            "IPTV" -> Main_Layout_3rd(context, reloadTrigger = reloadChannelsTrigger)
+                            else -> Main_Layout(context, reloadTrigger = reloadChannelsTrigger)
+                        }
                     }
                 }
             }
@@ -251,7 +331,10 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
         onReset = {
             showModeDialog = false
             Toast.makeText(context, "Refreshing Channels", Toast.LENGTH_LONG).show()
-            selectedTabIndex = savedTabIndex
+            selectedTabIndex = preferenceManager.myPrefs.selectedZoneTabTV.coerceIn(
+                0,
+                (tabs.size - 1).coerceAtLeast(0)
+            )
         },
         onSelectionsMade = { selectedQualities, selectedCategories, _, selectedLanguages, _ ->
             Log.d(
@@ -259,7 +342,10 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
                 "Qualities: $selectedQualities, Categories: $selectedCategories, Languages: $selectedLanguages"
             )
             Toast.makeText(context, "Refreshing Channels", Toast.LENGTH_LONG).show()
-            selectedTabIndex = savedTabIndex
+            selectedTabIndex = preferenceManager.myPrefs.selectedZoneTabTV.coerceIn(
+                0,
+                (tabs.size - 1).coerceAtLeast(0)
+            )
 
             reloadChannelsTrigger++
         },

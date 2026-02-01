@@ -4,7 +4,7 @@ import com.google.gson.annotations.SerializedName
 
 data class JTVConfiguration(
     @SerializedName("epg")
-    var epg: Boolean = false,
+    var epg: Boolean = true,
 
     @SerializedName("debug")
     var debug: Boolean = false,
@@ -28,5 +28,26 @@ data class JTVConfiguration(
     var pathPrefix: String = "",
 
     @SerializedName("proxy")
-    var proxy: String = ""
+    var proxy: String = "",
+
+    @SerializedName("log_path")
+    var logPath: String = "",
+
+    @SerializedName("log_to_stdout")
+    var logToStdout: Boolean = false,
+
+    @SerializedName("custom_channels_file")
+    var customChannelsFile: String = "custom_channels.json",
+
+    @SerializedName("default_categories")
+    var defaultCategories: List<String> = emptyList(),
+
+    @SerializedName("default_languages")
+    var defaultLanguages: List<String> = emptyList(),
+
+    @SerializedName("custom_channels_url")
+    var customChannelsUrl: String = "",
+
+    @SerializedName("epg_url")
+    var epgUrl: String = ""
 )

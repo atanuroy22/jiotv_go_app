@@ -88,10 +88,12 @@ import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.activities.AppListActivity
 import com.skylake.skytv.jgorunner.core.data.JTVConfigurationManager
 import com.skylake.skytv.jgorunner.data.SkySharedPref
+import com.skylake.skytv.jgorunner.services.BinaryService
 import com.skylake.skytv.jgorunner.ui.components.BackupDialog
 import com.skylake.skytv.jgorunner.ui.components.JTVModeSelectorPopup
 import com.skylake.skytv.jgorunner.ui.components.ModeSelectionDialog
 import com.skylake.skytv.jgorunner.ui.components.restoreBackup
+import kotlinx.coroutines.delay
 import kotlin.system.exitProcess
 
 
@@ -130,6 +132,9 @@ fun SettingsScreen(
     var isSwitchOnForEPG by remember {
         mutableStateOf(jtvConfigurationManager.jtvConfiguration.epg)
     }
+    var isSwitchOnForCustomChannels by remember {
+        mutableStateOf(jtvConfigurationManager.jtvConfiguration.customChannelsUrl.isNotBlank())
+    }
     var isSwitchOnForDRM by remember {
         mutableStateOf(jtvConfigurationManager.jtvConfiguration.drm)
     }
@@ -164,6 +169,7 @@ fun SettingsScreen(
     var showRestartDialog by remember { mutableStateOf(false) }
     var showRestartAppDialog by remember { mutableStateOf(false) }
     var showRestart by remember { mutableStateOf(false) }
+    var customChannelsInitialized by remember { mutableStateOf(false) }
 
     // Update shared preference when switch states change
     LaunchedEffect(isSwitchOnForLOCAL) {
@@ -218,6 +224,53 @@ fun SettingsScreen(
     LaunchedEffect(isSwitchOnForEPG) {
         jtvConfigurationManager.jtvConfiguration.epg = isSwitchOnForEPG
         jtvConfigurationManager.saveJTVConfiguration()
+    }
+
+    LaunchedEffect(isSwitchOnForCustomChannels) {
+        if (!customChannelsInitialized) {
+            customChannelsInitialized = true
+            return@LaunchedEffect
+        }
+        jtvConfigurationManager.jtvConfiguration.customChannelsUrl =
+            if (isSwitchOnForCustomChannels) {
+                "https://raw.githubusercontent.com/atanuroy22/iptv/refs/heads/main/output/custom-channels.json"
+            } else {
+                ""
+            }
+        jtvConfigurationManager.saveJTVConfiguration()
+
+        try {
+            context.getSharedPreferences("channel_cache", Context.MODE_PRIVATE).edit()
+                .remove("channels_json")
+                .apply()
+        } catch (_: Exception) {
+        }
+
+        if (BinaryService.isRunning) {
+            try {
+                val stopIntent = Intent(activity, BinaryService::class.java).apply {
+                    action = BinaryService.ACTION_STOP_BINARY
+                }
+                activity.startService(stopIntent)
+            } catch (_: Exception) {
+            }
+
+            var waitedMs = 0
+            while (BinaryService.isRunning && waitedMs < 4000) {
+                delay(100)
+                waitedMs += 100
+            }
+
+            try {
+                val startIntent = Intent(activity, BinaryService::class.java)
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    activity.startForegroundService(startIntent)
+                } else {
+                    activity.startService(startIntent)
+                }
+            } catch (_: Exception) {
+            }
+        }
     }
 
     LaunchedEffect(isSwitchOnForDRM) {
@@ -355,6 +408,19 @@ fun SettingsScreen(
                     subtitle = "Electronic program guide generation",
                     isChecked = isSwitchOnForEPG,
                     onCheckedChange = { isChecked -> isSwitchOnForEPG = isChecked },
+                )
+            }
+            item {
+                SettingSwitchItem(
+                    icon = Icons.Filled.BrowserUpdated,
+                    title = "Custom Channels",
+                    subtitle = if (isSwitchOnForCustomChannels) {
+                        "Enabled custom channel list"
+                    } else {
+                        "Disabled custom channel list"
+                    },
+                    isChecked = isSwitchOnForCustomChannels,
+                    onCheckedChange = { isChecked -> isSwitchOnForCustomChannels = isChecked },
                 )
             }
             item {

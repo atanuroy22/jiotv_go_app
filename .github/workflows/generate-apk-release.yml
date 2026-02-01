@@ -8,9 +8,13 @@ on:
   push:
     branches:
       - main
+      - develop
     paths:
       - "app/version.gradle"
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -34,13 +38,20 @@ jobs:
         run: |
           version_name=$(grep appVersionName ${{ env.main_project_module }}/version.gradle | awk -F'=' '{print $2}' | tr -d ' "')
           echo "version_name=$version_name" >> $GITHUB_ENV
+          if [ "${{ github.ref_name }}" = "develop" ]; then
+            echo "release_tag=v${version_name}-dev.${{ env.date_today }}.${{ github.run_number }}" >> $GITHUB_ENV
+            echo "is_prerelease=true" >> $GITHUB_ENV
+          else
+            echo "release_tag=v${version_name}" >> $GITHUB_ENV
+            echo "is_prerelease=false" >> $GITHUB_ENV
+          fi
 
       - name: Set Up JDK
         uses: actions/setup-java@v3
         with:
-          distribution: 'zulu'
-          java-version: '18'
-          cache: 'gradle'
+          distribution: "zulu"
+          java-version: "17"
+          cache: "gradle"
 
       - name: Change permissions for gradlew
         run: chmod +x ./gradlew
@@ -53,34 +64,20 @@ jobs:
       - name: Build release APK
         run: ./gradlew :${{ env.main_project_module }}:assembleRelease
 
-      # Sign APK
-      - name: Sign APK release
-        uses: r0adkll/sign-android-release@v1
-        id: sign_app
-        with:
-          releaseDirectory: ${{ env.main_project_module }}/build/outputs/apk/release
-          signingKeyBase64: ${{ secrets.SIGNING_KEY }}
-          alias: ${{ secrets.ALIAS }}
-          keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
-          keyPassword: ${{ secrets.KEY_PASSWORD }}
-        env:
-          BUILD_TOOLS_VERSION: "36.0.0"
-
       # Rename the signed APK
       - name: Rename APK with version and app name
         run: |
-          mv ${{ env.main_project_module }}/build/outputs/apk/release/app-release-unsigned-signed.apk \
-            ${{ env.main_project_module }}/build/outputs/apk/release/${{ env.app_name }}-v${{ env.version_name }}-release.apk
+          mv ${{ env.main_project_module }}/build/outputs/apk/release/app-release.apk \
+            ${{ env.main_project_module }}/build/outputs/apk/release/${{ env.app_name }}-${{ env.release_tag }}.apk
 
       # Upload to GitHub Release
       - name: Upload APK to release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: "v${{ env.version_name }}"
-          name: "v${{ env.version_name }}"
-          files: ${{ env.main_project_module }}/build/outputs/apk/release/${{ env.app_name }}-v${{ env.version_name }}-release.apk
+          token: ${{ github.token }}
+          tag_name: "${{ env.release_tag }}"
+          name: "${{ env.release_tag }}"
+          files: ${{ env.main_project_module }}/build/outputs/apk/release/${{ env.app_name }}-${{ env.release_tag }}.apk
           generate_release_notes: true
           draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          prerelease: ${{ env.is_prerelease }}

@@ -75,13 +75,14 @@ fun ChannelGridTV(
                     .combinedClickable(
                         onClick = {
                             Log.d("ChannelGridTV", "Open fullscreen: ${channel.name}")
-                            val channelInfoList = ArrayList(channels.map {
-                                ChannelInfo(it.url, it.logo ?: "", it.name)
-                            })
-                            val currentIndex = channels.indexOf(channel)
+                            val currentIndex = channels.indexOf(channel).coerceAtLeast(0)
                             val intent = Intent(context, ExoPlayJet::class.java).apply {
-                                putParcelableArrayListExtra("channel_list_data", channelInfoList)
-                                putExtra("current_channel_index", currentIndex)
+                                putExtra("zone", "TV")
+                                putExtra("channel_list_kind", "m3u")
+                                putExtra("current_channel_index", -1)
+                                putExtra("video_url", channel.url)
+                                putExtra("logo_url", channel.logo ?: "")
+                                putExtra("ch_name", channel.name)
                                 addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                                 if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
@@ -132,16 +133,14 @@ fun ChannelGridTV(
                                 PlayerCommandBus.requestSwitch(url = channel.url)
                             } else {
                                 // Fallback to open fullscreen if not in PiP
-                                val channelInfoList = ArrayList(channels.map {
-                                    ChannelInfo(it.url, it.logo ?: "", it.name)
-                                })
-                                val currentIndex = channels.indexOf(channel)
+                                val currentIndex = channels.indexOf(channel).coerceAtLeast(0)
                                 val intent = Intent(context, ExoPlayJet::class.java).apply {
-                                    putParcelableArrayListExtra(
-                                        "channel_list_data",
-                                        channelInfoList
-                                    )
-                                    putExtra("current_channel_index", currentIndex)
+                                    putExtra("zone", "TV")
+                                    putExtra("channel_list_kind", "m3u")
+                                    putExtra("current_channel_index", -1)
+                                    putExtra("video_url", channel.url)
+                                    putExtra("logo_url", channel.logo ?: "")
+                                    putExtra("ch_name", channel.name)
                                     addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                                     if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 }
@@ -205,21 +204,12 @@ fun ChannelGridMain(
                     }
                     .combinedClickable(
                         onClick = {
+                            val absoluteIndex = filteredChannels.indexOf(channel).coerceAtLeast(0)
                             val intent = Intent(context, ExoPlayJet::class.java).apply {
                                 putExtra("video_url", channel.channel_url)
                                 putExtra("zone", "TV")
-
-                                val allChannelsData = ArrayList(filteredChannels.map { ch ->
-                                    ChannelInfo(
-                                        withQuality(context, ch.channel_url),
-                                        "$basefinURL/jtvimage/${ch.logoUrl}",
-                                        ch.channel_name
-                                    )
-                                })
-                                putParcelableArrayListExtra("channel_list_data", allChannelsData)
-
-                                val currentChannelIndex = filteredChannels.indexOf(channel)
-                                putExtra("current_channel_index", currentChannelIndex)
+                                putExtra("channel_list_kind", "jio")
+                                putExtra("current_channel_index", -1)
                                 putExtra("logo_url", "$basefinURL/jtvimage/${channel.logoUrl}")
                                 putExtra("ch_name", channel.channel_name)
 
@@ -276,23 +266,13 @@ fun ChannelGridMain(
                                     Gson().toJson(recentChannels)
                                 preferenceManager.savePreferences()
                             } else {
+                                val absoluteIndex = filteredChannels.indexOf(channel).coerceAtLeast(0)
                                 // Fallback to normal open if not in PiP
                                 val intent = Intent(context, ExoPlayJet::class.java).apply {
                                     putExtra("video_url", channel.channel_url)
                                     putExtra("zone", "TV")
-                                    val allChannelsData = ArrayList(filteredChannels.map { ch ->
-                                        ChannelInfo(
-                                            withQuality(context, ch.channel_url),
-                                            "$basefinURL/jtvimage/${ch.logoUrl}",
-                                            ch.channel_name
-                                        )
-                                    })
-                                    putParcelableArrayListExtra(
-                                        "channel_list_data",
-                                        allChannelsData
-                                    )
-                                    val currentChannelIndex = filteredChannels.indexOf(channel)
-                                    putExtra("current_channel_index", currentChannelIndex)
+                                    putExtra("channel_list_kind", "jio")
+                                    putExtra("current_channel_index", -1)
                                     addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                                     if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 }
@@ -326,3 +306,29 @@ fun ChannelGridMain(
         }
     }
 }
+
+fun buildChannelInfoWindow(
+    context: Context,
+    channels: List<Channel>,
+    basefinURL: String,
+    centerIndex: Int,
+    maxItems: Int = 250
+): Pair<ArrayList<ChannelInfo>, Int> {
+    if (channels.isEmpty()) return Pair(arrayListOf(), 0)
+    val safeCenter = centerIndex.coerceIn(0, channels.lastIndex)
+    val safeMax = maxItems.coerceAtLeast(1).coerceAtMost(channels.size)
+    val half = safeMax / 2
+    val start = (safeCenter - half).coerceIn(0, (channels.size - safeMax).coerceAtLeast(0))
+    val endExclusive = (start + safeMax).coerceAtMost(channels.size)
+    val slice = channels.subList(start, endExclusive)
+    val list = ArrayList(slice.map { ch ->
+        ChannelInfo(
+            withQuality(context, ch.channel_url),
+            "$basefinURL/jtvimage/${ch.logoUrl}",
+            ch.channel_name
+        )
+    })
+    val relativeIndex = safeCenter - start
+    return Pair(list, relativeIndex)
+}
+

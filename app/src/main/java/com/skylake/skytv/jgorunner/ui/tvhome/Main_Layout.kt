@@ -179,17 +179,8 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                         val firstChannel = channelsToUse.first()
                         val intent = Intent(context, ExoPlayJet::class.java).apply {
                             putExtra("zone", "TV")
-                            putParcelableArrayListExtra(
-                                "channel_list_data",
-                                ArrayList(channelsToUse.map { ch ->
-                                    ChannelInfo(
-                                        withQuality(context, ch.channel_url),
-                                        "http://localhost:$localPORT/jtvimage/${ch.logoUrl}",
-                                        ch.channel_name
-                                    )
-                                })
-                            )
-                            putExtra("current_channel_index", 0)
+                            putExtra("channel_list_kind", "jio")
+                            putExtra("current_channel_index", -1)
                             putExtra("video_url", firstChannel.channel_url)
                             putExtra(
                                 "logo_url",
@@ -333,19 +324,8 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                 val firstChannel = channelsForAutoplay.first()
                 val intent = Intent(context, ExoPlayJet::class.java).apply {
                     putExtra("zone", "TV")
-                    putParcelableArrayListExtra(
-                        "channel_list_data",
-                        ArrayList(
-                            channelsForAutoplay.map { ch ->
-                                ChannelInfo(
-                                    withQuality(context, ch.channel_url),
-                                    "http://localhost:$localPORT/jtvimage/${ch.logoUrl}",
-                                    ch.channel_name
-                                )
-                            }
-                        )
-                    )
-                    putExtra("current_channel_index", 0)
+                    putExtra("channel_list_kind", "jio")
+                    putExtra("current_channel_index", -1)
                     putExtra("video_url", firstChannel.channel_url)
                     putExtra(
                         "logo_url",
@@ -462,7 +442,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
     }
 
     // UI: Loading state
-    if (!fetched && showLoading) {
+    if (showLoading) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxSize()
