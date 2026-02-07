@@ -88,7 +88,7 @@ class JTVConfigurationManager private constructor(context: Context) {
             preferenceManager.savePreferences()
         }
 
-        if (jtvConfiguration.pathPrefix != configDir.absolutePath) {
+        if (jtvConfiguration.pathPrefix != filesDir.absolutePath) {
             handlePathPrefixMismatch()
         }
 
@@ -102,7 +102,7 @@ class JTVConfigurationManager private constructor(context: Context) {
     }
 
     private fun handlePathPrefixMismatch() {
-        jtvConfiguration.pathPrefix = configDir.absolutePath
+        jtvConfiguration.pathPrefix = filesDir.absolutePath
     }
 
     fun deleteJTVConfiguration() {

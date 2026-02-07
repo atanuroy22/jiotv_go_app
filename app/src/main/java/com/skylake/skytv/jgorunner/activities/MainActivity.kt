@@ -270,6 +270,7 @@ class MainActivity : ComponentActivity() {
                 recentChannels = backupPrefs.recentChannels,
                 selectedScreenTV = backupPrefs.selectedScreenTV,
                 selectedRemoteNavTV = backupPrefs.selectedRemoteNavTV,
+                setupPending = backupPrefs.setupPending,
 
 //                custURL = backupPrefs.custURL,
 //                channelListJson = backupPrefs.channelListJson,
