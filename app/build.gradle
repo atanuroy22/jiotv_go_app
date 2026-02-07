@@ -8,6 +8,13 @@ plugins {
 
 apply from: "version.gradle"
 
+def releaseStoreFile = System.getenv("RELEASE_STORE_FILE")
+def releaseStorePassword = System.getenv("RELEASE_STORE_PASSWORD")
+def releaseKeyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: "release"
+def releaseKeyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: releaseStorePassword
+def hasReleaseSigning =
+        releaseStoreFile && releaseStorePassword
+
 android {
     namespace 'com.skylake.skytv.jgorunner'
     compileSdk = 36
@@ -35,11 +42,22 @@ android {
         options.compilerArgs << "-Xlint:deprecation"
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled true
             shrinkResources true
-            signingConfig signingConfigs.debug
+            signingConfig hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
