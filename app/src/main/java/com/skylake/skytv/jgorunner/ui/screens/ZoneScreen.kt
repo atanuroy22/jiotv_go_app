@@ -96,10 +96,9 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
     val preferenceManager = SkySharedPref.getInstance(context)
     val savedTabIndex = preferenceManager.myPrefs.selectedZoneTabTV
 
-    var iptvEnabled by remember { mutableStateOf(preferenceManager.myPrefs.homeIptvEnabled) }
     val showRecentTab = remember(reloadChannelsTrigger) { preferenceManager.myPrefs.showRecentTab }
     val customPlaylistSupport = remember(reloadChannelsTrigger) { preferenceManager.myPrefs.customPlaylistSupport }
-    val showIptvTab = iptvEnabled && customPlaylistSupport
+    val showIptvTab = customPlaylistSupport
 
     val tabs = buildList {
         add(TabItem("TV", Icons.Default.Tv))
@@ -151,9 +150,11 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
     val glowColor = remember { Animatable(glowColors[Random.nextInt(glowColors.size)]) }
     val customFontFamily = FontFamily(Font(R.font.chakrapetch_bold))
 
-    LaunchedEffect(iptvEnabled) {
-        preferenceManager.myPrefs.homeIptvEnabled = iptvEnabled
-        preferenceManager.savePreferences()
+    LaunchedEffect(Unit) {
+        if (!preferenceManager.myPrefs.homeIptvEnabled) {
+            preferenceManager.myPrefs.homeIptvEnabled = true
+            preferenceManager.savePreferencesQuick()
+        }
     }
 
     LaunchedEffect(selectedTabIndex) {
@@ -226,7 +227,7 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "JioTV Go",
+                        text = "JioTV+",
                         fontSize = 12.sp,
                         fontFamily = customFontFamily,
                         color = MaterialTheme.colorScheme.onBackground,
@@ -237,22 +238,6 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
                             )
                         )
                     )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = "IPTV",
-                            fontSize = 10.sp,
-                            fontFamily = customFontFamily,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Switch(
-                            checked = iptvEnabled,
-                            onCheckedChange = { iptvEnabled = it }
-                        )
-                    }
                 }
 
                 IconButton(

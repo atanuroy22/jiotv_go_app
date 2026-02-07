@@ -88,7 +88,7 @@ class MainActivity : ComponentActivity() {
         private const val TAG = "JTVGo::MainActivity"
     }
 
-    private var selectedBinaryName by mutableStateOf("JTV-GO SERVER")
+    private var selectedBinaryName by mutableStateOf("JioTV+")
     private lateinit var preferenceManager: SkySharedPref
 
     // SharedPreferences for saving binary selection

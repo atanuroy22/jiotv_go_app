@@ -330,7 +330,7 @@ fun SettingsScreen(
                 if (canUseRemote) "custom-channels.json" else fallbackLocalFileName
         } else {
             jtvConfigurationManager.jtvConfiguration.customChannelsUrl = ""
-            jtvConfigurationManager.jtvConfiguration.customChannelsFile = ""
+            jtvConfigurationManager.jtvConfiguration.customChannelsFile = "custom_channels_disabled"
         }
 
         val selectedEpgDownloadUrl =
