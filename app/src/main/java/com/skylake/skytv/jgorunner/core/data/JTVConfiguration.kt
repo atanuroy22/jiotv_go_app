@@ -19,7 +19,7 @@ data class JTVConfiguration(
     var drm: Boolean = false,
 
     @SerializedName("title")
-    var title: String = "JTV-GO",
+    var title: String = "Jio+",
 
     @SerializedName("disable_url_encryption")
     var disableUrlEncryption: Boolean = false,
@@ -49,5 +49,5 @@ data class JTVConfiguration(
     var customChannelsUrl: String = "",
 
     @SerializedName("epg_url")
-    var epgUrl: String = ""
+    var epgUrl: String = "https://avkb.short.gy/jioepg.xml.gz"
 )
