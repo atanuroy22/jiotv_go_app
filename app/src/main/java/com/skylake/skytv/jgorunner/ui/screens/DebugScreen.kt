@@ -775,7 +775,7 @@ fun handleButton3Click(context: Context) {
 }
 
 fun handleButton4Click(context: Context) {
-    val intent = Intent(Intent.ACTION_VIEW, "https://bit.ly/JTV-GO-Server".toUri())
+    val intent = Intent(Intent.ACTION_VIEW, "https://github.com/atanuroy22/jiotv_go_app".toUri())
     context.startActivity(intent)
 }
 
