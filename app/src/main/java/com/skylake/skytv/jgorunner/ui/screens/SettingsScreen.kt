@@ -138,11 +138,7 @@ fun SettingsScreen(
         mutableStateOf(jtvConfigurationManager.jtvConfiguration.epg)
     }
     var isSwitchOnForCustomChannels by remember {
-        mutableStateOf(
-            jtvConfigurationManager.jtvConfiguration.customChannelsUrl.isNotBlank() ||
-                jtvConfigurationManager.jtvConfiguration.customChannelsFile.equals("custom-channels.json", ignoreCase = true) ||
-                jtvConfigurationManager.jtvConfiguration.customChannelsFile.equals("custom-channels.yml", ignoreCase = true)
-        )
+        mutableStateOf(preferenceManager.myPrefs.enableCustomChannels)
     }
     var isSwitchOnForDRM by remember {
         mutableStateOf(jtvConfigurationManager.jtvConfiguration.drm)
@@ -309,17 +305,24 @@ fun SettingsScreen(
             return@LaunchedEffect
         }
 
+        preferenceManager.myPrefs.enableCustomChannels = isSwitchOnForCustomChannels
+        applySettings()
+
         val remoteCustomChannelsUrl =
             "https://raw.githubusercontent.com/atanuroy22/iptv/refs/heads/main/output/custom-channels.json"
 
         val configDir = File(activity.filesDir, "jiotv_go")
-        val localCustomJson = File(configDir, "custom-channels.json")
-        val localCustomYaml = File(configDir, "custom-channels.yml")
+        val localCustomJsonUnderscore = File(configDir, "custom_channels.json")
+        val localCustomYamlUnderscore = File(configDir, "custom_channels.yml")
+        val localCustomJsonHyphen = File(configDir, "custom-channels.json")
+        val localCustomYamlHyphen = File(configDir, "custom-channels.yml")
 
         val canUseRemote = isSwitchOnForCustomChannels && canDownloadEpg(remoteCustomChannelsUrl)
         val fallbackLocalFileName = when {
-            localCustomJson.exists() -> "custom-channels.json"
-            localCustomYaml.exists() -> "custom-channels.yml"
+            localCustomJsonUnderscore.exists() -> "custom_channels.json"
+            localCustomYamlUnderscore.exists() -> "custom_channels.yml"
+            localCustomJsonHyphen.exists() -> "custom-channels.json"
+            localCustomYamlHyphen.exists() -> "custom-channels.yml"
             else -> ""
         }
 
@@ -327,10 +330,10 @@ fun SettingsScreen(
             jtvConfigurationManager.jtvConfiguration.customChannelsUrl =
                 if (canUseRemote) remoteCustomChannelsUrl else ""
             jtvConfigurationManager.jtvConfiguration.customChannelsFile =
-                if (canUseRemote) "custom-channels.json" else fallbackLocalFileName
+                if (canUseRemote) "custom_channels.json" else fallbackLocalFileName
         } else {
             jtvConfigurationManager.jtvConfiguration.customChannelsUrl = ""
-            jtvConfigurationManager.jtvConfiguration.customChannelsFile = "custom_channels_disabled"
+            jtvConfigurationManager.jtvConfiguration.customChannelsFile = ""
         }
 
         val selectedEpgDownloadUrl =

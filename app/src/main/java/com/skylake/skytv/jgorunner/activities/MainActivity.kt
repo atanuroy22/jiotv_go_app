@@ -172,8 +172,37 @@ class MainActivity : ComponentActivity() {
             preferenceManager.savePreferences()
         }
 
-        JTVConfigurationManager.getInstance(this).saveJTVConfiguration()
+        val jtvConfigManager = JTVConfigurationManager.getInstance(this)
+        val wasServerRunning = BinaryService.isRunning
+        val hadCustomChannelsConfigured =
+            jtvConfigManager.jtvConfiguration.customChannelsUrl.isNotBlank() ||
+                jtvConfigManager.jtvConfiguration.customChannelsFile.isNotBlank()
+
+        if (!preferenceManager.myPrefs.enableCustomChannels) {
+            jtvConfigManager.jtvConfiguration.customChannelsUrl = ""
+            jtvConfigManager.jtvConfiguration.customChannelsFile = ""
+
+            try {
+                getSharedPreferences("channel_cache", MODE_PRIVATE).edit()
+                    .remove("channels_json")
+                    .apply()
+            } catch (_: Exception) {
+            }
+        }
+        jtvConfigManager.saveJTVConfiguration()
         isServerRunning = BinaryService.isRunning
+
+        if (!preferenceManager.myPrefs.enableCustomChannels && wasServerRunning && hadCustomChannelsConfigured) {
+            stopBinary(context = this, onBinaryStopped = {
+                isServerRunning = false
+                runBinary(
+                    activity = this,
+                    arguments = emptyArray(),
+                    onRunSuccess = { onJTVServerRun() },
+                    onOutput = { output -> outputText = output }
+                )
+            })
+        }
 
         if (preferenceManager.myPrefs.setupPending) {
             val intent = Intent(this, SetupWizardActivity::class.java)

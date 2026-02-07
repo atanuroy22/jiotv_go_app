@@ -37,7 +37,7 @@ data class JTVConfiguration(
     var logToStdout: Boolean = false,
 
     @SerializedName("custom_channels_file")
-    var customChannelsFile: String = "custom_channels.json",
+    var customChannelsFile: String = "",
 
     @SerializedName("default_categories")
     var defaultCategories: List<String> = emptyList(),
