@@ -19,7 +19,7 @@ data class JTVConfiguration(
     var drm: Boolean = false,
 
     @SerializedName("title")
-    var title: String = "JTV-GO",
+    var title: String = "Jio+",
 
     @SerializedName("disable_url_encryption")
     var disableUrlEncryption: Boolean = false,
@@ -37,7 +37,7 @@ data class JTVConfiguration(
     var logToStdout: Boolean = false,
 
     @SerializedName("custom_channels_file")
-    var customChannelsFile: String = "custom_channels.json",
+    var customChannelsFile: String = "",
 
     @SerializedName("default_categories")
     var defaultCategories: List<String> = emptyList(),
@@ -49,5 +49,5 @@ data class JTVConfiguration(
     var customChannelsUrl: String = "",
 
     @SerializedName("epg_url")
-    var epgUrl: String = ""
+    var epgUrl: String = "https://avkb.short.gy/jioepg.xml.gz"
 )

@@ -19,9 +19,16 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      RELEASE_STORE_FILE: ${{ github.workspace }}/release.keystore
+      RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v3
+
+      - name: Decode release keystore
+        run: |
+          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > "${{ env.RELEASE_STORE_FILE }}"
 
       # Set repo name as env variable (for reference/logging)
       - name: Set repository name as env variable

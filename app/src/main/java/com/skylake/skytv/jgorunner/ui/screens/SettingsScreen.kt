@@ -93,7 +93,12 @@ import com.skylake.skytv.jgorunner.ui.components.BackupDialog
 import com.skylake.skytv.jgorunner.ui.components.JTVModeSelectorPopup
 import com.skylake.skytv.jgorunner.ui.components.ModeSelectionDialog
 import com.skylake.skytv.jgorunner.ui.components.restoreBackup
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import kotlin.system.exitProcess
 
 
@@ -133,7 +138,7 @@ fun SettingsScreen(
         mutableStateOf(jtvConfigurationManager.jtvConfiguration.epg)
     }
     var isSwitchOnForCustomChannels by remember {
-        mutableStateOf(jtvConfigurationManager.jtvConfiguration.customChannelsUrl.isNotBlank())
+        mutableStateOf(preferenceManager.myPrefs.enableCustomChannels)
     }
     var isSwitchOnForDRM by remember {
         mutableStateOf(jtvConfigurationManager.jtvConfiguration.drm)
@@ -170,6 +175,36 @@ fun SettingsScreen(
     var showRestartAppDialog by remember { mutableStateOf(false) }
     var showRestart by remember { mutableStateOf(false) }
     var customChannelsInitialized by remember { mutableStateOf(false) }
+    var epgInitialized by remember { mutableStateOf(false) }
+
+    val jiotvEpgDownloadUrl = "https://avkb.short.gy/jioepg.xml.gz"
+    val iptvEpgIndiaDownloadUrl = "https://iptv-epg.org/files/epg-in.xml.gz"
+
+    suspend fun canDownloadEpg(url: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                    instanceFollowRedirects = true
+                    connectTimeout = 7000
+                    readTimeout = 7000
+                    requestMethod = "GET"
+                    setRequestProperty("Range", "bytes=0-0")
+                }
+                val code = connection.responseCode
+                if (code in 200..399) {
+                    try {
+                        connection.inputStream.use { it.read(ByteArray(1)) }
+                    } catch (_: Exception) {
+                    }
+                    true
+                } else {
+                    false
+                }
+            } catch (_: Exception) {
+                false
+            }
+        }
+    }
 
     // Update shared preference when switch states change
     LaunchedEffect(isSwitchOnForLOCAL) {
@@ -222,8 +257,46 @@ fun SettingsScreen(
     }
 
     LaunchedEffect(isSwitchOnForEPG) {
+        val selectedEpgDownloadUrl =
+            if (isSwitchOnForCustomChannels) iptvEpgIndiaDownloadUrl else jiotvEpgDownloadUrl
+        val shouldUseDownloadedEpg =
+            isSwitchOnForEPG && canDownloadEpg(selectedEpgDownloadUrl)
+
         jtvConfigurationManager.jtvConfiguration.epg = isSwitchOnForEPG
+        jtvConfigurationManager.jtvConfiguration.epgUrl =
+            if (shouldUseDownloadedEpg) selectedEpgDownloadUrl else ""
         jtvConfigurationManager.saveJTVConfiguration()
+
+        if (!epgInitialized) {
+            epgInitialized = true
+            return@LaunchedEffect
+        }
+
+        if (BinaryService.isRunning) {
+            try {
+                val stopIntent = Intent(activity, BinaryService::class.java).apply {
+                    action = BinaryService.ACTION_STOP_BINARY
+                }
+                activity.startService(stopIntent)
+            } catch (_: Exception) {
+            }
+
+            var waitedMs = 0
+            while (BinaryService.isRunning && waitedMs < 4000) {
+                delay(100)
+                waitedMs += 100
+            }
+
+            try {
+                val startIntent = Intent(activity, BinaryService::class.java)
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    activity.startForegroundService(startIntent)
+                } else {
+                    activity.startService(startIntent)
+                }
+            } catch (_: Exception) {
+            }
+        }
     }
 
     LaunchedEffect(isSwitchOnForCustomChannels) {
@@ -231,12 +304,43 @@ fun SettingsScreen(
             customChannelsInitialized = true
             return@LaunchedEffect
         }
-        jtvConfigurationManager.jtvConfiguration.customChannelsUrl =
-            if (isSwitchOnForCustomChannels) {
-                "https://raw.githubusercontent.com/atanuroy22/iptv/refs/heads/main/output/custom-channels.json"
-            } else {
-                ""
-            }
+
+        preferenceManager.myPrefs.enableCustomChannels = isSwitchOnForCustomChannels
+        applySettings()
+
+        val remoteCustomChannelsUrl =
+            "https://raw.githubusercontent.com/atanuroy22/iptv/refs/heads/main/output/custom-channels.json"
+
+        val configDir = File(activity.filesDir, "jiotv_go")
+        val localCustomJsonUnderscore = File(configDir, "custom_channels.json")
+        val localCustomYamlUnderscore = File(configDir, "custom_channels.yml")
+        val localCustomJsonHyphen = File(configDir, "custom-channels.json")
+        val localCustomYamlHyphen = File(configDir, "custom-channels.yml")
+
+        val canUseRemote = isSwitchOnForCustomChannels && canDownloadEpg(remoteCustomChannelsUrl)
+        val fallbackLocalFileName = when {
+            localCustomJsonUnderscore.exists() -> "custom_channels.json"
+            localCustomYamlUnderscore.exists() -> "custom_channels.yml"
+            localCustomJsonHyphen.exists() -> "custom-channels.json"
+            localCustomYamlHyphen.exists() -> "custom-channels.yml"
+            else -> ""
+        }
+
+        if (isSwitchOnForCustomChannels) {
+            jtvConfigurationManager.jtvConfiguration.customChannelsUrl =
+                if (canUseRemote) remoteCustomChannelsUrl else ""
+            jtvConfigurationManager.jtvConfiguration.customChannelsFile =
+                if (canUseRemote) "custom_channels.json" else fallbackLocalFileName
+        } else {
+            jtvConfigurationManager.jtvConfiguration.customChannelsUrl = ""
+            jtvConfigurationManager.jtvConfiguration.customChannelsFile = ""
+        }
+
+        val selectedEpgDownloadUrl =
+            if (isSwitchOnForCustomChannels) iptvEpgIndiaDownloadUrl else jiotvEpgDownloadUrl
+        jtvConfigurationManager.jtvConfiguration.epgUrl =
+            if (isSwitchOnForEPG && canDownloadEpg(selectedEpgDownloadUrl)) selectedEpgDownloadUrl else ""
+
         jtvConfigurationManager.saveJTVConfiguration()
 
         try {

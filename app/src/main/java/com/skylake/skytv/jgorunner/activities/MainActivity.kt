@@ -88,7 +88,7 @@ class MainActivity : ComponentActivity() {
         private const val TAG = "JTVGo::MainActivity"
     }
 
-    private var selectedBinaryName by mutableStateOf("JTV-GO SERVER")
+    private var selectedBinaryName by mutableStateOf("JioTV+")
     private lateinit var preferenceManager: SkySharedPref
 
     // SharedPreferences for saving binary selection
@@ -172,8 +172,37 @@ class MainActivity : ComponentActivity() {
             preferenceManager.savePreferences()
         }
 
-        JTVConfigurationManager.getInstance(this).saveJTVConfiguration()
+        val jtvConfigManager = JTVConfigurationManager.getInstance(this)
+        val wasServerRunning = BinaryService.isRunning
+        val hadCustomChannelsConfigured =
+            jtvConfigManager.jtvConfiguration.customChannelsUrl.isNotBlank() ||
+                jtvConfigManager.jtvConfiguration.customChannelsFile.isNotBlank()
+
+        if (!preferenceManager.myPrefs.enableCustomChannels) {
+            jtvConfigManager.jtvConfiguration.customChannelsUrl = ""
+            jtvConfigManager.jtvConfiguration.customChannelsFile = ""
+
+            try {
+                getSharedPreferences("channel_cache", MODE_PRIVATE).edit()
+                    .remove("channels_json")
+                    .apply()
+            } catch (_: Exception) {
+            }
+        }
+        jtvConfigManager.saveJTVConfiguration()
         isServerRunning = BinaryService.isRunning
+
+        if (!preferenceManager.myPrefs.enableCustomChannels && wasServerRunning && hadCustomChannelsConfigured) {
+            stopBinary(context = this, onBinaryStopped = {
+                isServerRunning = false
+                runBinary(
+                    activity = this,
+                    arguments = emptyArray(),
+                    onRunSuccess = { onJTVServerRun() },
+                    onOutput = { output -> outputText = output }
+                )
+            })
+        }
 
         if (preferenceManager.myPrefs.setupPending) {
             val intent = Intent(this, SetupWizardActivity::class.java)
@@ -270,6 +299,7 @@ class MainActivity : ComponentActivity() {
                 recentChannels = backupPrefs.recentChannels,
                 selectedScreenTV = backupPrefs.selectedScreenTV,
                 selectedRemoteNavTV = backupPrefs.selectedRemoteNavTV,
+                setupPending = backupPrefs.setupPending,
 
 //                custURL = backupPrefs.custURL,
 //                channelListJson = backupPrefs.channelListJson,
