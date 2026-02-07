@@ -96,6 +96,7 @@ import com.skylake.skytv.jgorunner.ui.components.restoreBackup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.system.exitProcess
@@ -137,7 +138,11 @@ fun SettingsScreen(
         mutableStateOf(jtvConfigurationManager.jtvConfiguration.epg)
     }
     var isSwitchOnForCustomChannels by remember {
-        mutableStateOf(jtvConfigurationManager.jtvConfiguration.customChannelsUrl.isNotBlank())
+        mutableStateOf(
+            jtvConfigurationManager.jtvConfiguration.customChannelsUrl.isNotBlank() ||
+                jtvConfigurationManager.jtvConfiguration.customChannelsFile.equals("custom-channels.json", ignoreCase = true) ||
+                jtvConfigurationManager.jtvConfiguration.customChannelsFile.equals("custom-channels.yml", ignoreCase = true)
+        )
     }
     var isSwitchOnForDRM by remember {
         mutableStateOf(jtvConfigurationManager.jtvConfiguration.drm)
@@ -304,13 +309,24 @@ fun SettingsScreen(
             return@LaunchedEffect
         }
 
-        val newCustomChannelsUrl =
-            if (isSwitchOnForCustomChannels) {
+        val configDir = File(activity.filesDir, "jiotv_go")
+        val localCustomYaml = File(configDir, "custom-channels.yml")
+        val localCustomJson = File(configDir, "custom-channels.json")
+
+        val resolvedCustomChannelsFile = when {
+            localCustomYaml.exists() -> "custom-channels.yml"
+            localCustomJson.exists() -> "custom-channels.json"
+            else -> "custom-channels.json"
+        }
+
+        jtvConfigurationManager.jtvConfiguration.customChannelsUrl =
+            if (isSwitchOnForCustomChannels && !localCustomYaml.exists() && !localCustomJson.exists()) {
                 "https://raw.githubusercontent.com/atanuroy22/iptv/refs/heads/main/output/custom-channels.json"
             } else {
                 ""
             }
-        jtvConfigurationManager.jtvConfiguration.customChannelsUrl = newCustomChannelsUrl
+        jtvConfigurationManager.jtvConfiguration.customChannelsFile =
+            if (isSwitchOnForCustomChannels) resolvedCustomChannelsFile else "custom_channels.json"
 
         val selectedEpgDownloadUrl =
             if (isSwitchOnForCustomChannels) iptvEpgIndiaDownloadUrl else jiotvEpgDownloadUrl

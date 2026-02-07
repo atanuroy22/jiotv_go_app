@@ -22,14 +22,52 @@ class JTVConfigurationManager private constructor(context: Context) {
     // Configuration
     private val preferenceManager = SkySharedPref.getInstance(context.applicationContext)
     private val filesDir = context.filesDir
+    private val configDir = File(filesDir, "jiotv_go")
+    private val configFileCandidates = listOf(
+        "jiotv-config.json",
+        "jtv_config.json",
+        "jiotv-config.toml",
+        "jiotv-config.yml",
+        "jiotv_go.toml"
+    )
     var jtvConfiguration = readFromJTVConfiguration()
         private set
 
+    private fun resolveConfigLocation(): String {
+        val current = preferenceManager.myPrefs.jtvConfigLocation?.takeIf { it.isNotBlank() }
+        if (current != null) {
+            val file = File(current)
+            if (file.exists()) return file.absolutePath
+        }
+
+        val searchDirs = listOf(configDir, filesDir)
+        for (dir in searchDirs) {
+            for (name in configFileCandidates) {
+                val candidate = File(dir, name)
+                if (candidate.exists()) {
+                    preferenceManager.myPrefs.jtvConfigLocation = candidate.absolutePath
+                    preferenceManager.savePreferences()
+                    return candidate.absolutePath
+                }
+            }
+        }
+
+        configDir.mkdirs()
+        val fallback = File(configDir, "jiotv-config.json")
+        preferenceManager.myPrefs.jtvConfigLocation = fallback.absolutePath
+        preferenceManager.savePreferences()
+        return fallback.absolutePath
+    }
+
     private fun readFromJTVConfiguration(): JTVConfiguration {
-        val jtvConfigLocation = preferenceManager.myPrefs.jtvConfigLocation ?: return JTVConfiguration()
+        val jtvConfigLocation = resolveConfigLocation()
         val jtvConfigFile = File(jtvConfigLocation)
         if (!jtvConfigFile.exists())
             return JTVConfiguration()
+
+        if (!jtvConfigFile.name.endsWith(".json", ignoreCase = true)) {
+            return JTVConfiguration()
+        }
 
         return try {
             Gson().fromJson(jtvConfigFile.readText(), JTVConfiguration::class.java)
@@ -39,23 +77,22 @@ class JTVConfigurationManager private constructor(context: Context) {
     }
 
     fun saveJTVConfiguration() {
-        var jtvConfigLocation = preferenceManager.myPrefs.jtvConfigLocation
+        var jtvConfigLocation = resolveConfigLocation()
+        configDir.mkdirs()
 
-        if (jtvConfiguration.pathPrefix != filesDir.absolutePath) {
-            handlePathPrefixMismatch()
-        }
-
-        if (jtvConfigLocation == null) {
-            val parentDir = File(filesDir, "jiotv_go")
-            jtvConfigLocation = File(parentDir, "jtv_config.json").absolutePath
-//            jtvConfiguration.pathPrefix = parentDir.absolutePath // fix v3.12.1+
-            jtvConfiguration.pathPrefix = filesDir.absolutePath
-
+        val currentFile = File(jtvConfigLocation)
+        if (!currentFile.name.endsWith(".json", ignoreCase = true)) {
+            val jsonFallback = File(configDir, "jiotv-config.json")
+            jtvConfigLocation = jsonFallback.absolutePath
             preferenceManager.myPrefs.jtvConfigLocation = jtvConfigLocation
             preferenceManager.savePreferences()
         }
 
-        val jtvConfigFile = File(jtvConfigLocation!!)
+        if (jtvConfiguration.pathPrefix != configDir.absolutePath) {
+            handlePathPrefixMismatch()
+        }
+
+        val jtvConfigFile = File(jtvConfigLocation)
         if (!jtvConfigFile.exists()) {
             jtvConfigFile.parentFile?.mkdirs()
             jtvConfigFile.createNewFile()
@@ -65,15 +102,19 @@ class JTVConfigurationManager private constructor(context: Context) {
     }
 
     private fun handlePathPrefixMismatch() {
-        jtvConfiguration.pathPrefix = filesDir.absolutePath
-//            jtvConfiguration.pathPrefix = parentDir.absolutePath // fix v3.12.1+
+        jtvConfiguration.pathPrefix = configDir.absolutePath
     }
 
     fun deleteJTVConfiguration() {
-        val jtvConfigLocation = preferenceManager.myPrefs.jtvConfigLocation ?: return
-        val jtvConfigFile = File(jtvConfigLocation)
-        if (jtvConfigFile.exists())
-            jtvConfigFile.delete()
+        val jtvConfigLocation = preferenceManager.myPrefs.jtvConfigLocation
+        if (!jtvConfigLocation.isNullOrBlank()) {
+            val jtvConfigFile = File(jtvConfigLocation)
+            if (jtvConfigFile.exists()) jtvConfigFile.delete()
+        }
+        for (name in configFileCandidates) {
+            val f = File(configDir, name)
+            if (f.exists()) f.delete()
+        }
         jtvConfiguration = JTVConfiguration()
     }
 }
