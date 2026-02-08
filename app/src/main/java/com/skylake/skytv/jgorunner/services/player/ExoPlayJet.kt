@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.lifecycleScope
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
@@ -23,10 +24,12 @@ import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.ui.screens.ExoPlayJetScreen
 import com.skylake.skytv.jgorunner.ui.theme.JGOTheme
 import com.skylake.skytv.jgorunner.ui.tvhome.ChannelResponse
+import com.skylake.skytv.jgorunner.ui.tvhome.ChannelUtils
 import com.skylake.skytv.jgorunner.ui.tvhome.M3UChannelExp
 import com.skylake.skytv.jgorunner.utils.DeviceUtils
 import com.skylake.skytv.jgorunner.utils.normalizePlaybackUrl
 import com.skylake.skytv.jgorunner.utils.withQuality
+import kotlinx.coroutines.launch
 
 @SuppressLint("MutableCollectionMutableState")
 class ExoPlayJet : ComponentActivity() {
@@ -48,6 +51,7 @@ class ExoPlayJet : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         applyIntent(intent)
+        maybeLoadChannelListAsync(intent)
 
         applyImmersive(this)
 
@@ -107,6 +111,7 @@ class ExoPlayJet : ComponentActivity() {
 
         if (wasInPip) {
             applyIntent(intent)
+            maybeLoadChannelListAsync(intent)
             val currentList = channelListState
             if (!currentList.isNullOrEmpty() && idx in currentList.indices) {
                 PlayerCommandBus.requestSwitch(index = idx)
@@ -116,6 +121,7 @@ class ExoPlayJet : ComponentActivity() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) pipController.updatePipActionsIfAllowed()
         } else {
             applyIntent(intent)
+            maybeLoadChannelListAsync(intent)
         }
     }
 
@@ -164,10 +170,91 @@ class ExoPlayJet : ComponentActivity() {
         }
     }
 
-    private fun loadChannelListFromCache(intent: Intent?): ArrayList<ChannelInfo>? {
+    private fun maybeLoadChannelListAsync(intent: Intent?) {
+        if (!channelListState.isNullOrEmpty()) return
         val kind = intent?.getStringExtra("channel_list_kind")?.lowercase()
+        if (kind != "jio") return
+
         val port = prefManager.myPrefs.jtvGoServerPort
         val basefinURL = "http://localhost:$port"
+        val incomingUrl = intent?.getStringExtra("video_url")
+
+        lifecycleScope.launch {
+            val response = try {
+                ChannelUtils.fetchChannels("$basefinURL/channels")
+            } catch (_: Exception) {
+                null
+            } ?: return@launch
+
+            try {
+                getSharedPreferences("channel_cache", MODE_PRIVATE)
+                    .edit()
+                    .putString("channels_json", Gson().toJson(response))
+                    .apply()
+            } catch (_: Exception) {
+            }
+
+            val list = buildChannelListFromResponse(response)
+            channelListState = list
+
+            if (!incomingUrl.isNullOrEmpty() && list.isNotEmpty()) {
+                val normalizedIncoming = normalizePlaybackUrl(this@ExoPlayJet, incomingUrl)
+                val incomingId =
+                    com.skylake.skytv.jgorunner.ui.tvhome.extractChannelIdFromPlayUrl(normalizedIncoming)
+                val found = if (incomingId != null) {
+                    list.indexOfFirst { item ->
+                        val candidate = item.videoUrl ?: return@indexOfFirst false
+                        val candidateId =
+                            com.skylake.skytv.jgorunner.ui.tvhome.extractChannelIdFromPlayUrl(
+                                normalizePlaybackUrl(this@ExoPlayJet, candidate)
+                            )
+                        candidateId == incomingId
+                    }
+                } else {
+                    list.indexOfFirst { normalizePlaybackUrl(this@ExoPlayJet, it.videoUrl ?: "") == normalizedIncoming }
+                }
+
+                if (found >= 0) {
+                    currentChannelIndexState = found
+                }
+            }
+        }
+    }
+
+    private fun buildChannelListFromResponse(response: ChannelResponse): ArrayList<ChannelInfo> {
+        val port = prefManager.myPrefs.jtvGoServerPort
+        val basefinURL = "http://localhost:$port"
+
+        val categoryIds = prefManager.myPrefs.filterCI
+            ?.split(",")
+            ?.mapNotNull { it.trim().toIntOrNull() }
+            ?.takeIf { it.isNotEmpty() }
+        val languageIds = prefManager.myPrefs.filterLI
+            ?.split(",")
+            ?.mapNotNull { it.trim().toIntOrNull() }
+            ?.takeIf { it.isNotEmpty() }
+
+        val filtered = ChannelUtils.filterChannels(
+            response,
+            categoryIds = categoryIds,
+            languageIds = languageIds
+        ).ifEmpty {
+            if (categoryIds != null || languageIds != null) response.result else emptyList()
+        }
+
+        return ArrayList(
+            filtered.map { ch ->
+                ChannelInfo(
+                    withQuality(this, ch.channel_url),
+                    "$basefinURL/jtvimage/${ch.logoUrl}",
+                    ch.channel_name
+                )
+            }
+        )
+    }
+
+    private fun loadChannelListFromCache(intent: Intent?): ArrayList<ChannelInfo>? {
+        val kind = intent?.getStringExtra("channel_list_kind")?.lowercase()
         return try {
             when (kind) {
                 "jio" -> {
@@ -176,15 +263,7 @@ class ExoPlayJet : ComponentActivity() {
                         ?.takeIf { it.isNotBlank() }
                         ?: return null
                     val response = Gson().fromJson(cachedJson, ChannelResponse::class.java) ?: return null
-                    ArrayList(
-                        response.result.map { ch ->
-                            ChannelInfo(
-                                withQuality(this, ch.channel_url),
-                                "$basefinURL/jtvimage/${ch.logoUrl}",
-                                ch.channel_name
-                            )
-                        }
-                    )
+                    buildChannelListFromResponse(response)
                 }
                 "m3u" -> {
                     val json = prefManager.myPrefs.channelListJson?.takeIf { it.isNotBlank() } ?: return null
@@ -192,7 +271,24 @@ class ExoPlayJet : ComponentActivity() {
                     val channels: List<M3UChannelExp> = Gson().fromJson(json, type) ?: return null
                     ArrayList(channels.map { ch -> ChannelInfo(ch.url, ch.logo ?: "", ch.name) })
                 }
-                else -> null
+                else -> {
+                    val cachedJson = getSharedPreferences("channel_cache", MODE_PRIVATE)
+                        .getString("channels_json", null)
+                        ?.takeIf { it.isNotBlank() }
+                    if (!cachedJson.isNullOrBlank()) {
+                        val response = Gson().fromJson(cachedJson, ChannelResponse::class.java)
+                        if (response != null) return buildChannelListFromResponse(response)
+                    }
+
+                    val json = prefManager.myPrefs.channelListJson?.takeIf { it.isNotBlank() }
+                    if (!json.isNullOrBlank()) {
+                        val type = object : TypeToken<List<M3UChannelExp>>() {}.type
+                        val channels: List<M3UChannelExp> = Gson().fromJson(json, type) ?: return null
+                        return ArrayList(channels.map { ch -> ChannelInfo(ch.url, ch.logo ?: "", ch.name) })
+                    }
+
+                    null
+                }
             }
         } catch (_: Exception) {
             null

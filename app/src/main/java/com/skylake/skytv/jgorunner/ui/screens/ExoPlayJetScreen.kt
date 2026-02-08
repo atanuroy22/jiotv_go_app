@@ -526,7 +526,7 @@ fun ExoPlayJetScreen(
                         return@onPreviewKeyEvent false
                     } else {
                         panelSelectedIndex = currentIndex
-                        showChannelPanel = channelList?.isNotEmpty() == true
+                        showChannelPanel = channelList != null
                         return@onPreviewKeyEvent true
                     }
                 }
@@ -907,7 +907,7 @@ fun ExoPlayJetScreen(
             IconButton(
                 onClick = {
                     panelSelectedIndex = currentIndex
-                    showChannelPanel = channelList?.isNotEmpty() == true && !showChannelPanel
+                    showChannelPanel = channelList != null && !showChannelPanel
                 },
                 modifier = Modifier
                     .align(Alignment.TopEnd)
