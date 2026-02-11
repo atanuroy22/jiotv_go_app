@@ -1348,6 +1348,171 @@ fun getCurrentFormattedTime(): String {
     return String.format("%02d:%02d %s", if (hour == 0) 12 else hour, minute, amPm)
 }
 
+private data class PlayerTrackOption(
+    val label: String,
+    val trackGroup: TrackGroup,
+    val trackIndex: Int,
+    val format: Format
+)
+
+@Composable
+private fun PlayerSettingsDialog(
+    tabIndex: Int,
+    onTabIndexChange: (Int) -> Unit,
+    onDismiss: () -> Unit,
+    tracksVersion: Int,
+    getVideoOptions: () -> List<PlayerTrackOption>,
+    getAudioOptions: () -> List<PlayerTrackOption>,
+    selectedSpeed: Float,
+    onSpeedSelected: (Float) -> Unit,
+    onVideoSelected: (PlayerTrackOption?) -> Unit,
+    onAudioSelected: (PlayerTrackOption?) -> Unit
+) {
+    val tabs = listOf("Quality", "Audio", "Speed")
+    val videoOptions = remember(tracksVersion) { getVideoOptions() }
+    val audioOptions = remember(tracksVersion) { getAudioOptions() }
+    val speeds = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.88f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White.copy(alpha = 0.06f))
+                        .padding(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    tabs.forEachIndexed { idx, title ->
+                        val selected = idx == tabIndex
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(
+                                    if (selected) Color.White.copy(alpha = 0.16f) else Color.Transparent
+                                )
+                                .clickable { onTabIndexChange(idx) }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = title,
+                                color = Color.White,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                when (tabIndex) {
+                    0 -> {
+                        LazyColumn(modifier = Modifier.height(360.dp)) {
+                            item {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            onVideoSelected(null)
+                                            onDismiss()
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 14.dp)
+                                ) {
+                                    Text(text = "Auto", color = Color.White, fontSize = 16.sp)
+                                }
+                            }
+                            itemsIndexed(videoOptions, key = { _, o -> "${o.label}|${o.trackIndex}|${o.format.bitrate}" }) { _, option ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            onVideoSelected(option)
+                                            onDismiss()
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 14.dp)
+                                ) {
+                                    Text(text = option.label, color = Color.White, fontSize = 16.sp)
+                                }
+                            }
+                        }
+                    }
+
+                    1 -> {
+                        LazyColumn(modifier = Modifier.height(360.dp)) {
+                            item {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            onAudioSelected(null)
+                                            onDismiss()
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 14.dp)
+                                ) {
+                                    Text(text = "Auto", color = Color.White, fontSize = 16.sp)
+                                }
+                            }
+                            itemsIndexed(audioOptions, key = { _, o -> "${o.label}|${o.trackIndex}|${o.format.language}" }) { _, option ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            onAudioSelected(option)
+                                            onDismiss()
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 14.dp)
+                                ) {
+                                    Text(text = option.label, color = Color.White, fontSize = 16.sp)
+                                }
+                            }
+                        }
+                    }
+
+                    else -> {
+                        LazyColumn(modifier = Modifier.height(360.dp)) {
+                            itemsIndexed(speeds, key = { _, s -> s }) { _, speed ->
+                                val selected = speed == selectedSpeed
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(
+                                            if (selected) Color.White.copy(alpha = 0.12f) else Color.Transparent
+                                        )
+                                        .clickable {
+                                            onSpeedSelected(speed)
+                                            onDismiss()
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 14.dp)
+                                ) {
+                                    Text(
+                                        text = "${speed}x",
+                                        color = Color.White,
+                                        fontSize = 16.sp,
+                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 private fun buildMediaItemForPlaybackUrl(url: String): MediaItem {
     val builder = MediaItem.Builder().setUri(url.toUri())
     val mimeType = inferPlaybackMimeType(url)
