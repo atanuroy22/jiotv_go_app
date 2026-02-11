@@ -121,10 +121,10 @@ fun normalizePlaybackUrl(context: Context, inputUrl: String): String {
 
     val parsedForPlay = runCatching { Uri.parse(url) }.getOrNull()
     val playPath = parsedForPlay?.encodedPath.orEmpty()
-    val playMatch = Regex(""".*/play/(\d+)$""").find(playPath)
-    if (playMatch != null) {
-        val id = playMatch.groupValues[1]
-        val livePath = "/live/$id.m3u8"
+    val playOrPlayerMatch = Regex(""".*/(?:play|player)/(\d+)$""").find(playPath)
+    if (playOrPlayerMatch != null) {
+        val id = playOrPlayerMatch.groupValues[1]
+        val livePath = "/live/$id"
         url = parsedForPlay?.buildUpon()?.encodedPath(livePath)?.build()?.toString() ?: url
     }
 
@@ -161,17 +161,42 @@ fun normalizePlaybackUrl(context: Context, inputUrl: String): String {
         }
     }
 
-    val parsedAfterQuality = runCatching { Uri.parse(url) }.getOrNull()
-    val path = parsedAfterQuality?.encodedPath.orEmpty()
-    if (path.contains("/live/", ignoreCase = true) &&
-        !path.endsWith(".m3u8", ignoreCase = true) &&
-        !path.endsWith(".m3u", ignoreCase = true)
-    ) {
-        val newPath = if (path.endsWith("/")) path.dropLast(1) + ".m3u8" else "$path.m3u8"
-        url = parsedAfterQuality?.buildUpon()?.encodedPath(newPath)?.build()?.toString() ?: url
-    }
-
     url = url.replace(".m3u8.m3u8", ".m3u8", ignoreCase = true)
     url = url.replace("/.m3u8", ".m3u8", ignoreCase = true)
+    url = url.replace(".mpd.mpd", ".mpd", ignoreCase = true)
+    url = url.replace("/.mpd", ".mpd", ignoreCase = true)
     return url
+}
+
+fun preferredPlaybackUrls(context: Context, inputUrl: String): List<String> {
+    val normalized = normalizePlaybackUrl(context, inputUrl)
+    if (normalized.isBlank()) return emptyList()
+
+    val uri = runCatching { Uri.parse(normalized) }.getOrNull() ?: return listOf(normalized)
+    val path = uri.encodedPath.orEmpty()
+    val isLiveLike = path.contains("/live/", ignoreCase = true) ||
+        path.contains("/play/", ignoreCase = true) ||
+        path.contains("/player/", ignoreCase = true)
+
+    if (!isLiveLike) return listOf(normalized)
+
+    val liveBaseUri = runCatching {
+        val match = Regex(""".*/(?:play|player)/(\d+)$""").find(path)
+        if (match != null) {
+            val id = match.groupValues[1]
+            uri.buildUpon().encodedPath("/live/$id").build()
+        } else uri
+    }.getOrNull() ?: uri
+
+    val livePathNoExt = liveBaseUri.encodedPath
+        .orEmpty()
+        .replace(Regex("""\.(mpd|m3u8|m3u)$""", RegexOption.IGNORE_CASE), "")
+        .trimEnd('/')
+
+    if (livePathNoExt.isBlank()) return listOf(normalized)
+
+    val dashUrl = liveBaseUri.buildUpon().encodedPath("$livePathNoExt.mpd").build().toString()
+    val hlsUrl = liveBaseUri.buildUpon().encodedPath("$livePathNoExt.m3u8").build().toString()
+
+    return listOf(dashUrl, hlsUrl).distinct()
 }

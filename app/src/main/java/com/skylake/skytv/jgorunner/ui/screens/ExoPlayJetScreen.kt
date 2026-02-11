@@ -53,10 +53,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -116,6 +118,7 @@ import com.skylake.skytv.jgorunner.ui.tvhome.extractChannelIdFromPlayUrl
 import com.skylake.skytv.jgorunner.utils.DeviceUtils
 import com.skylake.skytv.jgorunner.utils.containsAnyId
 import com.skylake.skytv.jgorunner.utils.normalizePlaybackUrl
+import com.skylake.skytv.jgorunner.utils.preferredPlaybackUrls
 import com.skylake.skytv.jgorunner.utils.setupCustomPlaybackLogic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -216,6 +219,16 @@ fun ExoPlayJetScreen(
     var resizeOverlayLabel by remember { mutableStateOf(resizeModes.first().second) }
     var resizeOverlayJob by remember { mutableStateOf<Job?>(null) }
     var videoAspect by remember { mutableFloatStateOf(16f / 9f) }
+    val qualityOptions = remember { listOf("auto", "high", "medium", "low") }
+    var qualityIndex by remember {
+        mutableIntStateOf(
+            qualityOptions.indexOf(preferenceManager.myPrefs.filterQX?.lowercase() ?: "auto")
+                .takeIf { it >= 0 } ?: 0
+        )
+    }
+    var showQualityOverlay by remember { mutableStateOf(false) }
+    var qualityOverlayLabel by remember { mutableStateOf(qualityOptions[qualityIndex].uppercase()) }
+    var qualityOverlayJob by remember { mutableStateOf<Job?>(null) }
 
     // --- Key Num Entry ---
     fun commitNumericEntryLocal(list: ArrayList<ChannelInfo>?) {
@@ -320,7 +333,7 @@ fun ExoPlayJetScreen(
         isBuffering = true
         try {
             val currentUrlRaw = channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
-            val currentUrl = normalizePlaybackUrl(context, currentUrlRaw)
+            val currentUrl = preferredPlaybackUrls(context, currentUrlRaw).firstOrNull().orEmpty()
             if (currentUrl.isBlank()) {
                 Toast.makeText(context, "Invalid stream URL", Toast.LENGTH_SHORT).show()
                 try {
@@ -353,6 +366,32 @@ fun ExoPlayJetScreen(
             showChannelOverlay = true
             delay(overlayDisplayTimeMs.toLong())
             showChannelOverlay = false
+        }
+    }
+
+    fun applyQualityAndReload(newQuality: String) {
+        try {
+            preferenceManager.myPrefs.filterQX = newQuality
+            preferenceManager.savePreferences()
+        } catch (_: Exception) {
+        }
+
+        try {
+            retryCountRef.value = 0
+            isBuffering = true
+            val rawUrl = overrideVideoUrl ?: channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
+            val finalUrl = preferredPlaybackUrls(context, rawUrl).firstOrNull().orEmpty()
+            if (finalUrl.isBlank()) return
+            val mediaItem = buildMediaItemForPlaybackUrl(finalUrl)
+            try {
+                exoPlayer.stop()
+                exoPlayer.clearMediaItems()
+            } catch (_: Exception) {
+            }
+            exoPlayer.setMediaItem(mediaItem)
+            exoPlayer.prepare()
+            exoPlayer.playWhenReady = true
+        } catch (_: Exception) {
         }
     }
 
@@ -441,7 +480,7 @@ fun ExoPlayJetScreen(
                 if (!targetUrl.isNullOrEmpty()) {
                     retryCountRef.value = 0
                     isBuffering = true
-                    val finalUrl = normalizePlaybackUrl(context, targetUrl)
+                    val finalUrl = preferredPlaybackUrls(context, targetUrl).firstOrNull().orEmpty()
                     if (finalUrl.isBlank()) return@setOnSwitchRequest
                     val mediaItem = buildMediaItemForPlaybackUrl(finalUrl)
                     try {
@@ -904,20 +943,46 @@ fun ExoPlayJetScreen(
         }
 
         if (!PlayerCommandBus.isInPipMode && isControllerVisible) {
-            IconButton(
-                onClick = {
-                    panelSelectedIndex = currentIndex
-                    showChannelPanel = channelList != null && !showChannelPanel
-                },
+            Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(0.dp)
+                    .padding(0.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Filled.AutoAwesomeMotion,
-                    contentDescription = "Toggle channel list",
-                    tint = Color.White.copy(alpha = 0.5f)
-                )
+                IconButton(
+                    onClick = {
+                        qualityIndex = (qualityIndex + 1) % qualityOptions.size
+                        val q = qualityOptions[qualityIndex]
+                        qualityOverlayLabel = q.uppercase()
+                        showQualityOverlay = true
+                        qualityOverlayJob?.cancel()
+                        qualityOverlayJob = scope.launch {
+                            delay(1200)
+                            showQualityOverlay = false
+                        }
+                        applyQualityAndReload(q)
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.HighQuality,
+                        contentDescription = "Change quality",
+                        tint = Color.White.copy(alpha = 0.5f)
+                    )
+                }
+
+                IconButton(
+                    onClick = {
+                        panelSelectedIndex = currentIndex
+                        showChannelPanel = channelList != null && !showChannelPanel
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.AutoAwesomeMotion,
+                        contentDescription = "Toggle channel list",
+                        tint = Color.White.copy(alpha = 0.5f)
+                    )
+                }
             }
         }
 
@@ -932,6 +997,24 @@ fun ExoPlayJetScreen(
             ) {
                 Text(
                     text = resizeOverlayLabel,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 16.sp
+                )
+            }
+        }
+
+        if (showQualityOverlay) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 136.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .padding(horizontal = 18.dp, vertical = 10.dp)
+            ) {
+                Text(
+                    text = qualityOverlayLabel,
                     color = Color.White,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 16.sp
@@ -1018,7 +1101,7 @@ fun ExoPlayJetScreen(
     LaunchedEffect(videoUrl) {
         if (channelList.isNullOrEmpty() || currentIndex < 0) {
             val rawUrl = channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
-            val url = normalizePlaybackUrl(context, rawUrl)
+            val url = preferredPlaybackUrls(context, rawUrl).firstOrNull().orEmpty()
             if (url.isBlank()) return@LaunchedEffect
             val mediaItem = buildMediaItemForPlaybackUrl(url)
             exoPlayer.setMediaItem(mediaItem)
@@ -1232,7 +1315,7 @@ fun initializePlayer(
     val retryHandler = Handler(Looper.getMainLooper())
 
     fun prepareAndPlay(seekToPosition: Long = 0L) {
-        val normalizedUrl = normalizePlaybackUrl(context, getCurrentVideoUrl())
+        val normalizedUrl = preferredPlaybackUrls(context, getCurrentVideoUrl()).firstOrNull().orEmpty()
         if (normalizedUrl.isBlank()) return
         val mediaItem = buildMediaItemForPlaybackUrl(normalizedUrl)
         player.setMediaItem(mediaItem)
@@ -1260,6 +1343,29 @@ fun initializePlayer(
                 return
             }
             val currentUrl = getCurrentVideoUrl()
+            val activeUrl = runCatching {
+                player.currentMediaItem?.localConfiguration?.uri?.toString().orEmpty()
+            }.getOrElse { "" }
+            val candidates = preferredPlaybackUrls(context, currentUrl)
+            val activeClean = activeUrl.substringBefore('#').substringBefore('?').lowercase()
+            val canFallback = candidates.size >= 2 &&
+                (activeClean.endsWith(".mpd") || activeClean.contains(".mpd")) &&
+                candidates[1].isNotBlank()
+
+            if (attempt == 2 && canFallback) {
+                retryCountRef.value = 0
+                retryHandler.removeCallbacksAndMessages(null)
+                try {
+                    player.stop()
+                } catch (_: Exception) {
+                }
+                val fallbackUrl = candidates[1]
+                val mediaItem = buildMediaItemForPlaybackUrl(fallbackUrl)
+                player.setMediaItem(mediaItem)
+                player.prepare()
+                player.playWhenReady = true
+                return
+            }
             val retryDelayMs = (attempt * 350L).coerceAtMost(2500L)
             retryHandler.removeCallbacksAndMessages(null)
             retryHandler.postDelayed(

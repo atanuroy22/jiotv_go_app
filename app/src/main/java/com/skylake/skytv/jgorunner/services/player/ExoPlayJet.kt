@@ -138,13 +138,27 @@ class ExoPlayJet : ComponentActivity() {
         val incomingUrl = parsed.videoUrl
         if (!activeList.isNullOrEmpty() && !incomingUrl.isNullOrEmpty()) {
             val normalizedIncoming = normalizePlaybackUrl(this, incomingUrl)
+            val incomingId =
+                com.skylake.skytv.jgorunner.ui.tvhome.extractChannelIdFromPlayUrl(normalizedIncoming)
             val idx = currentChannelIndexState
-            val idxMatches =
-                idx in activeList.indices &&
-                        normalizePlaybackUrl(this, activeList[idx].videoUrl ?: "") == normalizedIncoming
+            val idxMatches = idx in activeList.indices && run {
+                val candidate = activeList[idx].videoUrl ?: return@run false
+                val candidateId =
+                    com.skylake.skytv.jgorunner.ui.tvhome.extractChannelIdFromPlayUrl(
+                        normalizePlaybackUrl(this, candidate)
+                    )
+                if (incomingId != null) candidateId == incomingId
+                else normalizePlaybackUrl(this, candidate) == normalizedIncoming
+            }
             if (!idxMatches) {
                 val found = activeList.indexOfFirst {
-                    normalizePlaybackUrl(this, it.videoUrl ?: "") == normalizedIncoming
+                    val candidate = it.videoUrl ?: return@indexOfFirst false
+                    val candidateId =
+                        com.skylake.skytv.jgorunner.ui.tvhome.extractChannelIdFromPlayUrl(
+                            normalizePlaybackUrl(this, candidate)
+                        )
+                    if (incomingId != null) candidateId == incomingId
+                    else normalizePlaybackUrl(this, candidate) == normalizedIncoming
                 }
                 if (found >= 0) {
                     currentChannelIndexState = found

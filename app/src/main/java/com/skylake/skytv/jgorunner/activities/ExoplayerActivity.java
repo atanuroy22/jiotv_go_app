@@ -18,12 +18,14 @@ import androidx.activity.ComponentActivity;
 import androidx.annotation.NonNull;
 import androidx.annotation.OptIn;
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.MimeTypes;
+import androidx.media3.common.PlaybackException;
+import androidx.media3.common.Player;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DefaultHttpDataSource;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.SeekParameters;
-import androidx.media3.exoplayer.hls.HlsMediaSource;
-import androidx.media3.exoplayer.source.MediaSource;
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.ui.AspectRatioFrameLayout;
 import androidx.media3.ui.PlayerView;
 
@@ -51,6 +53,8 @@ public class ExoplayerActivity extends ComponentActivity {
     private PlayerView playerView;
     private boolean isInPipMode = false;
     private String currentPlayId;
+    private String activePlaybackUrl;
+    private boolean didFallbackToHls = false;
 
     private SkySharedPref skyPref;
     private String filterQX;
@@ -87,6 +91,7 @@ public class ExoplayerActivity extends ComponentActivity {
         String formattedUrl = formatVideoUrl(videoUrl, signatureFallback);
         Log.d(TAG, "Formatted URL: " + formattedUrl);
 
+        didFallbackToHls = false;
         setupPlayer(formattedUrl);
 
         hideControlsAfterDelay();
@@ -104,21 +109,38 @@ public class ExoplayerActivity extends ComponentActivity {
 
     @OptIn(markerClass = UnstableApi.class)
     private void setupPlayer(String videoUrl) {
-        player = new ExoPlayer.Builder(this).build();
+        DefaultHttpDataSource.Factory dataSourceFactory = new DefaultHttpDataSource.Factory()
+                .setAllowCrossProtocolRedirects(true);
+        DefaultMediaSourceFactory mediaSourceFactory = new DefaultMediaSourceFactory(this)
+                .setDataSourceFactory(dataSourceFactory);
+
+        player = new ExoPlayer.Builder(this)
+                .setMediaSourceFactory(mediaSourceFactory)
+                .build();
         playerView.setPlayer(player);
 
-        DefaultHttpDataSource.Factory dataSourceFactory = new DefaultHttpDataSource.Factory();
-        MediaSource hlsMediaSource = new HlsMediaSource.Factory(dataSourceFactory)
-                .setAllowChunklessPreparation(true)
-                .createMediaSource(MediaItem.fromUri(Uri.parse(videoUrl)));
+        player.addListener(new Player.Listener() {
+            @Override
+            public void onPlayerError(@NonNull PlaybackException error) {
+                if (didFallbackToHls) return;
+                String current = activePlaybackUrl == null ? "" : activePlaybackUrl;
+                String cleaned = current.toLowerCase().split("\\?")[0].split("#")[0];
+                if (!cleaned.endsWith(".mpd") && !cleaned.contains(".mpd")) return;
 
-        player.setMediaSource(hlsMediaSource);
+                String fallback = swapExtensionToM3u8(current);
+                if (fallback.equals(current)) return;
+
+                didFallbackToHls = true;
+                Log.d(TAG, "DASH failed, fallback to HLS: " + fallback);
+                playUrl(fallback);
+            }
+        });
+
         playerView.setResizeMode(AspectRatioFrameLayout.RESIZE_MODE_FIT);
         playerView.setShowNextButton(false);
         playerView.setShowPreviousButton(false);
         player.setSeekParameters(SeekParameters.CLOSEST_SYNC);
-        player.prepare();
-        player.setPlayWhenReady(true);
+        playUrl(videoUrl);
     }
 
     private String formatVideoUrl(String videoUrl, String signatureFallback) {
@@ -144,8 +166,20 @@ public class ExoplayerActivity extends ComponentActivity {
             }
         }
 
-        // Remove query parameters if URL contains ".m3u8"
-        if (videoUrl.contains(".m3u8")) {
+        try {
+            Uri u = Uri.parse(videoUrl);
+            String path = u.getPath();
+            if (path != null) {
+                Matcher matcher = Pattern.compile(".*/(play|player)/(\\d+)$").matcher(path);
+                if (matcher.matches()) {
+                    String id = matcher.group(2);
+                    videoUrl = u.buildUpon().path("/live/" + id + ".mpd").clearQuery().build().toString();
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        if (videoUrl.contains(".m3u8") || videoUrl.contains(".mpd")) {
             int questionMarkIndex = videoUrl.indexOf("?");
             if (questionMarkIndex != -1) {
                 videoUrl = videoUrl.substring(0, questionMarkIndex);
@@ -154,8 +188,48 @@ public class ExoplayerActivity extends ComponentActivity {
 
         // Fix potential issue with "//.m3u8"
         videoUrl = videoUrl.replace("//.m3u8", ".m3u8");
+        videoUrl = videoUrl.replace("//.mpd", ".mpd");
 
         return videoUrl;
+    }
+
+    private void playUrl(String url) {
+        activePlaybackUrl = url;
+        String mimeType = inferMimeType(url);
+
+        MediaItem.Builder builder = new MediaItem.Builder().setUri(Uri.parse(url));
+        if (mimeType != null && !mimeType.isEmpty()) builder.setMimeType(mimeType);
+        player.setMediaItem(builder.build());
+        player.prepare();
+        player.setPlayWhenReady(true);
+    }
+
+    private String inferMimeType(String url) {
+        if (url == null) return null;
+        String cleaned = url.toLowerCase().split("\\?")[0].split("#")[0];
+        if (cleaned.endsWith(".mpd") || cleaned.contains(".mpd")) return MimeTypes.APPLICATION_MPD;
+        if (cleaned.endsWith(".m3u8") || cleaned.contains(".m3u8")) return MimeTypes.APPLICATION_M3U8;
+        return null;
+    }
+
+    private String swapExtensionToM3u8(String url) {
+        if (url == null) return "";
+        String base = url;
+        String suffix = "";
+        int hash = base.indexOf('#');
+        if (hash >= 0) {
+            suffix = base.substring(hash) + suffix;
+            base = base.substring(0, hash);
+        }
+        int q = base.indexOf('?');
+        if (q >= 0) {
+            suffix = base.substring(q) + suffix;
+            base = base.substring(0, q);
+        }
+        base = base.replaceAll("(?i)\\.(mpd)$", "");
+        base = base.replaceAll("(?i)\\.(m3u8)$", "");
+        base = base.replaceAll("(?i)\\.(m3u)$", "");
+        return base + ".m3u8" + suffix;
     }
 
     @OptIn(markerClass = UnstableApi.class)

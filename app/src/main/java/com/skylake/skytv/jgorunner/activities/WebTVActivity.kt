@@ -325,9 +325,8 @@ class WebPlayerActivity : ComponentActivity() {
                 }
 
                 // Construct the new URL
-                var modifiedUrl = url.replace("/play/", "/live/") + ".m3u8"
-
-                modifiedUrl = modifiedUrl.replace("//.m3u8", ".m3u8")
+                var modifiedUrl = url.replace("/play/", "/live/") + ".mpd"
+                modifiedUrl = modifiedUrl.replace("//.mpd", ".mpd")
 
                 Log.d("DIX", "Modified URL for intent: $modifiedUrl")
 

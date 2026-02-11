@@ -48,7 +48,7 @@ object Helper {
 fun extractChannelIdFromPlayUrl(playUrl: String): String? {
     Log.d("ID_PARSER", ">> $playUrl")
     return if ("live" in playUrl) {
-        val regex = """.*/(\d+)(?:\.m3u8?|)?$""".toRegex()
+        val regex = """.*/(\d+)(?:\.(?:m3u8?|mpd))?$""".toRegex()
         regex.find(playUrl)?.groups?.get(1)?.value
     } else {
         extraLoader(playUrl)
