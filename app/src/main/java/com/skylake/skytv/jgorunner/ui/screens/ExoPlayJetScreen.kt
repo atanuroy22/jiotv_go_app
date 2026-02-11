@@ -1576,7 +1576,7 @@ private fun PlayerSettingsDialog(
                                     Text(text = "Auto", color = Color.White, fontSize = 16.sp)
                                 }
                             }
-                            itemsIndexed(videoOptions, key = { _, o -> "${o.label}|${o.trackIndex}|${o.format.height}|${o.format.id}" }) { _, option ->
+                            itemsIndexed(videoOptions, key = { _, o -> "${o.label}|${o.trackIndex}|${o.format.bitrate}" }) { _, option ->
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -1609,7 +1609,7 @@ private fun PlayerSettingsDialog(
                                     Text(text = "Auto", color = Color.White, fontSize = 16.sp)
                                 }
                             }
-                            itemsIndexed(audioOptions, key = { _, o -> "${o.label}|${o.trackIndex}|${o.format.language}|${o.format.id}" }) { _, option ->
+                            itemsIndexed(audioOptions, key = { _, o -> "${o.label}|${o.trackIndex}|${o.format.language}" }) { _, option ->
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
