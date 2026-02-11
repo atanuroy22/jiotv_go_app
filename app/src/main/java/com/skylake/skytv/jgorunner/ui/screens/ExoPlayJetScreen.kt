@@ -251,6 +251,42 @@ fun ExoPlayJetScreen(
         )
     }
 
+    fun applyQualityAndReload(newQuality: String) {
+        try {
+            preferenceManager.myPrefs.filterQX = newQuality
+            preferenceManager.savePreferences()
+        } catch (_: Exception) {
+        }
+
+        try {
+            val paramsBuilder = exoPlayer.trackSelectionParameters.buildUpon()
+            paramsBuilder.setPreferredVideoMimeTypes(MimeTypes.VIDEO_H264, MimeTypes.VIDEO_H265)
+            when (newQuality.lowercase()) {
+                "low" -> paramsBuilder.setMaxVideoSize(854, 480)
+                "medium" -> paramsBuilder.setMaxVideoSize(1280, 720)
+                "high" -> paramsBuilder.setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE)
+                else -> paramsBuilder.setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE)
+            }
+            exoPlayer.trackSelectionParameters = paramsBuilder.build()
+
+            retryCountRef.value = 0
+            isBuffering = true
+            val rawUrl = overrideVideoUrl ?: channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
+            val finalUrl = preferredPlaybackUrls(context, rawUrl).firstOrNull().orEmpty()
+            if (finalUrl.isBlank()) return
+            val mediaItem = buildMediaItemForPlaybackUrl(finalUrl)
+            try {
+                exoPlayer.stop()
+                exoPlayer.clearMediaItems()
+            } catch (_: Exception) {
+            }
+            exoPlayer.setMediaItem(mediaItem)
+            exoPlayer.prepare()
+            exoPlayer.playWhenReady = true
+        } catch (_: Exception) {
+        }
+    }
+
     // --- Resize Config ---
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
@@ -423,42 +459,6 @@ fun ExoPlayJetScreen(
             showChannelOverlay = true
             delay(overlayDisplayTimeMs.toLong())
             showChannelOverlay = false
-        }
-    }
-
-    fun applyQualityAndReload(newQuality: String) {
-        try {
-            preferenceManager.myPrefs.filterQX = newQuality
-            preferenceManager.savePreferences()
-        } catch (_: Exception) {
-        }
-
-        try {
-            val paramsBuilder = exoPlayer.trackSelectionParameters.buildUpon()
-            paramsBuilder.setPreferredVideoMimeTypes(MimeTypes.VIDEO_H264, MimeTypes.VIDEO_H265)
-            when (newQuality.lowercase()) {
-                "low" -> paramsBuilder.setMaxVideoSize(854, 480)
-                "medium" -> paramsBuilder.setMaxVideoSize(1280, 720)
-                "high" -> paramsBuilder.setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE)
-                else -> paramsBuilder.setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE)
-            }
-            exoPlayer.trackSelectionParameters = paramsBuilder.build()
-
-            retryCountRef.value = 0
-            isBuffering = true
-            val rawUrl = overrideVideoUrl ?: channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
-            val finalUrl = preferredPlaybackUrls(context, rawUrl).firstOrNull().orEmpty()
-            if (finalUrl.isBlank()) return
-            val mediaItem = buildMediaItemForPlaybackUrl(finalUrl)
-            try {
-                exoPlayer.stop()
-                exoPlayer.clearMediaItems()
-            } catch (_: Exception) {
-            }
-            exoPlayer.setMediaItem(mediaItem)
-            exoPlayer.prepare()
-            exoPlayer.playWhenReady = true
-        } catch (_: Exception) {
         }
     }
 
