@@ -44,7 +44,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesomeMotion
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularWavyProgressIndicator
@@ -54,6 +53,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -88,21 +88,17 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
 import androidx.media3.common.C
-import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
+import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.MimeTypes
-import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.common.TrackGroup
-import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -132,8 +128,6 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.Calendar
 
 const val TAG = "ExoJetScreen"
@@ -226,15 +220,18 @@ fun ExoPlayJetScreen(
     var resizeOverlayLabel by remember { mutableStateOf(resizeModes.first().second) }
     var resizeOverlayJob by remember { mutableStateOf<Job?>(null) }
     var videoAspect by remember { mutableFloatStateOf(16f / 9f) }
+    val qualityOptions = remember { listOf("auto", "high", "medium", "low") }
+    var qualityIndex by remember {
+        mutableIntStateOf(
+            qualityOptions.indexOf(preferenceManager.myPrefs.filterQX?.lowercase() ?: "auto")
+                .takeIf { it >= 0 } ?: 0
+        )
+    }
+    var showQualityOverlay by remember { mutableStateOf(false) }
+    var qualityOverlayLabel by remember { mutableStateOf(qualityOptions[qualityIndex].uppercase()) }
+    var qualityOverlayJob by remember { mutableStateOf<Job?>(null) }
     var videoProbeJob by remember { mutableStateOf<Job?>(null) }
     var isBuffering by remember { mutableStateOf(false) }
-    var showPlayerSettings by remember { mutableStateOf(false) }
-    var settingsTabIndex by remember { mutableIntStateOf(0) }
-    var selectedSpeed by remember { mutableFloatStateOf(1f) }
-    var tracksVersion by remember { mutableIntStateOf(0) }
-    var autoVideoQualityEnabled by remember { mutableStateOf(true) }
-    var autoVideoQualityUriKey by remember { mutableStateOf<String?>(null) }
-    var autoVideoQualityStepIndex by remember { mutableIntStateOf(0) }
 
     // --- Key Num Entry ---
     fun commitNumericEntryLocal(list: ArrayList<ChannelInfo>?) {
@@ -247,211 +244,48 @@ fun ExoPlayJetScreen(
         showNumericOverlay = false
     }
 
-    val exoPlayer = remember { initializePlayer(context = context) }
-
-    fun extractChannelIdForPlayback(url: String): String? {
-        val normalized = runCatching { normalizePlaybackUrl(context, url) }.getOrNull() ?: url
-        val fromHelper = runCatching { extractChannelIdFromPlayUrl(normalized) }.getOrNull()
-        if (!fromHelper.isNullOrBlank()) return fromHelper
-        return Regex(""".*/live/(?:low/|medium/|high/)?(\d+)""").find(normalized)?.groupValues?.getOrNull(1)
+    val exoPlayer = remember {
+        initializePlayer(
+            getCurrentVideoUrl = { overrideVideoUrl ?: channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl },
+            context = context,
+            retryCountRef = retryCountRef
+        )
     }
 
-    fun unescapeJsUrl(raw: String, base: String): String {
-        var s = raw
-        s = s.replace("\\u0026", "&")
-        s = s.replace("\\/", "/")
-        s = s.replace("https:\\/\\/", "https://")
-        s = s.replace("http:\\/\\/", "http://")
-        if (s.startsWith("/")) s = base.trimEnd('/') + s
-        return s
-    }
-
-    suspend fun fetchText(url: String): String? = withContext(Dispatchers.IO) {
-        runCatching {
-            val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = 6000
-                readTimeout = 6000
-            }
-            conn.inputStream.bufferedReader().use { it.readText() }.also { conn.disconnect() }
-        }.getOrNull()
-    }
-
-    suspend fun resolvePlayback(rawUrl: String, forceHls: Boolean = false): Pair<MediaItem, String>? {
-        val candidates = preferredPlaybackUrls(context, rawUrl)
-        val dashCandidate = candidates.firstOrNull().orEmpty()
-        val hlsCandidate = candidates.getOrNull(1).orEmpty()
-
-        if (!forceHls && dashCandidate.isNotBlank() && inferPlaybackMimeType(dashCandidate) == MimeTypes.APPLICATION_MPD) {
-            val channelId = extractChannelIdForPlayback(rawUrl)
-            if (!channelId.isNullOrBlank()) {
-                val html = fetchText("$basefinURL/player/$channelId")
-                if (!html.isNullOrBlank()) {
-                    val playRaw =
-                        Regex("""player\.load\("([^"]*)"\)""").find(html)?.groupValues?.getOrNull(1)
-                    val licenseRaw =
-                        Regex("""com\.widevine\.alpha":\s*"([^"]*)""").find(html)?.groupValues?.getOrNull(1)
-                    val playUrl = playRaw?.takeIf { it.isNotBlank() && it != "Not Found" }?.let {
-                        unescapeJsUrl(it, basefinURL)
-                    }
-                    val licenseUrl = licenseRaw?.takeIf { it.isNotBlank() && it != "Not Found" }?.let {
-                        unescapeJsUrl(it, basefinURL)
-                    }
-                    if (!playUrl.isNullOrBlank()) {
-                        val builder = MediaItem.Builder()
-                            .setUri(playUrl.toUri())
-                            .setMimeType(MimeTypes.APPLICATION_MPD)
-                        if (!licenseUrl.isNullOrBlank()) {
-                            builder.setDrmConfiguration(
-                                MediaItem.DrmConfiguration.Builder(C.WIDEVINE_UUID)
-                                    .setLicenseUri(licenseUrl.toUri())
-                                    .build()
-                            )
-                        }
-                        return builder.build() to playUrl
-                    }
-                }
-            }
-            return buildMediaItemForPlaybackUrl(dashCandidate) to dashCandidate
+    fun applyQualityAndReload(newQuality: String) {
+        try {
+            preferenceManager.myPrefs.filterQX = newQuality
+            preferenceManager.savePreferences()
+        } catch (_: Exception) {
         }
 
-        if (hlsCandidate.isNotBlank()) return buildMediaItemForPlaybackUrl(hlsCandidate) to hlsCandidate
-        if (dashCandidate.isNotBlank()) return buildMediaItemForPlaybackUrl(dashCandidate) to dashCandidate
-        return null
-    }
+        try {
+            val paramsBuilder = exoPlayer.trackSelectionParameters.buildUpon()
+            paramsBuilder.setPreferredVideoMimeTypes(MimeTypes.VIDEO_H264, MimeTypes.VIDEO_H265)
+            when (newQuality.lowercase()) {
+                "low" -> paramsBuilder.setMaxVideoSize(854, 480)
+                "medium" -> paramsBuilder.setMaxVideoSize(1280, 720)
+                "high" -> paramsBuilder.setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE)
+                else -> paramsBuilder.setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE)
+            }
+            exoPlayer.trackSelectionParameters = paramsBuilder.build()
 
-    fun playFromRawUrl(rawUrl: String, forceHls: Boolean = false) {
-        scope.launch {
-            val resolved = resolvePlayback(rawUrl = rawUrl, forceHls = forceHls) ?: return@launch
-            val (mediaItem, effectiveUrl) = resolved
+            retryCountRef.value = 0
+            isBuffering = true
+            val rawUrl = overrideVideoUrl ?: channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
+            val finalUrl = preferredPlaybackUrls(context, rawUrl).firstOrNull().orEmpty()
+            if (finalUrl.isBlank()) return
+            val mediaItem = buildMediaItemForPlaybackUrl(finalUrl)
             try {
                 exoPlayer.stop()
                 exoPlayer.clearMediaItems()
             } catch (_: Exception) {
             }
-            if (autoVideoQualityEnabled) {
-                autoVideoQualityUriKey = null
-                autoVideoQualityStepIndex = 0
-                try {
-                    val builder = exoPlayer.trackSelectionParameters.buildUpon()
-                    builder.clearOverridesOfType(C.TRACK_TYPE_VIDEO)
-                    exoPlayer.trackSelectionParameters = builder.build()
-                } catch (_: Exception) {
-                }
-            }
             exoPlayer.setMediaItem(mediaItem)
             exoPlayer.prepare()
             exoPlayer.playWhenReady = true
-            setupCustomPlaybackLogic(exoPlayer, effectiveUrl)
-        }
-    }
-
-    fun setPlaybackSpeed(speed: Float) {
-        selectedSpeed = speed
-        try {
-            exoPlayer.playbackParameters = PlaybackParameters(speed)
         } catch (_: Exception) {
         }
-    }
-
-    fun getVideoOptionsForDialog(): List<PlayerTrackOption> {
-        val bestByHeight = linkedMapOf<Int, PlayerTrackOption>()
-        val groups = runCatching { exoPlayer.currentTracks.groups }.getOrNull().orEmpty()
-        for (group in groups) {
-            if (group.type != C.TRACK_TYPE_VIDEO) continue
-            val tg = group.mediaTrackGroup
-            for (i in 0 until group.length) {
-                if (!group.isTrackSupported(i)) continue
-                val format = tg.getFormat(i)
-                val h = format.height
-                if (h <= 0) continue
-                val candidate = PlayerTrackOption(
-                    label = "${h}p",
-                    trackGroup = tg,
-                    trackIndex = i,
-                    format = format
-                )
-                val current = bestByHeight[h]
-                if (current == null) {
-                    bestByHeight[h] = candidate
-                } else {
-                    val cb = current.format.bitrate.takeIf { it > 0 } ?: 0
-                    val nb = format.bitrate.takeIf { it > 0 } ?: 0
-                    if (nb >= cb) bestByHeight[h] = candidate
-                }
-            }
-        }
-        return bestByHeight.entries.sortedByDescending { it.key }.map { it.value }
-    }
-
-    fun getAudioOptionsForDialog(): List<PlayerTrackOption> {
-        val options = mutableListOf<PlayerTrackOption>()
-        val seen = linkedSetOf<String>()
-        val groups = runCatching { exoPlayer.currentTracks.groups }.getOrNull().orEmpty()
-        for (group in groups) {
-            if (group.type != C.TRACK_TYPE_AUDIO) continue
-            val tg = group.mediaTrackGroup
-            for (i in 0 until group.length) {
-                if (!group.isTrackSupported(i)) continue
-                val format = tg.getFormat(i)
-                val language = format.language?.takeIf { it.isNotBlank() } ?: "und"
-                val label = format.label?.takeIf { it.isNotBlank() } ?: language
-                val key = "$language|$label|${format.channelCount}"
-                if (!seen.add(key)) continue
-                options.add(
-                    PlayerTrackOption(
-                        label = label,
-                        trackGroup = tg,
-                        trackIndex = i,
-                        format = format
-                    )
-                )
-            }
-        }
-        return options
-    }
-
-    fun applyTrackOverride(trackType: Int, option: PlayerTrackOption?) {
-        try {
-            val builder = exoPlayer.trackSelectionParameters.buildUpon()
-            builder.clearOverridesOfType(trackType)
-            if (option != null) {
-                builder.setOverrideForType(
-                    TrackSelectionOverride(option.trackGroup, listOf(option.trackIndex))
-                )
-            }
-            exoPlayer.trackSelectionParameters = builder.build()
-        } catch (_: Exception) {
-        }
-    }
-
-    fun currentMediaUriKey(): String? {
-        val uri = runCatching { exoPlayer.currentMediaItem?.localConfiguration?.uri?.toString() }.getOrNull()
-            ?: return null
-        return uri.substringBefore('#').substringBefore('?')
-    }
-
-    fun applyAutoHighPriorityVideoIfNeeded() {
-        if (!autoVideoQualityEnabled) return
-        val key = currentMediaUriKey() ?: return
-        if (autoVideoQualityUriKey == key) return
-        val options = getVideoOptionsForDialog()
-        if (options.isEmpty()) return
-        autoVideoQualityUriKey = key
-        autoVideoQualityStepIndex = 0
-        applyTrackOverride(C.TRACK_TYPE_VIDEO, options[0])
-    }
-
-    fun stepDownAutoVideoQualityIfPossible(): Boolean {
-        if (!autoVideoQualityEnabled) return false
-        val key = currentMediaUriKey() ?: return false
-        if (autoVideoQualityUriKey != key) return false
-        val options = getVideoOptionsForDialog()
-        val nextIndex = autoVideoQualityStepIndex + 1
-        if (nextIndex !in options.indices) return false
-        autoVideoQualityStepIndex = nextIndex
-        applyTrackOverride(C.TRACK_TYPE_VIDEO, options[nextIndex])
-        return true
     }
 
     // --- Resize Config ---
@@ -505,56 +339,62 @@ fun ExoPlayJetScreen(
                     isBuffering = false
                     videoProbeJob?.cancel()
                     videoProbeJob = scope.launch {
-                        delay(2600)
+                        delay(1600)
                         val hasVideo = runCatching { exoPlayer.currentTracks.isTypeSelected(C.TRACK_TYPE_VIDEO) }
                             .getOrNull()
                             ?: (exoPlayer.videoSize.height > 0 && exoPlayer.videoSize.width > 0)
                         if (!hasVideo) {
+                            val q = preferenceManager.myPrefs.filterQX?.lowercase() ?: "auto"
+                            if (q == "high" || q == "medium") {
+                                val nextQ = "low"
+                                qualityIndex = qualityOptions.indexOf(nextQ).takeIf { it >= 0 } ?: 0
+                                qualityOverlayLabel = nextQ.uppercase()
+                                showQualityOverlay = true
+                                qualityOverlayJob?.cancel()
+                                qualityOverlayJob = scope.launch {
+                                    delay(1200)
+                                    showQualityOverlay = false
+                                }
+                                Toast.makeText(
+                                    context,
+                                    "Video not supported in $q, switching to $nextQ",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                applyQualityAndReload(nextQ)
+                                return@launch
+                            }
+
                             val activeUrl = runCatching {
                                 exoPlayer.currentMediaItem?.localConfiguration?.uri?.toString().orEmpty()
                             }.getOrElse { "" }
                             val activeClean = activeUrl.substringBefore('#').substringBefore('?').lowercase()
                             if (activeClean.endsWith(".mpd") || activeClean.contains(".mpd")) {
-                                if (stepDownAutoVideoQualityIfPossible()) {
+                                val rawUrl =
+                                    overrideVideoUrl ?: channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
+                                val candidates = preferredPlaybackUrls(context, rawUrl)
+                                val fallbackUrl = candidates.getOrNull(1).orEmpty()
+                                if (fallbackUrl.isNotBlank()) {
+                                    Toast.makeText(
+                                        context,
+                                        "DASH video not supported, switching to HLS",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    val mediaItem = buildMediaItemForPlaybackUrl(fallbackUrl)
                                     try {
-                                        exoPlayer.prepare()
-                                        exoPlayer.playWhenReady = true
+                                        exoPlayer.stop()
+                                        exoPlayer.clearMediaItems()
                                     } catch (_: Exception) {
                                     }
-                                    return@launch
+                                    exoPlayer.setMediaItem(mediaItem)
+                                    exoPlayer.prepare()
+                                    exoPlayer.playWhenReady = true
                                 }
-                                val rawUrl = overrideVideoUrl ?: channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
-                                Toast.makeText(context, "DASH video not available, switching to HLS", Toast.LENGTH_SHORT).show()
-                                playFromRawUrl(rawUrl = rawUrl, forceHls = true)
-                                return@launch
                             }
                         }
                     }
                 }
                 // Update PiP actions as play/pause state may have effectively changed
                 PlayerCommandBus.notifyStateChanged()
-            }
-
-            override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
-                tracksVersion += 1
-                applyAutoHighPriorityVideoIfNeeded()
-            }
-
-            override fun onPlayerError(error: PlaybackException) {
-                val rawUrl = overrideVideoUrl ?: channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
-                val activeUrl = runCatching {
-                    exoPlayer.currentMediaItem?.localConfiguration?.uri?.toString().orEmpty()
-                }.getOrElse { "" }
-                val activeClean = activeUrl.substringBefore('#').substringBefore('?').lowercase()
-                if (stepDownAutoVideoQualityIfPossible()) {
-                    try {
-                        exoPlayer.prepare()
-                        exoPlayer.playWhenReady = true
-                    } catch (_: Exception) {
-                    }
-                    return
-                }
-                playFromRawUrl(rawUrl = rawUrl, forceHls = activeClean.endsWith(".mpd") || activeClean.contains(".mpd"))
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -586,8 +426,8 @@ fun ExoPlayJetScreen(
         isBuffering = true
         try {
             val currentUrlRaw = channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
-            val resolved = resolvePlayback(rawUrl = currentUrlRaw, forceHls = false)
-            if (resolved == null) {
+            val currentUrl = preferredPlaybackUrls(context, currentUrlRaw).firstOrNull().orEmpty()
+            if (currentUrl.isBlank()) {
                 Toast.makeText(context, "Invalid stream URL", Toast.LENGTH_SHORT).show()
                 try {
                     exoPlayer.stop()
@@ -598,12 +438,12 @@ fun ExoPlayJetScreen(
                 return@LaunchedEffect
             }
 
-            val (mediaItem, effectiveUrl) = resolved
+            val mediaItem = buildMediaItemForPlaybackUrl(currentUrl)
             exoPlayer.setMediaItem(mediaItem)
             exoPlayer.prepare()
             exoPlayer.playWhenReady = true
 
-            setupCustomPlaybackLogic(exoPlayer, effectiveUrl)
+            setupCustomPlaybackLogic(exoPlayer, currentUrl)
         } catch (_: Exception) {
             Toast.makeText(context, "Stream not supported", Toast.LENGTH_SHORT).show()
             try {
@@ -707,7 +547,17 @@ fun ExoPlayJetScreen(
                 if (!targetUrl.isNullOrEmpty()) {
                     retryCountRef.value = 0
                     isBuffering = true
-                    playFromRawUrl(rawUrl = targetUrl, forceHls = false)
+                    val finalUrl = preferredPlaybackUrls(context, targetUrl).firstOrNull().orEmpty()
+                    if (finalUrl.isBlank()) return@setOnSwitchRequest
+                    val mediaItem = buildMediaItemForPlaybackUrl(finalUrl)
+                    try {
+                        exoPlayer.stop()
+                        exoPlayer.clearMediaItems()
+                    } catch (_: Exception) {
+                    }
+                    exoPlayer.setMediaItem(mediaItem)
+                    exoPlayer.prepare()
+                    exoPlayer.playWhenReady = true
                 }
             } catch (_: Exception) {
             }
@@ -1169,13 +1019,21 @@ fun ExoPlayJetScreen(
             ) {
                 IconButton(
                     onClick = {
-                        settingsTabIndex = 0
-                        showPlayerSettings = true
+                        qualityIndex = (qualityIndex + 1) % qualityOptions.size
+                        val q = qualityOptions[qualityIndex]
+                        qualityOverlayLabel = q.uppercase()
+                        showQualityOverlay = true
+                        qualityOverlayJob?.cancel()
+                        qualityOverlayJob = scope.launch {
+                            delay(1200)
+                            showQualityOverlay = false
+                        }
+                        applyQualityAndReload(q)
                     }
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Settings,
-                        contentDescription = "Player settings",
+                        imageVector = Icons.Filled.HighQuality,
+                        contentDescription = "Change quality",
                         tint = Color.White.copy(alpha = 0.5f)
                     )
                 }
@@ -1213,26 +1071,22 @@ fun ExoPlayJetScreen(
             }
         }
 
-        if (!PlayerCommandBus.isInPipMode && showPlayerSettings) {
-            PlayerSettingsDialog(
-                tabIndex = settingsTabIndex,
-                onTabIndexChange = { settingsTabIndex = it },
-                onDismiss = { showPlayerSettings = false },
-                tracksVersion = tracksVersion,
-                getVideoOptions = { getVideoOptionsForDialog() },
-                getAudioOptions = { getAudioOptionsForDialog() },
-                selectedSpeed = selectedSpeed,
-                onSpeedSelected = { setPlaybackSpeed(it) },
-                onVideoSelected = { option ->
-                    autoVideoQualityEnabled = (option == null)
-                    if (autoVideoQualityEnabled) {
-                        autoVideoQualityUriKey = null
-                        autoVideoQualityStepIndex = 0
-                    }
-                    applyTrackOverride(C.TRACK_TYPE_VIDEO, option)
-                },
-                onAudioSelected = { option -> applyTrackOverride(C.TRACK_TYPE_AUDIO, option) }
-            )
+        if (showQualityOverlay) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 136.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .padding(horizontal = 18.dp, vertical = 10.dp)
+            ) {
+                Text(
+                    text = qualityOverlayLabel,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 16.sp
+                )
+            }
         }
 
         // Left-side channel panel
@@ -1314,12 +1168,12 @@ fun ExoPlayJetScreen(
     LaunchedEffect(videoUrl) {
         if (channelList.isNullOrEmpty() || currentIndex < 0) {
             val rawUrl = channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
-            val resolved = resolvePlayback(rawUrl = rawUrl, forceHls = false) ?: return@LaunchedEffect
-            val (mediaItem, effectiveUrl) = resolved
+            val url = preferredPlaybackUrls(context, rawUrl).firstOrNull().orEmpty()
+            if (url.isBlank()) return@LaunchedEffect
+            val mediaItem = buildMediaItemForPlaybackUrl(url)
             exoPlayer.setMediaItem(mediaItem)
             exoPlayer.prepare()
             exoPlayer.playWhenReady = true
-            setupCustomPlaybackLogic(exoPlayer, effectiveUrl)
         }
     }
 
@@ -1494,171 +1348,6 @@ fun getCurrentFormattedTime(): String {
     return String.format("%02d:%02d %s", if (hour == 0) 12 else hour, minute, amPm)
 }
 
-private data class PlayerTrackOption(
-    val label: String,
-    val trackGroup: TrackGroup,
-    val trackIndex: Int,
-    val format: Format
-)
-
-@Composable
-private fun PlayerSettingsDialog(
-    tabIndex: Int,
-    onTabIndexChange: (Int) -> Unit,
-    onDismiss: () -> Unit,
-    tracksVersion: Int,
-    getVideoOptions: () -> List<PlayerTrackOption>,
-    getAudioOptions: () -> List<PlayerTrackOption>,
-    selectedSpeed: Float,
-    onSpeedSelected: (Float) -> Unit,
-    onVideoSelected: (PlayerTrackOption?) -> Unit,
-    onAudioSelected: (PlayerTrackOption?) -> Unit
-) {
-    val tabs = listOf("Quality", "Audio", "Speed")
-    val videoOptions = remember(tracksVersion) { getVideoOptions() }
-    val audioOptions = remember(tracksVersion) { getAudioOptions() }
-    val speeds = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
-
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.88f)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.White.copy(alpha = 0.06f))
-                        .padding(6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    tabs.forEachIndexed { idx, title ->
-                        val selected = idx == tabIndex
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(
-                                    if (selected) Color.White.copy(alpha = 0.16f) else Color.Transparent
-                                )
-                                .clickable { onTabIndexChange(idx) }
-                                .padding(vertical = 10.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = title,
-                                color = Color.White,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                fontSize = 14.sp
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                when (tabIndex) {
-                    0 -> {
-                        LazyColumn(modifier = Modifier.height(360.dp)) {
-                            item {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .clickable {
-                                            onVideoSelected(null)
-                                            onDismiss()
-                                        }
-                                        .padding(horizontal = 12.dp, vertical = 14.dp)
-                                ) {
-                                    Text(text = "Auto", color = Color.White, fontSize = 16.sp)
-                                }
-                            }
-                            itemsIndexed(videoOptions, key = { _, o -> "${o.label}|${o.trackIndex}|${o.format.bitrate}" }) { _, option ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .clickable {
-                                            onVideoSelected(option)
-                                            onDismiss()
-                                        }
-                                        .padding(horizontal = 12.dp, vertical = 14.dp)
-                                ) {
-                                    Text(text = option.label, color = Color.White, fontSize = 16.sp)
-                                }
-                            }
-                        }
-                    }
-
-                    1 -> {
-                        LazyColumn(modifier = Modifier.height(360.dp)) {
-                            item {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .clickable {
-                                            onAudioSelected(null)
-                                            onDismiss()
-                                        }
-                                        .padding(horizontal = 12.dp, vertical = 14.dp)
-                                ) {
-                                    Text(text = "Auto", color = Color.White, fontSize = 16.sp)
-                                }
-                            }
-                            itemsIndexed(audioOptions, key = { _, o -> "${o.label}|${o.trackIndex}|${o.format.language}" }) { _, option ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .clickable {
-                                            onAudioSelected(option)
-                                            onDismiss()
-                                        }
-                                        .padding(horizontal = 12.dp, vertical = 14.dp)
-                                ) {
-                                    Text(text = option.label, color = Color.White, fontSize = 16.sp)
-                                }
-                            }
-                        }
-                    }
-
-                    else -> {
-                        LazyColumn(modifier = Modifier.height(360.dp)) {
-                            itemsIndexed(speeds, key = { _, s -> s }) { _, speed ->
-                                val selected = speed == selectedSpeed
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(
-                                            if (selected) Color.White.copy(alpha = 0.12f) else Color.Transparent
-                                        )
-                                        .clickable {
-                                            onSpeedSelected(speed)
-                                            onDismiss()
-                                        }
-                                        .padding(horizontal = 12.dp, vertical = 14.dp)
-                                ) {
-                                    Text(
-                                        text = "${speed}x",
-                                        color = Color.White,
-                                        fontSize = 16.sp,
-                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 private fun buildMediaItemForPlaybackUrl(url: String): MediaItem {
     val builder = MediaItem.Builder().setUri(url.toUri())
     val mimeType = inferPlaybackMimeType(url)
@@ -1677,7 +1366,9 @@ private fun inferPlaybackMimeType(url: String): String? {
 
 @UnstableApi
 fun initializePlayer(
-    context: Context
+    getCurrentVideoUrl: () -> String,
+    context: Context,
+    retryCountRef: MutableState<Int>
 ): ExoPlayer {
     val httpDataSourceFactory = DefaultHttpDataSource.Factory()
         .setAllowCrossProtocolRedirects(true)
@@ -1685,7 +1376,103 @@ fun initializePlayer(
     val mediaSourceFactory =
         DefaultMediaSourceFactory(context).setDataSourceFactory(httpDataSourceFactory)
 
-    return ExoPlayer.Builder(context).setMediaSourceFactory(mediaSourceFactory).build()
+    val player = ExoPlayer.Builder(context).setMediaSourceFactory(mediaSourceFactory).build()
+    var resumePosition: Long
+    retryCountRef.value = 0
+    val retryHandler = Handler(Looper.getMainLooper())
+
+    fun applySelectionParametersFromPrefs() {
+        val q = runCatching { SkySharedPref.getInstance(context).myPrefs.filterQX?.lowercase() }
+            .getOrNull()
+            ?: "auto"
+        val builder: TrackSelectionParameters.Builder = player.trackSelectionParameters.buildUpon()
+        builder.setPreferredVideoMimeTypes(MimeTypes.VIDEO_H264, MimeTypes.VIDEO_H265)
+        when (q) {
+            "low" -> builder.setMaxVideoSize(854, 480)
+            "medium" -> builder.setMaxVideoSize(1280, 720)
+            "high" -> builder.setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE)
+            else -> builder.setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE)
+        }
+        player.trackSelectionParameters = builder.build()
+    }
+
+    fun prepareAndPlay(seekToPosition: Long = 0L) {
+        applySelectionParametersFromPrefs()
+        val normalizedUrl = preferredPlaybackUrls(context, getCurrentVideoUrl()).firstOrNull().orEmpty()
+        if (normalizedUrl.isBlank()) return
+        val mediaItem = buildMediaItemForPlaybackUrl(normalizedUrl)
+        player.setMediaItem(mediaItem)
+        player.prepare()
+        if (seekToPosition > 0L) {
+            player.seekTo(seekToPosition)
+        }
+        player.playWhenReady = true
+    }
+
+    prepareAndPlay()
+
+    // Always Retry
+    player.addListener(object : Player.Listener {
+        override fun onPlayerError(error: PlaybackException) {
+            val attempt = retryCountRef.value + 1
+            retryCountRef.value = attempt
+            if (attempt > 12) {
+                try {
+                    player.stop()
+                    player.clearMediaItems()
+                    player.playWhenReady = false
+                } catch (_: Exception) {
+                }
+                return
+            }
+            val currentUrl = getCurrentVideoUrl()
+            val activeUrl = runCatching {
+                player.currentMediaItem?.localConfiguration?.uri?.toString().orEmpty()
+            }.getOrElse { "" }
+            val candidates = preferredPlaybackUrls(context, currentUrl)
+            val activeClean = activeUrl.substringBefore('#').substringBefore('?').lowercase()
+            val canFallback = candidates.size >= 2 &&
+                (activeClean.endsWith(".mpd") || activeClean.contains(".mpd")) &&
+                candidates[1].isNotBlank()
+
+            if (attempt == 2 && canFallback) {
+                retryCountRef.value = 0
+                retryHandler.removeCallbacksAndMessages(null)
+                try {
+                    player.stop()
+                } catch (_: Exception) {
+                }
+                val fallbackUrl = candidates[1]
+                val mediaItem = buildMediaItemForPlaybackUrl(fallbackUrl)
+                applySelectionParametersFromPrefs()
+                player.setMediaItem(mediaItem)
+                player.prepare()
+                player.playWhenReady = true
+                return
+            }
+            val retryDelayMs = (attempt * 350L).coerceAtMost(2500L)
+            retryHandler.removeCallbacksAndMessages(null)
+            retryHandler.postDelayed(
+                {
+                    try {
+                        if (currentUrl.containsAnyId()) {
+                            resumePosition = player.currentPosition
+                            player.stop()
+                            prepareAndPlay(resumePosition)
+                        } else {
+                            player.stop()
+                            prepareAndPlay()
+                        }
+                    } catch (_: Exception) {
+                    }
+                },
+                retryDelayMs
+            )
+        }
+    })
+
+
+    return player
 }
 
 fun handleTVRemoteKey(
