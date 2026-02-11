@@ -59,7 +59,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -94,7 +93,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -229,6 +230,7 @@ fun ExoPlayJetScreen(
     var showQualityOverlay by remember { mutableStateOf(false) }
     var qualityOverlayLabel by remember { mutableStateOf(qualityOptions[qualityIndex].uppercase()) }
     var qualityOverlayJob by remember { mutableStateOf<Job?>(null) }
+    var videoProbeJob by remember { mutableStateOf<Job?>(null) }
 
     // --- Key Num Entry ---
     fun commitNumericEntryLocal(list: ArrayList<ChannelInfo>?) {
@@ -299,6 +301,61 @@ fun ExoPlayJetScreen(
                 isBuffering = (state == Player.STATE_BUFFERING)
                 if (state == Player.STATE_READY) {
                     isBuffering = false
+                    videoProbeJob?.cancel()
+                    videoProbeJob = scope.launch {
+                        delay(1600)
+                        val hasVideo = runCatching { exoPlayer.currentTracks.isTypeSelected(C.TRACK_TYPE_VIDEO) }
+                            .getOrNull()
+                            ?: (exoPlayer.videoSize.height > 0 && exoPlayer.videoSize.width > 0)
+                        if (!hasVideo) {
+                            val q = preferenceManager.myPrefs.filterQX?.lowercase() ?: "auto"
+                            if (q == "high" || q == "medium") {
+                                val nextQ = "low"
+                                qualityIndex = qualityOptions.indexOf(nextQ).takeIf { it >= 0 } ?: 0
+                                qualityOverlayLabel = nextQ.uppercase()
+                                showQualityOverlay = true
+                                qualityOverlayJob?.cancel()
+                                qualityOverlayJob = scope.launch {
+                                    delay(1200)
+                                    showQualityOverlay = false
+                                }
+                                Toast.makeText(
+                                    context,
+                                    "Video not supported in $q, switching to $nextQ",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                applyQualityAndReload(nextQ)
+                                return@launch
+                            }
+
+                            val activeUrl = runCatching {
+                                exoPlayer.currentMediaItem?.localConfiguration?.uri?.toString().orEmpty()
+                            }.getOrElse { "" }
+                            val activeClean = activeUrl.substringBefore('#').substringBefore('?').lowercase()
+                            if (activeClean.endsWith(".mpd") || activeClean.contains(".mpd")) {
+                                val rawUrl =
+                                    overrideVideoUrl ?: channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
+                                val candidates = preferredPlaybackUrls(context, rawUrl)
+                                val fallbackUrl = candidates.getOrNull(1).orEmpty()
+                                if (fallbackUrl.isNotBlank()) {
+                                    Toast.makeText(
+                                        context,
+                                        "DASH video not supported, switching to HLS",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    val mediaItem = buildMediaItemForPlaybackUrl(fallbackUrl)
+                                    try {
+                                        exoPlayer.stop()
+                                        exoPlayer.clearMediaItems()
+                                    } catch (_: Exception) {
+                                    }
+                                    exoPlayer.setMediaItem(mediaItem)
+                                    exoPlayer.prepare()
+                                    exoPlayer.playWhenReady = true
+                                }
+                            }
+                        }
+                    }
                 }
                 // Update PiP actions as play/pause state may have effectively changed
                 PlayerCommandBus.notifyStateChanged()
@@ -377,6 +434,16 @@ fun ExoPlayJetScreen(
         }
 
         try {
+            val paramsBuilder = exoPlayer.trackSelectionParameters.buildUpon()
+            paramsBuilder.setPreferredVideoMimeTypes(MimeTypes.VIDEO_H264, MimeTypes.VIDEO_H265)
+            when (newQuality.lowercase()) {
+                "low" -> paramsBuilder.setMaxVideoSize(854, 480)
+                "medium" -> paramsBuilder.setMaxVideoSize(1280, 720)
+                "high" -> paramsBuilder.setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE)
+                else -> paramsBuilder.setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE)
+            }
+            exoPlayer.trackSelectionParameters = paramsBuilder.build()
+
             retryCountRef.value = 0
             isBuffering = true
             val rawUrl = overrideVideoUrl ?: channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
@@ -1314,7 +1381,23 @@ fun initializePlayer(
     retryCountRef.value = 0
     val retryHandler = Handler(Looper.getMainLooper())
 
+    fun applySelectionParametersFromPrefs() {
+        val q = runCatching { SkySharedPref.getInstance(context).myPrefs.filterQX?.lowercase() }
+            .getOrNull()
+            ?: "auto"
+        val builder: TrackSelectionParameters.Builder = player.trackSelectionParameters.buildUpon()
+        builder.setPreferredVideoMimeTypes(MimeTypes.VIDEO_H264, MimeTypes.VIDEO_H265)
+        when (q) {
+            "low" -> builder.setMaxVideoSize(854, 480)
+            "medium" -> builder.setMaxVideoSize(1280, 720)
+            "high" -> builder.setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE)
+            else -> builder.setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE)
+        }
+        player.trackSelectionParameters = builder.build()
+    }
+
     fun prepareAndPlay(seekToPosition: Long = 0L) {
+        applySelectionParametersFromPrefs()
         val normalizedUrl = preferredPlaybackUrls(context, getCurrentVideoUrl()).firstOrNull().orEmpty()
         if (normalizedUrl.isBlank()) return
         val mediaItem = buildMediaItemForPlaybackUrl(normalizedUrl)
@@ -1361,6 +1444,7 @@ fun initializePlayer(
                 }
                 val fallbackUrl = candidates[1]
                 val mediaItem = buildMediaItemForPlaybackUrl(fallbackUrl)
+                applySelectionParametersFromPrefs()
                 player.setMediaItem(mediaItem)
                 player.prepare()
                 player.playWhenReady = true

@@ -195,8 +195,18 @@ fun preferredPlaybackUrls(context: Context, inputUrl: String): List<String> {
 
     if (livePathNoExt.isBlank()) return listOf(normalized)
 
-    val dashUrl = liveBaseUri.buildUpon().encodedPath("$livePathNoExt.mpd").build().toString()
-    val hlsUrl = liveBaseUri.buildUpon().encodedPath("$livePathNoExt.m3u8").build().toString()
+    val dashPathNoQuality = livePathNoExt
+        .replace("/live/low/", "/live/", ignoreCase = true)
+        .replace("/live/medium/", "/live/", ignoreCase = true)
+        .replace("/live/high/", "/live/", ignoreCase = true)
+    val dashUrl = liveBaseUri.buildUpon().encodedPath("$dashPathNoQuality.mpd").build().toString()
+
+    val hlsBaseUri = runCatching { Uri.parse(normalized) }.getOrNull() ?: liveBaseUri
+    val hlsPathNoExt = hlsBaseUri.encodedPath
+        .orEmpty()
+        .replace(Regex("""\.(mpd|m3u8|m3u)$""", RegexOption.IGNORE_CASE), "")
+        .trimEnd('/')
+    val hlsUrl = hlsBaseUri.buildUpon().encodedPath("$hlsPathNoExt.m3u8").build().toString()
 
     return listOf(dashUrl, hlsUrl).distinct()
 }
