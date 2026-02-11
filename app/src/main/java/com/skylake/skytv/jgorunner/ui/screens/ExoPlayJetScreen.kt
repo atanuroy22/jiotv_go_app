@@ -231,6 +231,7 @@ fun ExoPlayJetScreen(
     var qualityOverlayLabel by remember { mutableStateOf(qualityOptions[qualityIndex].uppercase()) }
     var qualityOverlayJob by remember { mutableStateOf<Job?>(null) }
     var videoProbeJob by remember { mutableStateOf<Job?>(null) }
+    var isBuffering by remember { mutableStateOf(false) }
 
     // --- Key Num Entry ---
     fun commitNumericEntryLocal(list: ArrayList<ChannelInfo>?) {
@@ -330,7 +331,6 @@ fun ExoPlayJetScreen(
     }
 
     // --- Custom Buffering ---
-    var isBuffering by remember { mutableStateOf(false) }
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
