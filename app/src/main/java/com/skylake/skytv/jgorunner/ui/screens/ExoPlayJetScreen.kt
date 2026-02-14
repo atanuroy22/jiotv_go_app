@@ -976,15 +976,14 @@ fun ExoPlayJetScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(if (isSelected) Color(0x33FFFFFF) else Color.Transparent)
-                                .padding(horizontal = 16.dp, vertical = 10.dp)
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(Color.Transparent)
+                                .background(if (isSelected) Color(0x33FFFFFF) else Color.Transparent)
                                 .clickable {
                                     panelSelectedIndex = idx
                                     currentIndex = idx
                                     showChannelPanel = false
-                                },
+                                }
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             AsyncImage(
