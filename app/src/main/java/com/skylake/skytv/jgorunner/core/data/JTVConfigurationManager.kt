@@ -92,6 +92,10 @@ class JTVConfigurationManager private constructor(context: Context) {
             handlePathPrefixMismatch()
         }
 
+        if (jtvConfiguration.plugins.isNullOrEmpty()) {
+            jtvConfiguration.plugins = listOf("zee5")
+        }
+
         val jtvConfigFile = File(jtvConfigLocation)
         if (!jtvConfigFile.exists()) {
             jtvConfigFile.parentFile?.mkdirs()
