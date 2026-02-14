@@ -6,6 +6,7 @@ import android.content.Context.CONNECTIVITY_SERVICE
 import android.net.ConnectivityManager
 import android.net.LinkProperties
 import android.net.NetworkCapabilities
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import android.webkit.WebView
@@ -335,17 +336,16 @@ private class CustomWebViewClient(
             try {
                 val parsed = Uri.parse(videoUrl)
                 if (parsed.getQueryParameter("q") != null) {
-                    val builder = parsed.buildUpon().clearQuery()
-                    for (name in parsed.queryParameterNames) {
-                        if (name.equals("q", ignoreCase = true)) continue
-                        val values = parsed.getQueryParameters(name)
-                        if (values.isEmpty()) {
-                            builder.appendQueryParameter(name, null)
-                        } else {
-                            values.forEach { v -> builder.appendQueryParameter(name, v) }
+                    val encodedQuery = parsed.encodedQuery
+                    if (!encodedQuery.isNullOrBlank()) {
+                        val kept = encodedQuery.split('&').filter { part ->
+                            val key = part.substringBefore('=', part).substringBefore('&')
+                            !key.equals("q", ignoreCase = true)
                         }
+                        val builder = parsed.buildUpon()
+                        builder.encodedQuery(kept.joinToString("&").ifBlank { null })
+                        videoUrl = builder.build().toString()
                     }
-                    videoUrl = builder.build().toString()
                 }
             } catch (_: Exception) {
             }
