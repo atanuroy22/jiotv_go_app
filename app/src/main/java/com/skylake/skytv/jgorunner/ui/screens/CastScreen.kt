@@ -332,9 +332,22 @@ private class CustomWebViewClient(
         }
 
         if (videoUrl.contains(".m3u8")) {
-            val questionMarkIndex = videoUrl.indexOf("?")
-            if (questionMarkIndex != -1) {
-                videoUrl = videoUrl.substring(0, questionMarkIndex)
+            try {
+                val parsed = Uri.parse(videoUrl)
+                if (parsed.getQueryParameter("q") != null) {
+                    val builder = parsed.buildUpon().clearQuery()
+                    for (name in parsed.queryParameterNames) {
+                        if (name.equals("q", ignoreCase = true)) continue
+                        val values = parsed.getQueryParameters(name)
+                        if (values.isEmpty()) {
+                            builder.appendQueryParameter(name, null)
+                        } else {
+                            values.forEach { v -> builder.appendQueryParameter(name, v) }
+                        }
+                    }
+                    videoUrl = builder.build().toString()
+                }
+            } catch (_: Exception) {
             }
         }
 
