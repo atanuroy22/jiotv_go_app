@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -92,6 +93,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
@@ -108,6 +110,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
+import com.skylake.skytv.jgorunner.core.data.JTVConfigurationManager
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.receivers.PipActionReceiver
 import com.skylake.skytv.jgorunner.services.player.PlayerCommandBus
@@ -117,14 +120,19 @@ import com.skylake.skytv.jgorunner.utils.DeviceUtils
 import com.skylake.skytv.jgorunner.utils.containsAnyId
 import com.skylake.skytv.jgorunner.utils.normalizePlaybackUrl
 import com.skylake.skytv.jgorunner.utils.setupCustomPlaybackLogic
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.util.Calendar
+import java.util.concurrent.TimeUnit
 
 const val TAG = "ExoJetScreen"
 
@@ -320,8 +328,8 @@ fun ExoPlayJetScreen(
         isBuffering = true
         try {
             val currentUrlRaw = channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
-            val currentUrl = normalizePlaybackUrl(context, currentUrlRaw)
-            if (currentUrl.isBlank()) {
+            val mediaItem = resolvePlaybackMediaItem(context, currentUrlRaw)
+            if (mediaItem == null) {
                 Toast.makeText(context, "Invalid stream URL", Toast.LENGTH_SHORT).show()
                 try {
                     exoPlayer.stop()
@@ -332,12 +340,14 @@ fun ExoPlayJetScreen(
                 return@LaunchedEffect
             }
 
-            val mediaItem = buildMediaItemForPlaybackUrl(currentUrl)
             exoPlayer.setMediaItem(mediaItem)
             exoPlayer.prepare()
             exoPlayer.playWhenReady = true
 
-            setupCustomPlaybackLogic(exoPlayer, currentUrl)
+            val logicUrl =
+                mediaItem.localConfiguration?.uri?.toString()
+                    ?: normalizePlaybackUrl(context, currentUrlRaw)
+            setupCustomPlaybackLogic(exoPlayer, logicUrl)
         } catch (_: Exception) {
             Toast.makeText(context, "Stream not supported", Toast.LENGTH_SHORT).show()
             try {
@@ -439,19 +449,22 @@ fun ExoPlayJetScreen(
                     }
                 }
                 if (!targetUrl.isNullOrEmpty()) {
-                    retryCountRef.value = 0
-                    isBuffering = true
-                    val finalUrl = normalizePlaybackUrl(context, targetUrl)
-                    if (finalUrl.isBlank()) return@setOnSwitchRequest
-                    val mediaItem = buildMediaItemForPlaybackUrl(finalUrl)
-                    try {
-                        exoPlayer.stop()
-                        exoPlayer.clearMediaItems()
-                    } catch (_: Exception) {
+                    scope.launch {
+                        try {
+                            retryCountRef.value = 0
+                            isBuffering = true
+                            val mediaItem = resolvePlaybackMediaItem(context, targetUrl) ?: return@launch
+                            try {
+                                exoPlayer.stop()
+                                exoPlayer.clearMediaItems()
+                            } catch (_: Exception) {
+                            }
+                            exoPlayer.setMediaItem(mediaItem)
+                            exoPlayer.prepare()
+                            exoPlayer.playWhenReady = true
+                        } catch (_: Exception) {
+                        }
                     }
-                    exoPlayer.setMediaItem(mediaItem)
-                    exoPlayer.prepare()
-                    exoPlayer.playWhenReady = true
                 }
             } catch (_: Exception) {
             }
@@ -963,15 +976,14 @@ fun ExoPlayJetScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(if (isSelected) Color(0x33FFFFFF) else Color.Transparent)
-                                .padding(horizontal = 16.dp, vertical = 10.dp)
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(Color.Transparent)
+                                .background(if (isSelected) Color(0x33FFFFFF) else Color.Transparent)
                                 .clickable {
                                     panelSelectedIndex = idx
                                     currentIndex = idx
                                     showChannelPanel = false
-                                },
+                                }
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             AsyncImage(
@@ -1018,9 +1030,7 @@ fun ExoPlayJetScreen(
     LaunchedEffect(videoUrl) {
         if (channelList.isNullOrEmpty() || currentIndex < 0) {
             val rawUrl = channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
-            val url = normalizePlaybackUrl(context, rawUrl)
-            if (url.isBlank()) return@LaunchedEffect
-            val mediaItem = buildMediaItemForPlaybackUrl(url)
+            val mediaItem = resolvePlaybackMediaItem(context, rawUrl) ?: return@LaunchedEffect
             exoPlayer.setMediaItem(mediaItem)
             exoPlayer.prepare()
             exoPlayer.playWhenReady = true
@@ -1198,6 +1208,117 @@ fun getCurrentFormattedTime(): String {
     return String.format("%02d:%02d %s", if (hour == 0) 12 else hour, minute, amPm)
 }
 
+private val playPageHttpClient: OkHttpClient =
+    OkHttpClient.Builder()
+        .followRedirects(true)
+        .followSslRedirects(true)
+        .connectTimeout(6, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
+        .callTimeout(10, TimeUnit.SECONDS)
+        .build()
+
+private data class DrmDashInfo(val manifestUrl: String, val licenseUrl: String?)
+
+private fun normalizeAbsoluteUrl(context: Context, inputUrl: String): String {
+    val skyPref = SkySharedPref.getInstance(context).myPrefs
+    var url = inputUrl.trim().trim('`', '"', '\'')
+    if (url.isEmpty()) return url
+
+    val parsed = runCatching { Uri.parse(url) }.getOrNull()
+    if (parsed != null && parsed.scheme.isNullOrEmpty()) {
+        val base = "http://localhost:${skyPref.jtvGoServerPort}"
+        url = if (url.startsWith("/")) "$base$url" else "$base/$url"
+    }
+    return url
+}
+
+private fun unescapeShakaString(raw: String): String {
+    return raw
+        .replace("\\u0026", "&")
+        .replace("\\/", "/")
+        .replace("\\\\", "\\")
+        .trim()
+}
+
+private fun makeAbsoluteToLocal(context: Context, maybeUrl: String): String {
+    val url = maybeUrl.trim()
+    if (url.isEmpty()) return url
+    val parsed = runCatching { Uri.parse(url) }.getOrNull()
+    if (parsed != null && !parsed.scheme.isNullOrEmpty()) return url
+
+    val base = "http://localhost:${SkySharedPref.getInstance(context).myPrefs.jtvGoServerPort}"
+    return if (url.startsWith("/")) "$base$url" else "$base/$url"
+}
+
+private fun buildDashMediaItem(manifestUrl: String, licenseUrl: String?): MediaItem {
+    val builder =
+        MediaItem.Builder()
+            .setUri(manifestUrl.toUri())
+            .setMimeType(MimeTypes.APPLICATION_MPD)
+    if (!licenseUrl.isNullOrBlank()) {
+        val drmConfig =
+            MediaItem.DrmConfiguration.Builder(C.WIDEVINE_UUID)
+                .setLicenseUri(licenseUrl.toUri())
+                .build()
+        builder.setDrmConfiguration(drmConfig)
+    }
+    return builder.build()
+}
+
+private suspend fun tryResolveDrmDashFromPlayPage(context: Context, pageUrl: String): DrmDashInfo? {
+    return withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder().url(pageUrl).build()
+            val response = playPageHttpClient.newCall(request).execute()
+            response.use {
+                if (!it.isSuccessful) return@withContext null
+                val body = it.body?.string().orEmpty()
+                if (body.isBlank()) return@withContext null
+
+                val playRaw =
+                    Regex("""player\.load\(\s*"([^"]+)"\s*\)""").find(body)?.groupValues?.getOrNull(1)
+                        ?: Regex("""player\.load\(\s*'([^']+)'\s*\)""").find(body)?.groupValues?.getOrNull(1)
+                val licRaw =
+                    Regex("""com\.widevine\.alpha"\s*:\s*"([^"]+)"""").find(body)?.groupValues?.getOrNull(1)
+                        ?: Regex("""com\.widevine\.alpha'\s*:\s*'([^']+)"""").find(body)?.groupValues?.getOrNull(1)
+
+                val playUrl = playRaw?.let { makeAbsoluteToLocal(context, unescapeShakaString(it)) }.orEmpty()
+                if (playUrl.isBlank() || !playUrl.contains(".mpd", ignoreCase = true)) return@withContext null
+
+                val licenseUrl = licRaw?.let { makeAbsoluteToLocal(context, unescapeShakaString(it)) }
+                    ?.takeIf { it.isNotBlank() && !it.equals("Not Found", ignoreCase = true) }
+
+                DrmDashInfo(manifestUrl = playUrl, licenseUrl = licenseUrl)
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+}
+
+private suspend fun resolvePlaybackMediaItem(context: Context, rawUrl: String): MediaItem? {
+    val absolute = normalizeAbsoluteUrl(context, rawUrl)
+    if (absolute.isBlank()) return null
+
+    val path = runCatching { Uri.parse(absolute).encodedPath.orEmpty() }.getOrDefault("")
+    val isPlayPage =
+        path.contains("/play/", ignoreCase = true) || path.contains("/player/", ignoreCase = true)
+    val drmEnabled = runCatching {
+        JTVConfigurationManager.getInstance(context).jtvConfiguration.drm
+    }.getOrDefault(false)
+
+    if (isPlayPage && drmEnabled) {
+        val drmDash = tryResolveDrmDashFromPlayPage(context, absolute)
+        if (drmDash != null) {
+            return buildDashMediaItem(drmDash.manifestUrl, drmDash.licenseUrl)
+        }
+    }
+
+    val normalizedUrl = normalizePlaybackUrl(context, rawUrl)
+    if (normalizedUrl.isBlank()) return null
+    return buildMediaItemForPlaybackUrl(normalizedUrl)
+}
+
 private fun buildMediaItemForPlaybackUrl(url: String): MediaItem {
     val builder = MediaItem.Builder().setUri(url.toUri())
     val mimeType = inferPlaybackMimeType(url)
@@ -1230,17 +1351,21 @@ fun initializePlayer(
     var resumePosition: Long
     retryCountRef.value = 0
     val retryHandler = Handler(Looper.getMainLooper())
+    val resolveScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    var resolveJob: Job? = null
 
     fun prepareAndPlay(seekToPosition: Long = 0L) {
-        val normalizedUrl = normalizePlaybackUrl(context, getCurrentVideoUrl())
-        if (normalizedUrl.isBlank()) return
-        val mediaItem = buildMediaItemForPlaybackUrl(normalizedUrl)
-        player.setMediaItem(mediaItem)
-        player.prepare()
-        if (seekToPosition > 0L) {
-            player.seekTo(seekToPosition)
+        val rawUrl = getCurrentVideoUrl()
+        resolveJob?.cancel()
+        resolveJob = resolveScope.launch {
+            val mediaItem = resolvePlaybackMediaItem(context, rawUrl) ?: return@launch
+            player.setMediaItem(mediaItem)
+            player.prepare()
+            if (seekToPosition > 0L) {
+                player.seekTo(seekToPosition)
+            }
+            player.playWhenReady = true
         }
-        player.playWhenReady = true
     }
 
     prepareAndPlay()

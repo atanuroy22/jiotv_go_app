@@ -6,6 +6,7 @@ import android.content.Intent
 import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,12 +14,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,8 +52,13 @@ fun ChannelGridTV(
 //    selectedChannel: M3UChannelExp?,
     onSelectedChannelChanged: (M3UChannelExp) -> Unit
 ) {
-    val focusRequester = remember { FocusRequester() }
+    val firstItemFocusRequester = remember { FocusRequester() }
     val preferenceManager = remember { SkySharedPref.getInstance(context) }
+    LaunchedEffect(channels) {
+        if (channels.isNotEmpty()) {
+            firstItemFocusRequester.requestFocus()
+        }
+    }
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 100.dp),
         contentPadding = PaddingValues(16.dp),
@@ -59,13 +66,16 @@ fun ChannelGridTV(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        items(channels, key = { it.url }) { channel ->
+        itemsIndexed(channels, key = { _, item -> item.url }) { idx, channel ->
             var isFocused by remember { mutableStateOf(false) }
 
             Card(
                 modifier = Modifier
                     .height(120.dp)
-                    .focusRequester(focusRequester)
+                    .then(
+                        if (idx == 0) Modifier.focusRequester(firstItemFocusRequester) else Modifier
+                    )
+                    .focusable()
                     .onFocusChanged { focusState ->
                         isFocused = focusState.isFocused
                         if (focusState.isFocused) {
@@ -184,18 +194,28 @@ fun ChannelGridMain(
     preferenceManager: SkySharedPref
 ) {
     val basefinURL = "http://localhost:$localPORT"
+    val firstItemFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(filteredChannels) {
+        if (filteredChannels.isNotEmpty()) {
+            firstItemFocusRequester.requestFocus()
+        }
+    }
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 100.dp),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        items(filteredChannels) { channel ->
+        itemsIndexed(filteredChannels, key = { _, item -> item.channel_id ?: item.channel_url }) { idx, channel ->
             var isFocused by remember { mutableStateOf(false) }
 
             Card(
                 modifier = Modifier
                     .height(120.dp)
+                    .then(
+                        if (idx == 0) Modifier.focusRequester(firstItemFocusRequester) else Modifier
+                    )
+                    .focusable()
                     .onFocusChanged { focusState ->
                         isFocused = focusState.isFocused
                         if (focusState.isFocused) {
