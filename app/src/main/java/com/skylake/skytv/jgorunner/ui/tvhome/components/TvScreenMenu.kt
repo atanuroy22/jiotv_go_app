@@ -487,21 +487,21 @@ fun TvScreenMenu(
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 ///////////////////////////////
-                // if (showPlaylist) {
-                //     Row(
-                //         verticalAlignment = Alignment.CenterVertically,
-                //         modifier = Modifier.fillMaxWidth()
-                //     ) {
-                //         Checkbox(
-                //             checked = showRecentTab,
-                //             onCheckedChange = { checked ->
-                //                 showRecentTab = checked
-                //             }
-                //         )
-                //         Spacer(modifier = Modifier.width(8.dp))
-                //         Text(text = "Show Recent Channels")
-                //     }
-                // }
+                if (showPlaylist) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Checkbox(
+                            checked = showRecentTab,
+                            onCheckedChange = { checked ->
+                                showRecentTab = checked
+                            }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "Show Recent Channels")
+                    }
+                }
 
 ///////////////////////////////
 
