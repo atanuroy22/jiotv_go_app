@@ -6,7 +6,6 @@ import android.content.Context.CONNECTIVITY_SERVICE
 import android.net.ConnectivityManager
 import android.net.LinkProperties
 import android.net.NetworkCapabilities
-import android.net.Uri
 import android.os.Build
 import android.util.Log
 import android.webkit.WebView
@@ -333,21 +332,9 @@ private class CustomWebViewClient(
         }
 
         if (videoUrl.contains(".m3u8")) {
-            try {
-                val parsed = Uri.parse(videoUrl)
-                if (parsed.getQueryParameter("q") != null) {
-                    val encodedQuery = parsed.encodedQuery
-                    if (!encodedQuery.isNullOrBlank()) {
-                        val kept = encodedQuery.split('&').filter { part ->
-                            val key = part.substringBefore('=', part).substringBefore('&')
-                            !key.equals("q", ignoreCase = true)
-                        }
-                        val builder = parsed.buildUpon()
-                        builder.encodedQuery(kept.joinToString("&").ifBlank { null })
-                        videoUrl = builder.build().toString()
-                    }
-                }
-            } catch (_: Exception) {
+            val questionMarkIndex = videoUrl.indexOf("?")
+            if (questionMarkIndex != -1) {
+                videoUrl = videoUrl.substring(0, questionMarkIndex)
             }
         }
 

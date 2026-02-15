@@ -132,17 +132,20 @@ fun normalizePlaybackUrl(context: Context, inputUrl: String): String {
     val qFromUrl = parsed?.getQueryParameter("q")?.lowercase()
     val qFromPref = skyPref.filterQX?.lowercase()
     val effectiveQuality = qFromPref ?: qFromUrl
-    if (parsed != null && qFromUrl != null) {
-        val encodedQuery = parsed.encodedQuery
-        if (!encodedQuery.isNullOrBlank()) {
-            val kept = encodedQuery.split('&').filter { part ->
-                val key = part.substringBefore('=', part).substringBefore('&')
-                !key.equals("q", ignoreCase = true)
+
+    if (parsed != null && parsed.query?.isNotEmpty() == true) {
+        val builder = parsed.buildUpon().clearQuery()
+        val names = runCatching { parsed.queryParameterNames }.getOrNull().orEmpty()
+        for (name in names) {
+            if (name.equals("q", ignoreCase = true)) continue
+            val values = parsed.getQueryParameters(name)
+            if (values.isEmpty()) {
+                builder.appendQueryParameter(name, null)
+            } else {
+                values.forEach { v -> builder.appendQueryParameter(name, v) }
             }
-            val builder = parsed.buildUpon()
-            builder.encodedQuery(kept.joinToString("&").ifBlank { null })
-            url = builder.build().toString()
         }
+        url = builder.build().toString()
     }
 
     if (!effectiveQuality.isNullOrEmpty()) {

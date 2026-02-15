@@ -49,8 +49,5 @@ data class JTVConfiguration(
     var customChannelsUrl: String = "",
 
     @SerializedName("epg_url")
-    var epgUrl: String = "https://avkb.short.gy/jioepg.xml.gz",
-
-    @SerializedName("plugins")
-    var plugins: List<String>? = listOf("zee5")
+    var epgUrl: String = "https://avkb.short.gy/jioepg.xml.gz"
 )

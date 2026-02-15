@@ -146,22 +146,9 @@ public class ExoplayerActivity extends ComponentActivity {
 
         // Remove query parameters if URL contains ".m3u8"
         if (videoUrl.contains(".m3u8")) {
-            try {
-                Uri parsed = Uri.parse(videoUrl);
-                if (parsed.getQueryParameter("q") != null) {
-                    Uri.Builder builder = parsed.buildUpon().clearQuery();
-                    for (String name : parsed.getQueryParameterNames()) {
-                        if ("q".equalsIgnoreCase(name)) continue;
-                        List<String> values = parsed.getQueryParameters(name);
-                        if (values == null || values.isEmpty()) {
-                            builder.appendQueryParameter(name, null);
-                        } else {
-                            for (String v : values) builder.appendQueryParameter(name, v);
-                        }
-                    }
-                    videoUrl = builder.build().toString();
-                }
-            } catch (Exception ignored) {
+            int questionMarkIndex = videoUrl.indexOf("?");
+            if (questionMarkIndex != -1) {
+                videoUrl = videoUrl.substring(0, questionMarkIndex);
             }
         }
 
