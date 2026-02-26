@@ -30,19 +30,6 @@
   </tr>
 </table>
 
----
-
-### ✨ Features
-
-**JioTV+** is a lightweight Android app that runs the JioTV Go server and provides a TV-friendly UI.
-
-- ⚡️ **Smaller, Faster, and Lighter**: At around 5 MB, JTV-GO is optimized for minimal storage use, with no unnecessary clutter, making it faster and more efficient.
-- 📱 **One APK for All Devices**: Designed to work seamlessly across devices from Android 5 to the latest version, so there's no need for multiple versions.
-- 🛠 **No Dependency Hassles**: JTV-GO Server is a standalone, native app. No extra installations needed.
-- 🚀 **Enhanced Performance**: Built for efficient resource usage, JTV-GO provides a smooth, stable streaming experience.
-- 🔄 **Streamlined Design**: Focused exclusively on TV streaming, JTV-GO has a simple and user-friendly interface that’s easy to navigate.
-
-JTV-GO Server keeps the focus on TV streaming with extra optimizations for a better, faster experience.
 
 ---
 
@@ -51,7 +38,17 @@ JTV-GO Server keeps the focus on TV streaming with extra optimizations for a bet
 1. **Download the APK**: Grab the latest release
    <!--  from the [releases page](https://github.com/atanuroy22/jiotv_go_app/releases/latest). -->
 
-   [<img src="https://img.shields.io/badge/Download-APK-2ea44f?style=for-the-badge" alt="Download APK">](https://github.com/atanuroy22/jiotv_go_app/releases/latest)
+   <p align="center">
+     <a href="https://github.com/atanuroy22/jiotv_go_app/releases/latest" style="text-decoration:none;">
+       <img src="https://img.shields.io/badge/Click%20Here%20to%20Download-TV%20%26%20Mobile-2ea44f?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" style="border-radius:16px; box-shadow:0 4px 16px #2ea44f; margin:16px 0; width:320px; height:70px;">
+     </a>
+     <br>
+     <span style="font-size:1.3em; color:#2ea44f; font-weight:bold; letter-spacing:1px;">
+       <!-- <img src="https://img.icons8.com/ios-filled/50/2ea44f/tv.png" alt="TV Icon" height="24" style="vertical-align:middle; margin-right:6px;">
+       <img src="https://img.icons8.com/ios-filled/50/2ea44f/iphone.png" alt="Mobile Icon" height="24" style="vertical-align:middle; margin-right:6px;"> -->
+       TV & Mobile Friendly
+     </span>
+   </p>
 
 2. **Install the APK**:
 
@@ -62,7 +59,20 @@ JTV-GO Server keeps the focus on TV streaming with extra optimizations for a bet
 
 ---
 
-### 🚀 Usage
+### ✨ Features
+
+**JioTV+** is a lightweight Android and TV app that provides a TV-friendly UI.
+
+- ⚡️ **Smaller, Faster, and Lighter**: At around 5 MB, JTV-GO is has 1k+ jio channels and 2k+ IPTV channels, making it faster and more efficient.
+<!-- - 📱 **One APK for All Devices**: Designed to work seamlessly across devices from Android 5 to the latest version, so there's no need for multiple versions.
+- 🛠 **No Dependency Hassles**: JTV-GO Server is a standalone, native app. No extra installations needed.
+- 🚀 **Enhanced Performance**: Built for efficient resource usage, JTV-GO provides a smooth, stable streaming experience.
+- 🔄 **Streamlined Design**: Focused exclusively on TV streaming, JTV-GO has a simple and user-friendly interface that’s easy to navigate.
+
+JTV-GO Server keeps the focus on TV streaming with extra optimizations for a better, faster experience. -->
+
+<!-----
+ ### 🚀 Usage
 
 1. **Setting Up for the First Time**:
 
@@ -85,12 +95,9 @@ JTV-GO Server keeps the focus on TV streaming with extra optimizations for a bet
    - If you experience issues with channel playback, ensure the server is running and the network connection is stable.
    - Check for any firewall or security settings blocking the server’s port.
 
----
+--- -->
 
-### 🙏 Thanks
-
-- **rabilrbl** — original developer
-- All contributors who helped improve this project
+🙏 Thanks to rabilrbl — original developer & All contributors who helped improve this project.
 <!-- 
 build
 

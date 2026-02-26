@@ -86,6 +86,8 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
     var showLoading by remember { mutableStateOf(false) }
     var reloadAttemptCount by rememberSaveable { mutableIntStateOf(0) }
     var waitingDots by remember { mutableStateOf("") }
+    var autoLoadCountdown by remember { mutableIntStateOf(5) }
+    var autoLoadTriggered by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
     remember { FocusRequester() }
@@ -388,18 +390,34 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
         }
     }
 
-    LaunchedEffect(fetched, filteredChannels.value, reloadAttemptCount) {
-        if (fetched && filteredChannels.value.isEmpty() && reloadAttemptCount < 2) {
-            waitingDots = ""
-            for (i in 1..6) {
-                waitingDots += "."
-                delay(300)
+    // Auto-load cached channels after 5 seconds if not clicked
+    LaunchedEffect(fetched, filteredChannels.value) {
+        if (fetched && filteredChannels.value.isEmpty() && !autoLoadTriggered) {
+            autoLoadTriggered = true
+            var countdownActive = true
+            
+            // Start countdown
+            for (i in 5 downTo 1) {
+                if (!countdownActive) break
+                autoLoadCountdown = i
+                // Create waiting dots animation
+                waitingDots = ""
+                for (j in 1..6) {
+                    if (!countdownActive) break
+                    waitingDots += "."
+                    delay(100)
+                }
+                delay(600) // Complete the 1 second cycle
             }
-            reloadAttemptCount++
-            showLoading = true
-            val fetchedChannels = fetchFromBackend()
-            filteredChannels.value = fetchedChannels
-            showLoading = false
+            
+            // Auto-load from cache if countdown completed without being cancelled
+            if (countdownActive) {
+                reloadAttemptCount++
+                showLoading = true
+                val fetchedChannels = fetchFromBackend()
+                filteredChannels.value = fetchedChannels
+                showLoading = false
+            }
         }
     }
 
@@ -465,14 +483,22 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(text = waitingDots, style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold))
                 Spacer(modifier = Modifier.height(10.dp))
+                Text(text = waitingDots, style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold))
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Try the following steps:",
-                    style = TextStyle(fontSize = 16.sp)
+                    text = "Auto-loading cached channels in ${autoLoadCountdown}s...",
+                    style = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Bold),
+                    color = Color.Blue
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Click Reload to reload now, or wait for auto-load",
+                    style = TextStyle(fontSize = 14.sp)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "\n• Check your internet connection\n• Reload the app\n• Go to Main Screen for detailed information",
-                    style = TextStyle(fontSize = 15.sp, color = Color.Gray)
+                    text = "• Check your internet connection\n• Go to Main Screen for detailed information",
+                    style = TextStyle(fontSize = 13.sp, color = Color.Gray)
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 ElevatedCard(
