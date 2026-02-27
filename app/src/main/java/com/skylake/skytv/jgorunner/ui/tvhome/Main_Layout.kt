@@ -186,7 +186,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                             putExtra("video_url", firstChannel.channel_url)
                             putExtra(
                                 "logo_url",
-                                "http://localhost:$localPORT/jtvimage/${firstChannel.logoUrl}"
+                                if (firstChannel.logoUrl.startsWith("http")) firstChannel.logoUrl else "http://localhost:$localPORT/jtvimage/${firstChannel.logoUrl}"
                             )
                             putExtra("ch_name", firstChannel.channel_name)
                         }
@@ -331,7 +331,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                     putExtra("video_url", firstChannel.channel_url)
                     putExtra(
                         "logo_url",
-                        "http://localhost:$localPORT/jtvimage/${firstChannel.logoUrl}"
+                        if (firstChannel.logoUrl.startsWith("http")) firstChannel.logoUrl else "http://localhost:$localPORT/jtvimage/${firstChannel.logoUrl}"
                     )
                     putExtra("ch_name", firstChannel.channel_name)
                 }

@@ -210,7 +210,7 @@ fun ChannelGridMain(
                                 putExtra("zone", "TV")
                                 putExtra("channel_list_kind", "jio")
                                 putExtra("current_channel_index", -1)
-                                putExtra("logo_url", "$basefinURL/jtvimage/${channel.logoUrl}")
+                                putExtra("logo_url", if (channel.logoUrl.startsWith("http")) channel.logoUrl else "$basefinURL/jtvimage/${channel.logoUrl}")
                                 putExtra("ch_name", channel.channel_name)
 
                                 addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
@@ -288,7 +288,7 @@ fun ChannelGridMain(
                 )
             ) {
                 val logoUrl = channel.logoUrl
-                val imageUrl = "$basefinURL/jtvimage/$logoUrl"
+                val imageUrl = if (logoUrl.startsWith("http")) logoUrl else "$basefinURL/jtvimage/$logoUrl"
                 GlideImage(
                     model = imageUrl,
                     contentDescription = channel.channel_name,
@@ -324,7 +324,7 @@ fun buildChannelInfoWindow(
     val list = ArrayList(slice.map { ch ->
         ChannelInfo(
             withQuality(context, ch.channel_url),
-            "$basefinURL/jtvimage/${ch.logoUrl}",
+            if (ch.logoUrl.startsWith("http")) ch.logoUrl else "$basefinURL/jtvimage/${ch.logoUrl}",
             ch.channel_name
         )
     })
