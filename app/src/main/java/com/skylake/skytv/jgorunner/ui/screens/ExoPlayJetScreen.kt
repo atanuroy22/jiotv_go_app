@@ -1210,6 +1210,9 @@ private fun inferPlaybackMimeType(url: String): String? {
     return when {
         cleaned.endsWith(".m3u8") || cleaned.contains(".m3u8") -> MimeTypes.APPLICATION_M3U8
         cleaned.endsWith(".mpd") || cleaned.contains(".mpd") -> MimeTypes.APPLICATION_MPD
+        // Plugin channels (e.g. /zee5/...) served by the local server have no file extension.
+        // All local-server endpoints ultimately serve HLS, so hint ExoPlayer accordingly.
+        cleaned.contains("localhost") && !cleaned.substringAfterLast("/").contains(".") -> MimeTypes.APPLICATION_M3U8
         else -> null
     }
 }
