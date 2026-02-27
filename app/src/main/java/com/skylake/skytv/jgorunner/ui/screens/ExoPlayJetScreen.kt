@@ -170,11 +170,12 @@ fun ExoPlayJetScreen(
     var isControllerVisible by remember { mutableStateOf(false) }
 
 
-    // Keep local state in sync when a new intent provides a different index
+    // Keep local state in sync when a new intent provides a different index.
+    // Only update when a real index is given (>= 0). -1 means "play by URL" (e.g. plugin/Zee
+    // channels) and must not be coerced to 0, which would wrongly play channelList[0].
     LaunchedEffect(currentChannelIndex) {
-        val incoming = currentChannelIndex.coerceAtLeast(0)
-        if (incoming != currentIndex) {
-            currentIndex = incoming
+        if (currentChannelIndex >= 0 && currentChannelIndex != currentIndex) {
+            currentIndex = currentChannelIndex
         }
     }
 

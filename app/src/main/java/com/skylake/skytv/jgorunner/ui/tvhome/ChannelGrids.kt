@@ -208,7 +208,7 @@ fun ChannelGridMain(
                             val intent = Intent(context, ExoPlayJet::class.java).apply {
                                 putExtra("video_url", channel.channel_url)
                                 putExtra("zone", "TV")
-                                putExtra("channel_list_kind", "jio")
+                                if (channel.channel_id.all { it.isDigit() }) putExtra("channel_list_kind", "jio")
                                 putExtra("current_channel_index", -1)
                                 putExtra("logo_url", if (channel.logoUrl.startsWith("http")) channel.logoUrl else "$basefinURL/jtvimage/${channel.logoUrl}")
                                 putExtra("ch_name", channel.channel_name)
@@ -271,7 +271,7 @@ fun ChannelGridMain(
                                 val intent = Intent(context, ExoPlayJet::class.java).apply {
                                     putExtra("video_url", channel.channel_url)
                                     putExtra("zone", "TV")
-                                    putExtra("channel_list_kind", "jio")
+                                    if (channel.channel_id.all { it.isDigit() }) putExtra("channel_list_kind", "jio")
                                     putExtra("current_channel_index", -1)
                                     addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                                     if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

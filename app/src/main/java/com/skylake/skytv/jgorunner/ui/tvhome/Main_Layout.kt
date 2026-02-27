@@ -181,7 +181,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                         val firstChannel = channelsToUse.first()
                         val intent = Intent(context, ExoPlayJet::class.java).apply {
                             putExtra("zone", "TV")
-                            putExtra("channel_list_kind", "jio")
+                            if (firstChannel.channel_id.all { it.isDigit() }) putExtra("channel_list_kind", "jio")
                             putExtra("current_channel_index", -1)
                             putExtra("video_url", firstChannel.channel_url)
                             putExtra(
@@ -326,7 +326,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                 val firstChannel = channelsForAutoplay.first()
                 val intent = Intent(context, ExoPlayJet::class.java).apply {
                     putExtra("zone", "TV")
-                    putExtra("channel_list_kind", "jio")
+                    if (firstChannel.channel_id.all { it.isDigit() }) putExtra("channel_list_kind", "jio")
                     putExtra("current_channel_index", -1)
                     putExtra("video_url", firstChannel.channel_url)
                     putExtra(

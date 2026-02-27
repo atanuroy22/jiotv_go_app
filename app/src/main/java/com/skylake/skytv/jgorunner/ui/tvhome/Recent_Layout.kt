@@ -101,7 +101,7 @@ fun Recent_Layout(context: Context) {
 
                                 val intent = Intent(context, ExoPlayJet::class.java).apply {
                                     putExtra("zone", "TV")
-                                    putExtra("channel_list_kind", "jio")
+                                    if (channel.channel_id.all { it.isDigit() }) putExtra("channel_list_kind", "jio")
                                     putExtra("current_channel_index", -1)
                                     putExtra("video_url", channel.channel_url)
                                     putExtra("logo_url", if (channel.logoUrl.startsWith("http")) channel.logoUrl else "http://localhost:$serverPort/jtvimage/${channel.logoUrl}")
