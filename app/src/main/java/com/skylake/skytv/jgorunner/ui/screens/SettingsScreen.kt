@@ -143,6 +143,9 @@ fun SettingsScreen(
     var isSwitchOnForDRM by remember {
         mutableStateOf(jtvConfigurationManager.jtvConfiguration.drm)
     }
+    var isSwitchOnForZeePlugin by remember {
+        mutableStateOf(jtvConfigurationManager.jtvConfiguration.plugins.contains("zee5"))
+    }
     var isSwitchOnForAutoStartServer by remember {
         mutableStateOf(preferenceManager.myPrefs.autoStartServer)
     }
@@ -176,6 +179,7 @@ fun SettingsScreen(
     var showRestart by remember { mutableStateOf(false) }
     var customChannelsInitialized by remember { mutableStateOf(false) }
     var epgInitialized by remember { mutableStateOf(false) }
+    var zeePluginInitialized by remember { mutableStateOf(false) }
 
     val jiotvEpgDownloadUrl = "https://avkb.short.gy/jioepg.xml.gz"
     val iptvEpgIndiaDownloadUrl = "https://iptv-epg.org/files/epg-in.xml.gz"
@@ -382,6 +386,48 @@ fun SettingsScreen(
         jtvConfigurationManager.saveJTVConfiguration()
     }
 
+    LaunchedEffect(isSwitchOnForZeePlugin) {
+        val currentPlugins = jtvConfigurationManager.jtvConfiguration.plugins.toMutableList()
+        if (isSwitchOnForZeePlugin) {
+            if (!currentPlugins.contains("zee5")) currentPlugins.add("zee5")
+        } else {
+            currentPlugins.remove("zee5")
+        }
+        jtvConfigurationManager.jtvConfiguration.plugins = currentPlugins
+        jtvConfigurationManager.saveJTVConfiguration()
+
+        if (!zeePluginInitialized) {
+            zeePluginInitialized = true
+            return@LaunchedEffect
+        }
+
+        if (BinaryService.isRunning) {
+            try {
+                val stopIntent = Intent(activity, BinaryService::class.java).apply {
+                    action = BinaryService.ACTION_STOP_BINARY
+                }
+                activity.startService(stopIntent)
+            } catch (_: Exception) {
+            }
+
+            var waitedMs = 0
+            while (BinaryService.isRunning && waitedMs < 4000) {
+                delay(100)
+                waitedMs += 100
+            }
+
+            try {
+                val startIntent = Intent(activity, BinaryService::class.java)
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    activity.startForegroundService(startIntent)
+                } else {
+                    activity.startService(startIntent)
+                }
+            } catch (_: Exception) {
+            }
+        }
+    }
+
     LaunchedEffect(selectedIndex) {
         preferenceManager.myPrefs.operationMODE = selectedIndex
         applySettings()
@@ -481,6 +527,16 @@ fun SettingsScreen(
                     subtitle =  "DRM toggle [chrome/firefox only]",
                     isChecked = isSwitchOnForDRM,
                     onCheckedChange = { isChecked -> isSwitchOnForDRM = isChecked },
+                )
+            }
+
+            item {
+                SettingSwitchItem(
+                    icon = Icons.Filled.LiveTv,
+                    title = "Zee5 Plugin",
+                    subtitle = if (isSwitchOnForZeePlugin) "Zee channels enabled (restart server)" else "Zee channels disabled",
+                    isChecked = isSwitchOnForZeePlugin,
+                    onCheckedChange = { isChecked -> isSwitchOnForZeePlugin = isChecked },
                 )
             }
 

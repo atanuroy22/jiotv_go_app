@@ -170,10 +170,10 @@ fun SearchTabLayout(context: Context, focusRequester: FocusRequester) {
                                         SkySharedPref.getInstance(context).myPrefs.jtvGoServerPort
                                     val intent = Intent(context, ExoPlayJet::class.java).apply {
                                         putExtra("zone", "TV")
-                                        putExtra("channel_list_kind", "jio")
+                                        if (channel.channel_id.all { it.isDigit() }) putExtra("channel_list_kind", "jio")
                                         putExtra("current_channel_index", -1)
                                         putExtra("video_url", channel.channel_url)
-                                        putExtra("logo_url", "http://localhost:$serverPort/jtvimage/${channel.logoUrl}")
+                                        putExtra("logo_url", if (channel.logoUrl.startsWith("http")) channel.logoUrl else "http://localhost:$serverPort/jtvimage/${channel.logoUrl}")
                                         putExtra("ch_name", channel.channel_name)
                                     }
                                     if (context !is Activity) {
@@ -213,7 +213,7 @@ fun SearchTabLayout(context: Context, focusRequester: FocusRequester) {
                         ) {
                             Column {
                                 GlideImage(
-                                    model = "http://localhost:${localPORT}/jtvimage/${channel.logoUrl}",
+                                    model = if (channel.logoUrl.startsWith("http")) channel.logoUrl else "http://localhost:${localPORT}/jtvimage/${channel.logoUrl}",
                                     contentDescription = channel.channel_name,
                                     modifier = Modifier
                                         .fillMaxWidth()
