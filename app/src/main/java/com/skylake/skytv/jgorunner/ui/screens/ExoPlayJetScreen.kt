@@ -282,10 +282,16 @@ fun ExoPlayJetScreen(
     // --- Custom Buffering ---
     var isBuffering by remember { mutableStateOf(false) }
     DisposableEffect(exoPlayer) {
+        val bufferHandler = android.os.Handler(android.os.Looper.getMainLooper())
+        val showBufferingRunnable = Runnable { isBuffering = true }
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
-                isBuffering = (state == Player.STATE_BUFFERING)
-                if (state == Player.STATE_READY) {
+                if (state == Player.STATE_BUFFERING) {
+                    // Debounce: only show spinner if buffering persists > 2000ms
+                    // (HLS live-stream segment fetches are transient and complete faster)
+                    bufferHandler.postDelayed(showBufferingRunnable, 2000)
+                } else {
+                    bufferHandler.removeCallbacks(showBufferingRunnable)
                     isBuffering = false
                 }
                 // Update PiP actions as play/pause state may have effectively changed
@@ -306,7 +312,10 @@ fun ExoPlayJetScreen(
             }
         }
         exoPlayer.addListener(listener)
-        onDispose { exoPlayer.removeListener(listener) }
+        onDispose {
+            bufferHandler.removeCallbacks(showBufferingRunnable)
+            exoPlayer.removeListener(listener)
+        }
     }
 
     LaunchedEffect(lifecycleOwner.lifecycle.currentStateAsState().value) {
@@ -635,6 +644,7 @@ fun ExoPlayJetScreen(
                     setShowNextButton(false)
                     setShowPreviousButton(false)
                     setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+                    controllerAutoShow = false
                     controllerShowTimeoutMs = 3000
                     setResizeMode(resizeModes[resizeModeIndex].first)
                     player = exoPlayer
