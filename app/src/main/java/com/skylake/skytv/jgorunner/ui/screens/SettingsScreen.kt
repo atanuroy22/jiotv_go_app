@@ -144,7 +144,7 @@ fun SettingsScreen(
         mutableStateOf(jtvConfigurationManager.jtvConfiguration.drm)
     }
     var isSwitchOnForZeePlugin by remember {
-        mutableStateOf(jtvConfigurationManager.jtvConfiguration.plugins.contains("zee5"))
+        mutableStateOf(true) // Zee5 always enabled by default
     }
     var isSwitchOnForAutoStartServer by remember {
         mutableStateOf(preferenceManager.myPrefs.autoStartServer)
@@ -530,15 +530,6 @@ fun SettingsScreen(
                 )
             }
 
-            item {
-                SettingSwitchItem(
-                    icon = Icons.Filled.LiveTv,
-                    title = "Zee5 Plugin",
-                    subtitle = if (isSwitchOnForZeePlugin) "Zee channels enabled (restart server)" else "Zee channels disabled",
-                    isChecked = isSwitchOnForZeePlugin,
-                    onCheckedChange = { isChecked -> isSwitchOnForZeePlugin = isChecked },
-                )
-            }
 
             // Port Number Setting
             item {
