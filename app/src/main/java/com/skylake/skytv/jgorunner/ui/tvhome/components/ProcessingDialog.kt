@@ -121,6 +121,9 @@ fun parseM3Uexp(m3uContent: String): List<M3UChannelExp> {
         val name = Regex(",\\s*(.+)$").find(line)?.groupValues?.get(1)?.trim().orEmpty()
         val logo = Regex("""tvg-logo="([^"]*)"""", RegexOption.IGNORE_CASE).find(line)?.groupValues?.get(1)
         val category = Regex("""group-title="([^"]*)"""", RegexOption.IGNORE_CASE).find(line)?.groupValues?.get(1)
+        val language = Regex("""tvg-language="([^"]*)"""", RegexOption.IGNORE_CASE).find(line)?.groupValues?.get(1)?.trim()?.ifEmpty { null }
+            ?.let { normalizeLanguageCode(it) }
+        val country = Regex("""tvg-country="([^"]*)"""", RegexOption.IGNORE_CASE).find(line)?.groupValues?.get(1)?.trim()?.uppercase()?.ifEmpty { null }
 
         var urlLineIndex: Int? = null
         var j = i + 1
@@ -140,13 +143,62 @@ fun parseM3Uexp(m3uContent: String): List<M3UChannelExp> {
         if (name.isNotEmpty() && url.isNotEmpty()) {
             Log.d(
                 "parseM3Uexp",
-                "Parsed channel: name=$name, url=$url, logo=$logo, category=$category"
+                "Parsed channel: name=$name, lang=$language, country=$country, category=$category"
             )
-            channels.add(M3UChannelExp(name, url, logo, category))
+            channels.add(M3UChannelExp(name, url, logo, category, language, country))
         }
 
         i = (urlLineIndex?.plus(1)) ?: (i + 1)
     }
     Log.d("parseM3Uexp", "Total channels parsed: ${channels.size}")
     return channels
+}
+
+/**
+ * Normalizes a raw tvg-language value to a lowercase ISO 639-1 code.
+ * Handles:
+ *  - JioTV / Zee5 integer IDs  (e.g. "8" → "ta")
+ *  - Full language names        (e.g. "Tamil" → "ta")
+ *  - ISO codes already correct  (e.g. "ta" → "ta")
+ */
+private fun normalizeLanguageCode(raw: String): String? {
+    val trimmed = raw.trim()
+    if (trimmed.isEmpty()) return null
+
+    // JioTV / Zee5 integer language IDs → ISO code
+    val intToIso = mapOf(
+        "1" to "hi",  // Hindi
+        "2" to "mr",  // Marathi
+        "3" to "pa",  // Punjabi
+        "4" to "ar",  // Arabic (Zee Alwan/Aflam)
+        "5" to "bn",  // Bengali
+        "6" to "en",  // English
+        "7" to "ml",  // Malayalam
+        "8" to "ta",  // Tamil
+        "9" to "gu",  // Gujarati
+        "10" to "or", // Odia
+        "11" to "te", // Telugu
+        "12" to "bho",// Bhojpuri
+        "13" to "kn", // Kannada
+        "14" to "as", // Assamese
+        "15" to "ne", // Nepali
+        "16" to "fr", // French
+        "18" to "id"  // Indonesian / Other
+    )
+    intToIso[trimmed]?.let { return it }
+
+    // Full English name → ISO code
+    val nameToIso = mapOf(
+        "hindi" to "hi", "marathi" to "mr", "punjabi" to "pa",
+        "arabic" to "ar", "bengali" to "bn", "english" to "en",
+        "malayalam" to "ml", "tamil" to "ta", "gujarati" to "gu",
+        "odia" to "or", "oriya" to "or", "telugu" to "te",
+        "bhojpuri" to "bho", "kannada" to "kn", "assamese" to "as",
+        "nepali" to "ne", "french" to "fr", "indonesian" to "id",
+        "urdu" to "ur", "sinhala" to "si"
+    )
+    nameToIso[trimmed.lowercase()]?.let { return it }
+
+    // Already a short ISO code or unknown — return lowercase as-is
+    return trimmed.lowercase()
 }

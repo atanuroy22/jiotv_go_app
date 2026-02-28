@@ -246,7 +246,7 @@ class ExoPlayJet : ComponentActivity() {
             filtered.map { ch ->
                 ChannelInfo(
                     withQuality(this, ch.channel_url),
-                    "$basefinURL/jtvimage/${ch.logoUrl}",
+                    if (ch.logoUrl.startsWith("http")) ch.logoUrl else "$basefinURL/jtvimage/${ch.logoUrl}",
                     ch.channel_name
                 )
             }

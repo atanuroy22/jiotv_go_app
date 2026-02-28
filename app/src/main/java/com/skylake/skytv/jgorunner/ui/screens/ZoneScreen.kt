@@ -6,7 +6,6 @@ import android.content.res.Configuration
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.animation.Animatable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -266,9 +265,7 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp)
-                            .focusRestorer()
-                            .focusRequester(tabFocusRequester)
-                            .focusable(),
+                            .focusRestorer(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         PrimaryTabRow(selectedTabIndex = selectedTabIndex) {
@@ -276,6 +273,10 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
                                 Tab(
                                     selected = index == selectedTabIndex,
                                     onClick = { selectedTabIndex = index },
+                                    modifier = if (index == selectedTabIndex)
+                                        Modifier.focusRequester(tabFocusRequester)
+                                    else
+                                        Modifier,
                                     text = {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Icon(

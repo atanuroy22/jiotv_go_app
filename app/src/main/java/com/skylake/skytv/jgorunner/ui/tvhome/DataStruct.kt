@@ -1,6 +1,7 @@
 package com.skylake.skytv.jgorunner.ui.tvhome
 
 import androidx.annotation.Keep
+import com.google.gson.annotations.SerializedName
 
 @Keep
 data class ChannelResponse(
@@ -11,13 +12,21 @@ data class ChannelResponse(
 
 @Keep
 data class Channel(
+    @SerializedName(value = "channel_id", alternate = ["id"])
     val channel_id: String,
+    @SerializedName(value = "channel_name", alternate = ["name"])
     val channel_name: String,
+    @SerializedName(value = "channel_url", alternate = ["url"])
     val channel_url: String,
+    @SerializedName(value = "logoUrl", alternate = ["logo"])
     val logoUrl: String,
-    val channelCategoryId: Int,
-    val channelLanguageId: Int,
-    val isHD: Boolean
+    @SerializedName(value = "channelCategoryId", alternate = ["category_id"])
+    val channelCategoryId: Int = 0,
+    @SerializedName(value = "channelLanguageId", alternate = ["language"])
+    val channelLanguageId: Int = 0,
+    @SerializedName(value = "country", alternate = ["country_code"])
+    val country: String? = null,
+    val isHD: Boolean = false
 )
 
 @Keep
@@ -45,5 +54,7 @@ data class M3UChannelExp(
     val name: String,
     val url: String,
     val logo: String?,
-    val category: String?
+    val category: String?,
+    val language: String? = null,   // ISO 639-1 code e.g. "ta", "hi", "en"
+    val country: String? = null     // ISO 3166-1 alpha-2 code e.g. "IN", "GB"
 )

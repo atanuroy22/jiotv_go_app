@@ -83,15 +83,39 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int) {
         } ?: listOf("All"))
     }
 
+    var selectedLanguages by remember {
+        mutableStateOf(preferenceManager.myPrefs.lastSelectedLanguagesExp?.let {
+            Gson().fromJson(it, object : TypeToken<List<String>>() {}.type)
+        } ?: listOf("All"))
+    }
+
+    var selectedCountries by remember {
+        mutableStateOf(preferenceManager.myPrefs.lastSelectedCountriesExp?.let {
+            Gson().fromJson(it, object : TypeToken<List<String>>() {}.type)
+        } ?: listOf("All"))
+    }
+
     val categoriesList = remember(allChannels) {
         listOf("All") + allChannels.mapNotNull { it.category }.distinct().sorted()
     }
 
-    val filteredChannels = remember(selectedCategories2, allChannels) {
-        if (selectedCategories2.contains("All") || selectedCategories2.isEmpty()) {
-            allChannels
-        } else {
-            allChannels.filter { it.category in selectedCategories2 }
+    val languagesList = remember(allChannels) {
+        listOf("All") + allChannels.mapNotNull { it.language?.lowercase() }.distinct().sorted()
+    }
+
+    val countriesList = remember(allChannels) {
+        listOf("All") + allChannels.mapNotNull { it.country?.uppercase() }.distinct().sorted()
+    }
+
+    val filteredChannels = remember(selectedCategories2, selectedLanguages, selectedCountries, allChannels) {
+        allChannels.filter { ch ->
+            val catOk = selectedCategories2.contains("All") || selectedCategories2.isEmpty() ||
+                    ch.category in selectedCategories2
+            val langOk = selectedLanguages.contains("All") || selectedLanguages.isEmpty() ||
+                    ch.language?.lowercase() in selectedLanguages
+            val cntryOk = selectedCountries.contains("All") || selectedCountries.isEmpty() ||
+                    ch.country?.uppercase() in selectedCountries
+            catOk && langOk && cntryOk
         }
     }
 
@@ -262,6 +286,30 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int) {
                         preferenceManager.savePreferences()
                     }
                 )
+                if (languagesList.size > 2) {
+                    LanguageFilterRow(
+                        languages = languagesList,
+                        selectedLanguages = selectedLanguages,
+                        onSelectedLanguagesChange = { newSelection ->
+                            selectedLanguages = newSelection
+                            preferenceManager.myPrefs.lastSelectedLanguagesExp =
+                                Gson().toJson(newSelection)
+                            preferenceManager.savePreferences()
+                        }
+                    )
+                }
+                if (countriesList.size > 2) {
+                    CountryFilterRow(
+                        countries = countriesList,
+                        selectedCountries = selectedCountries,
+                        onSelectedCountriesChange = { newSelection ->
+                            selectedCountries = newSelection
+                            preferenceManager.myPrefs.lastSelectedCountriesExp =
+                                Gson().toJson(newSelection)
+                            preferenceManager.savePreferences()
+                        }
+                    )
+                }
 
                 //////////
 
@@ -365,6 +413,21 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int) {
 }
 
 
+// Maps ISO 639-1 language codes to human-readable names
+private val isoLanguageNameMap = mapOf(
+    "hi" to "Hindi", "mr" to "Marathi", "pa" to "Punjabi", "ar" to "Arabic",
+    "bn" to "Bengali", "en" to "English", "ml" to "Malayalam", "ta" to "Tamil",
+    "gu" to "Gujarati", "or" to "Odia", "te" to "Telugu", "kn" to "Kannada",
+    "bho" to "Bhojpuri", "id" to "Indonesian", "ur" to "Urdu", "as" to "Assamese",
+    "ne" to "Nepali", "fr" to "French", "si" to "Sinhala"
+)
+
+// Maps ISO 3166-1 alpha-2 country codes to human-readable names
+private val isoCountryNameMap = mapOf(
+    "IN" to "India", "GB" to "UK", "SG" to "APAC", "AE" to "UAE", "US" to "USA",
+    "AU" to "Australia", "CA" to "Canada", "NZ" to "New Zealand", "NL" to "Netherlands"
+)
+
 @Composable
 private fun CategoryFilterRow(
     categories: List<String>,
@@ -407,6 +470,106 @@ private fun CategoryFilterRow(
                     onSelectedCategoriesChange(newSelection)
                 },
                 label = { Text(category) },
+                leadingIcon = if (isSelected) {
+                    { Icon(Icons.Filled.Done, contentDescription = "Selected") }
+                } else null
+            )
+        }
+    }
+}
+
+@Composable
+private fun LanguageFilterRow(
+    languages: List<String>,   // list of ISO codes + "All"
+    selectedLanguages: List<String>,
+    onSelectedLanguagesChange: (List<String>) -> Unit
+) {
+    val reordered = remember(languages, selectedLanguages) {
+        val all = languages.find { it == "All" }
+        val sel = selectedLanguages.filter { it != "All" && it in languages }
+        val rest = languages.filter { it != "All" && it !in selectedLanguages }
+        listOfNotNull(all) + sel + rest
+    }
+
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        items(reordered, key = { it }) { code ->
+            val label = if (code == "All") "All Languages"
+                        else isoLanguageNameMap[code.lowercase()] ?: code.uppercase()
+            val isSelected = selectedLanguages.contains(code)
+            FilterChip(
+                selected = isSelected,
+                onClick = {
+                    val newSel = selectedLanguages.toMutableList()
+                    if (code == "All") {
+                        newSel.clear()
+                        newSel.add("All")
+                    } else {
+                        if (isSelected) {
+                            newSel.remove(code)
+                            if (newSel.isEmpty()) newSel.add("All")
+                        } else {
+                            newSel.add(code)
+                            newSel.remove("All")
+                        }
+                    }
+                    onSelectedLanguagesChange(newSel)
+                },
+                label = { Text(label) },
+                leadingIcon = if (isSelected) {
+                    { Icon(Icons.Filled.Done, contentDescription = "Selected") }
+                } else null
+            )
+        }
+    }
+}
+
+@Composable
+private fun CountryFilterRow(
+    countries: List<String>,   // list of ISO country codes + "All"
+    selectedCountries: List<String>,
+    onSelectedCountriesChange: (List<String>) -> Unit
+) {
+    val reordered = remember(countries, selectedCountries) {
+        val all = countries.find { it == "All" }
+        val sel = selectedCountries.filter { it != "All" && it in countries }
+        val rest = countries.filter { it != "All" && it !in selectedCountries }
+        listOfNotNull(all) + sel + rest
+    }
+
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        items(reordered, key = { it }) { code ->
+            val label = if (code == "All") "All Regions"
+                        else isoCountryNameMap[code.uppercase()] ?: code.uppercase()
+            val isSelected = selectedCountries.contains(code)
+            FilterChip(
+                selected = isSelected,
+                onClick = {
+                    val newSel = selectedCountries.toMutableList()
+                    if (code == "All") {
+                        newSel.clear()
+                        newSel.add("All")
+                    } else {
+                        if (isSelected) {
+                            newSel.remove(code)
+                            if (newSel.isEmpty()) newSel.add("All")
+                        } else {
+                            newSel.add(code)
+                            newSel.remove("All")
+                        }
+                    }
+                    onSelectedCountriesChange(newSel)
+                },
+                label = { Text(label) },
                 leadingIcon = if (isSelected) {
                     { Icon(Icons.Filled.Done, contentDescription = "Selected") }
                 } else null
