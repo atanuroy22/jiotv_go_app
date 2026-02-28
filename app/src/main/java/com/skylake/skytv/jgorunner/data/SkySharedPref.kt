@@ -202,6 +202,8 @@ class SkySharedPref(context: Context) {
         @SharedPrefKey("preRelease") var preRelease: Boolean = false,
         @SharedPrefKey("epgDebug") var epgDebug: Boolean = false,
         @SharedPrefKey("lastSelectedCategoriesExp") var lastSelectedCategoriesExp: String? = "",
+        @SharedPrefKey("lastSelectedLanguagesExp") var lastSelectedLanguagesExp: String? = "",
+        @SharedPrefKey("lastSelectedCountriesExp") var lastSelectedCountriesExp: String? = "",
         @SharedPrefKey("setupPending") var setupPending: Boolean = true,
         @SharedPrefKey("enable_pip") var enablePip: Boolean = false,
 

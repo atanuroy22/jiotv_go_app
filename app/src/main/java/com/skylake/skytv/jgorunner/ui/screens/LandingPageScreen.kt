@@ -173,8 +173,7 @@ fun LandingPageScreen(context: Context, onNavigate: (String) -> Unit, onExit: ()
         // Tabs
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-                .focusRestorer()
-                .focusRequester(tabFocusRequester),
+                .focusRestorer(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             PrimaryTabRow(selectedTabIndex = selectedTabIndex) {
@@ -182,6 +181,10 @@ fun LandingPageScreen(context: Context, onNavigate: (String) -> Unit, onExit: ()
                     Tab(
                         selected = index == selectedTabIndex,
                         onClick = { selectedTabIndex = index },
+                        modifier = if (index == selectedTabIndex)
+                            Modifier.focusRequester(tabFocusRequester)
+                        else
+                            Modifier,
                         text = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
