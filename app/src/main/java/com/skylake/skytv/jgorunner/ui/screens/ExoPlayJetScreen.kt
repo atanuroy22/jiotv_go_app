@@ -287,9 +287,9 @@ fun ExoPlayJetScreen(
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_BUFFERING) {
-                    // Debounce: only show spinner if buffering persists > 800ms
+                    // Debounce: only show spinner if buffering persists > 2000ms
                     // (HLS live-stream segment fetches are transient and complete faster)
-                    bufferHandler.postDelayed(showBufferingRunnable, 800)
+                    bufferHandler.postDelayed(showBufferingRunnable, 2000)
                 } else {
                     bufferHandler.removeCallbacks(showBufferingRunnable)
                     isBuffering = false
