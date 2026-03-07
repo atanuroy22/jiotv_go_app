@@ -115,6 +115,7 @@ import com.skylake.skytv.jgorunner.services.player.PlayerCommandBus
 import com.skylake.skytv.jgorunner.ui.tvhome.ChannelUtils
 import com.skylake.skytv.jgorunner.ui.tvhome.extractChannelIdFromPlayUrl
 import com.skylake.skytv.jgorunner.utils.DeviceUtils
+import com.skylake.skytv.jgorunner.utils.cleanupPlaybackLogic
 import com.skylake.skytv.jgorunner.utils.containsAnyId
 import com.skylake.skytv.jgorunner.utils.normalizePlaybackUrl
 import com.skylake.skytv.jgorunner.utils.setupCustomPlaybackLogic
@@ -262,12 +263,14 @@ fun ExoPlayJetScreen(
                     false
 
                 Lifecycle.Event.ON_DESTROY -> {
+                    // Do not release here — onDispose always runs and is the
+                    // single correct place to release. Releasing in both places
+                    // causes a double-release which is undefined behaviour.
                     try {
                         exoPlayer.stop()
                         exoPlayer.clearMediaItems()
                     } catch (_: Exception) {
                     }
-                    exoPlayer.release()
                 }
 
                 else -> Unit
@@ -276,6 +279,7 @@ fun ExoPlayJetScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            cleanupPlaybackLogic(exoPlayer)  // remove listener ref before release → no leak
             exoPlayer.release()
         }
     }
@@ -288,9 +292,10 @@ fun ExoPlayJetScreen(
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_BUFFERING) {
-                    // Debounce: only show spinner if buffering persists > 800ms
-                    // (HLS live-stream segment fetches are transient and complete faster)
-                    bufferHandler.postDelayed(showBufferingRunnable, 800)
+                    // Debounce: only show spinner if buffering persists > 1500ms.
+                    // seekTo() and normal HLS segment fetches complete well within
+                    // that window, so they never show the spinner at all.
+                    bufferHandler.postDelayed(showBufferingRunnable, 1500)
                 } else {
                     bufferHandler.removeCallbacks(showBufferingRunnable)
                     isBuffering = false
@@ -328,7 +333,9 @@ fun ExoPlayJetScreen(
     LaunchedEffect(currentIndex) {
         overrideVideoUrl = null
         retryCountRef.value = 0
-        isBuffering = true
+        // Do NOT set isBuffering=true here — let the 800ms debounce in the Player.Listener
+        // handle it. Setting it immediately causes the spinner to flash on every channel
+        // switch even when the new channel starts playing within milliseconds.
         try {
             val currentUrlRaw = channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
             val currentUrl = normalizePlaybackUrl(context, currentUrlRaw)
@@ -451,15 +458,12 @@ fun ExoPlayJetScreen(
                 }
                 if (!targetUrl.isNullOrEmpty()) {
                     retryCountRef.value = 0
-                    isBuffering = true
                     val finalUrl = normalizePlaybackUrl(context, targetUrl)
                     if (finalUrl.isBlank()) return@setOnSwitchRequest
                     val mediaItem = buildMediaItemForPlaybackUrl(finalUrl)
-                    try {
-                        exoPlayer.stop()
-                        exoPlayer.clearMediaItems()
-                    } catch (_: Exception) {
-                    }
+                    // Do NOT stop() — stop() blanks the surface. Set the new item
+                    // directly; keepContentOnPlayerReset keeps the last frame
+                    // visible until the new channel's first frame arrives.
                     exoPlayer.setMediaItem(mediaItem)
                     exoPlayer.prepare()
                     exoPlayer.playWhenReady = true
@@ -843,9 +847,7 @@ fun ExoPlayJetScreen(
 
         if (isBuffering) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.4f)),
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 CircularWavyProgressIndicator(
@@ -1292,7 +1294,6 @@ fun initializePlayer(
         .setMediaSourceFactory(mediaSourceFactory)
         .setLoadControl(loadControl)
         .build()
-    var resumePosition: Long
     retryCountRef.value = 0
     val retryHandler = Handler(Looper.getMainLooper())
 
