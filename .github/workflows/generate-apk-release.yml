@@ -2,7 +2,7 @@ name: APK Build and Release Pipeline
 
 env:
   main_project_module: app
-  app_name: JTV-GO-Server
+  app_name: JioTV_Go
 
 on:
   push:
