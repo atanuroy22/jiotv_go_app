@@ -99,6 +99,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
@@ -114,6 +115,7 @@ import com.skylake.skytv.jgorunner.services.player.PlayerCommandBus
 import com.skylake.skytv.jgorunner.ui.tvhome.ChannelUtils
 import com.skylake.skytv.jgorunner.ui.tvhome.extractChannelIdFromPlayUrl
 import com.skylake.skytv.jgorunner.utils.DeviceUtils
+import com.skylake.skytv.jgorunner.utils.cleanupPlaybackLogic
 import com.skylake.skytv.jgorunner.utils.containsAnyId
 import com.skylake.skytv.jgorunner.utils.normalizePlaybackUrl
 import com.skylake.skytv.jgorunner.utils.setupCustomPlaybackLogic
@@ -261,12 +263,14 @@ fun ExoPlayJetScreen(
                     false
 
                 Lifecycle.Event.ON_DESTROY -> {
+                    // Do not release here — onDispose always runs and is the
+                    // single correct place to release. Releasing in both places
+                    // causes a double-release which is undefined behaviour.
                     try {
                         exoPlayer.stop()
                         exoPlayer.clearMediaItems()
                     } catch (_: Exception) {
                     }
-                    exoPlayer.release()
                 }
 
                 else -> Unit
@@ -275,6 +279,7 @@ fun ExoPlayJetScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            cleanupPlaybackLogic(exoPlayer)  // remove listener ref before release → no leak
             exoPlayer.release()
         }
     }
@@ -287,9 +292,10 @@ fun ExoPlayJetScreen(
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_BUFFERING) {
-                    // Debounce: only show spinner if buffering persists > 800ms
-                    // (HLS live-stream segment fetches are transient and complete faster)
-                    bufferHandler.postDelayed(showBufferingRunnable, 800)
+                    // Debounce: only show spinner if buffering persists > 1500ms.
+                    // seekTo() and normal HLS segment fetches complete well within
+                    // that window, so they never show the spinner at all.
+                    bufferHandler.postDelayed(showBufferingRunnable, 1500)
                 } else {
                     bufferHandler.removeCallbacks(showBufferingRunnable)
                     isBuffering = false
@@ -327,7 +333,9 @@ fun ExoPlayJetScreen(
     LaunchedEffect(currentIndex) {
         overrideVideoUrl = null
         retryCountRef.value = 0
-        isBuffering = true
+        // Do NOT set isBuffering=true here — let the 800ms debounce in the Player.Listener
+        // handle it. Setting it immediately causes the spinner to flash on every channel
+        // switch even when the new channel starts playing within milliseconds.
         try {
             val currentUrlRaw = channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
             val currentUrl = normalizePlaybackUrl(context, currentUrlRaw)
@@ -450,15 +458,12 @@ fun ExoPlayJetScreen(
                 }
                 if (!targetUrl.isNullOrEmpty()) {
                     retryCountRef.value = 0
-                    isBuffering = true
                     val finalUrl = normalizePlaybackUrl(context, targetUrl)
                     if (finalUrl.isBlank()) return@setOnSwitchRequest
                     val mediaItem = buildMediaItemForPlaybackUrl(finalUrl)
-                    try {
-                        exoPlayer.stop()
-                        exoPlayer.clearMediaItems()
-                    } catch (_: Exception) {
-                    }
+                    // Do NOT stop() — stop() blanks the surface. Set the new item
+                    // directly; keepContentOnPlayerReset keeps the last frame
+                    // visible until the new channel's first frame arrives.
                     exoPlayer.setMediaItem(mediaItem)
                     exoPlayer.prepare()
                     exoPlayer.playWhenReady = true
@@ -644,6 +649,9 @@ fun ExoPlayJetScreen(
                     setShowNextButton(false)
                     setShowPreviousButton(false)
                     setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+                    // Keep the last rendered frame frozen on screen during buffering,
+                    // retries, and player resets — this is the primary fix for black screens.
+                    setKeepContentOnPlayerReset(true)
                     controllerAutoShow = false
                     controllerShowTimeoutMs = 3000
                     setResizeMode(resizeModes[resizeModeIndex].first)
@@ -839,9 +847,7 @@ fun ExoPlayJetScreen(
 
         if (isBuffering) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.4f)),
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 CircularWavyProgressIndicator(
@@ -1213,6 +1219,24 @@ private fun buildMediaItemForPlaybackUrl(url: String): MediaItem {
     val builder = MediaItem.Builder().setUri(url.toUri())
     val mimeType = inferPlaybackMimeType(url)
     if (!mimeType.isNullOrBlank()) builder.setMimeType(mimeType)
+
+    // For HLS live streams: stay 15 s behind the live edge.
+    // ExoPlayer silently pre-fetches the next 15 s of segments in the background,
+    // so any network hiccup shorter than 15 s is absorbed with zero stall or black
+    // screen. Playback may start 15 s delayed (acceptable for TV live streams).
+    val isLikelyLive = mimeType == MimeTypes.APPLICATION_M3U8 || mimeType == null
+    if (isLikelyLive) {
+        builder.setLiveConfiguration(
+            MediaItem.LiveConfiguration.Builder()
+                .setTargetOffsetMs(15_000)   // play 15 s behind live edge
+                .setMinOffsetMs(8_000)       // never closer than 8 s to live edge
+                .setMaxOffsetMs(25_000)      // never further than 25 s behind
+                .setMinPlaybackSpeed(0.97f)  // allow slight slowdown to hold offset
+                .setMaxPlaybackSpeed(1.03f)  // allow slight speedup to catch up
+                .build()
+        )
+    }
+
     return builder.build()
 }
 
@@ -1234,14 +1258,42 @@ fun initializePlayer(
     context: Context,
     retryCountRef: MutableState<Int>
 ): ExoPlayer {
+    // Short timeouts: if a segment fetch hangs, fail fast (8 s) and retry
+    // instead of waiting the OS default ~15 s with a black screen.
     val httpDataSourceFactory = DefaultHttpDataSource.Factory()
         .setAllowCrossProtocolRedirects(true)
+        .setConnectTimeoutMs(8_000)
+        .setReadTimeoutMs(8_000)
 //        .setUserAgent(userAgent) //Future Ref
     val mediaSourceFactory =
-        DefaultMediaSourceFactory(context).setDataSourceFactory(httpDataSourceFactory)
+            DefaultMediaSourceFactory(context)
+                .setDataSourceFactory(httpDataSourceFactory)
+                // Pre-fetch segments 15 s ahead of playback position at the factory level
+                // (complements the per-MediaItem live configuration below).
+                .setLiveTargetOffsetMs(15_000)
 
-    val player = ExoPlayer.Builder(context).setMediaSourceFactory(mediaSourceFactory).build()
-    var resumePosition: Long
+    // Buffer tuning for smooth live-stream playback:
+    //   minBufferMs  20 s  – start refilling as soon as ahead-buffer < 20 s
+    //   maxBufferMs  60 s  – keep up to 60 s downloaded ahead
+    //   bufferForPlaybackMs  2.5 s  – fast cold start
+    //   bufferForPlaybackAfterRebufferMs  6 s  – after a stall, wait for 6 s
+    //       before resuming so we don't stutter again 2 s later
+    //   setPrioritizeTimeOverSizeThresholds  – buffer is measured in time not
+    //       bytes, so behaviour is consistent across bitrate switches
+    val loadControl = DefaultLoadControl.Builder()
+        .setBufferDurationsMs(
+            /* minBufferMs                     */ 20_000,
+            /* maxBufferMs                     */ 60_000,
+            /* bufferForPlaybackMs             */ 2_500,
+            /* bufferForPlaybackAfterRebufferMs */ 6_000
+        )
+        .setPrioritizeTimeOverSizeThresholds(true)
+        .build()
+
+    val player = ExoPlayer.Builder(context)
+        .setMediaSourceFactory(mediaSourceFactory)
+        .setLoadControl(loadControl)
+        .build()
     retryCountRef.value = 0
     val retryHandler = Handler(Looper.getMainLooper())
 
@@ -1279,12 +1331,13 @@ fun initializePlayer(
             retryHandler.postDelayed(
                 {
                     try {
+                        // Do NOT call player.stop() — stop() clears the video surface
+                        // causing a black screen. Instead, set the media item and call
+                        // prepare() directly; the last rendered frame stays visible on
+                        // screen until new video frames arrive.
                         if (currentUrl.containsAnyId()) {
-                            resumePosition = player.currentPosition
-                            player.stop()
-                            prepareAndPlay(resumePosition)
+                            prepareAndPlay(player.currentPosition)
                         } else {
-                            player.stop()
                             prepareAndPlay()
                         }
                     } catch (_: Exception) {
