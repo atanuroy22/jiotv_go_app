@@ -645,6 +645,9 @@ fun ExoPlayJetScreen(
                     setShowNextButton(false)
                     setShowPreviousButton(false)
                     setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+                    // Keep the last rendered frame frozen on screen during buffering,
+                    // retries, and player resets — this is the primary fix for black screens.
+                    keepContentOnPlayerReset = true
                     controllerAutoShow = false
                     controllerShowTimeoutMs = 3000
                     setResizeMode(resizeModes[resizeModeIndex].first)
@@ -1214,6 +1217,24 @@ private fun buildMediaItemForPlaybackUrl(url: String): MediaItem {
     val builder = MediaItem.Builder().setUri(url.toUri())
     val mimeType = inferPlaybackMimeType(url)
     if (!mimeType.isNullOrBlank()) builder.setMimeType(mimeType)
+
+    // For HLS live streams: stay 15 s behind the live edge.
+    // ExoPlayer silently pre-fetches the next 15 s of segments in the background,
+    // so any network hiccup shorter than 15 s is absorbed with zero stall or black
+    // screen. Playback may start 15 s delayed (acceptable for TV live streams).
+    val isLikelyLive = mimeType == MimeTypes.APPLICATION_M3U8 || mimeType == null
+    if (isLikelyLive) {
+        builder.setLiveConfiguration(
+            MediaItem.LiveConfiguration.Builder()
+                .setTargetOffsetMs(15_000)   // play 15 s behind live edge
+                .setMinOffsetMs(8_000)       // never closer than 8 s to live edge
+                .setMaxOffsetMs(25_000)      // never further than 25 s behind
+                .setMinPlaybackSpeed(0.97f)  // allow slight slowdown to hold offset
+                .setMaxPlaybackSpeed(1.03f)  // allow slight speedup to catch up
+                .build()
+        )
+    }
+
     return builder.build()
 }
 
@@ -1243,8 +1264,11 @@ fun initializePlayer(
         .setReadTimeoutMs(8_000)
 //        .setUserAgent(userAgent) //Future Ref
     val mediaSourceFactory =
-        DefaultMediaSourceFactory(context)
-            .setDataSourceFactory(httpDataSourceFactory)
+            DefaultMediaSourceFactory(context)
+                .setDataSourceFactory(httpDataSourceFactory)
+                // Pre-fetch segments 15 s ahead of playback position at the factory level
+                // (complements the per-MediaItem live configuration below).
+                .setLiveTargetOffsetMs(15_000)
 
     // Buffer tuning for smooth live-stream playback:
     //   minBufferMs  20 s  – start refilling as soon as ahead-buffer < 20 s
@@ -1306,12 +1330,13 @@ fun initializePlayer(
             retryHandler.postDelayed(
                 {
                     try {
+                        // Do NOT call player.stop() — stop() clears the video surface
+                        // causing a black screen. Instead, set the media item and call
+                        // prepare() directly; the last rendered frame stays visible on
+                        // screen until new video frames arrive.
                         if (currentUrl.containsAnyId()) {
-                            resumePosition = player.currentPosition
-                            player.stop()
-                            prepareAndPlay(resumePosition)
+                            prepareAndPlay(player.currentPosition)
                         } else {
-                            player.stop()
                             prepareAndPlay()
                         }
                     } catch (_: Exception) {

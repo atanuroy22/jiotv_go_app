@@ -118,6 +118,9 @@ public class ExoplayerActivity extends ComponentActivity {
 
         player = new ExoPlayer.Builder(this).setLoadControl(loadControl).build();
         playerView.setPlayer(player);
+        // Keep the last rendered frame frozen on screen during buffering and
+        // retries — prevents the surface going black on network hiccups.
+        playerView.setKeepContentOnPlayerReset(true);
 
         // Short timeouts: if a segment fetch hangs, fail fast (8 s) and retry
         // instead of waiting the OS default ~15 s with a black screen.
@@ -125,9 +128,25 @@ public class ExoplayerActivity extends ComponentActivity {
                 .setConnectTimeoutMs(8_000)
                 .setReadTimeoutMs(8_000)
                 .setAllowCrossProtocolRedirects(true);
+        // Live offset targeting: stay 15 s behind the live edge so the next
+        // 15 s of segments are always pre-fetched before they're needed.
+        // Any network hiccup shorter than 15 s is absorbed with zero stall.
+        MediaItem mediaItem = new MediaItem.Builder()
+                .setUri(Uri.parse(videoUrl))
+                .setMimeType("application/x-mpegURL")
+                .setLiveConfiguration(
+                        new MediaItem.LiveConfiguration.Builder()
+                                .setTargetOffsetMs(15_000)
+                                .setMinOffsetMs(8_000)
+                                .setMaxOffsetMs(25_000)
+                                .setMinPlaybackSpeed(0.97f)
+                                .setMaxPlaybackSpeed(1.03f)
+                                .build()
+                )
+                .build();
         MediaSource hlsMediaSource = new HlsMediaSource.Factory(dataSourceFactory)
                 .setAllowChunklessPreparation(true)
-                .createMediaSource(MediaItem.fromUri(Uri.parse(videoUrl)));
+                .createMediaSource(mediaItem);
 
         player.setMediaSource(hlsMediaSource);
         playerView.setResizeMode(AspectRatioFrameLayout.RESIZE_MODE_FIT);
