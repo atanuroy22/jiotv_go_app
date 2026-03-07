@@ -20,6 +20,7 @@ import androidx.annotation.OptIn;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DefaultHttpDataSource;
+import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.SeekParameters;
 import androidx.media3.exoplayer.hls.HlsMediaSource;
@@ -104,10 +105,26 @@ public class ExoplayerActivity extends ComponentActivity {
 
     @OptIn(markerClass = UnstableApi.class)
     private void setupPlayer(String videoUrl) {
-        player = new ExoPlayer.Builder(this).build();
+        // Pre-buffer more data so normal network hiccups don't stall playback.
+        DefaultLoadControl loadControl = new DefaultLoadControl.Builder()
+                .setBufferDurationsMs(
+                        /* minBufferMs                     */ 20_000,
+                        /* maxBufferMs                     */ 60_000,
+                        /* bufferForPlaybackMs             */ 2_500,
+                        /* bufferForPlaybackAfterRebufferMs */ 6_000
+                )
+                .setPrioritizeTimeOverSizeThresholds(true)
+                .build();
+
+        player = new ExoPlayer.Builder(this).setLoadControl(loadControl).build();
         playerView.setPlayer(player);
 
-        DefaultHttpDataSource.Factory dataSourceFactory = new DefaultHttpDataSource.Factory();
+        // Short timeouts: if a segment fetch hangs, fail fast (8 s) and retry
+        // instead of waiting the OS default ~15 s with a black screen.
+        DefaultHttpDataSource.Factory dataSourceFactory = new DefaultHttpDataSource.Factory()
+                .setConnectTimeoutMs(8_000)
+                .setReadTimeoutMs(8_000)
+                .setAllowCrossProtocolRedirects(true);
         MediaSource hlsMediaSource = new HlsMediaSource.Factory(dataSourceFactory)
                 .setAllowChunklessPreparation(true)
                 .createMediaSource(MediaItem.fromUri(Uri.parse(videoUrl)));

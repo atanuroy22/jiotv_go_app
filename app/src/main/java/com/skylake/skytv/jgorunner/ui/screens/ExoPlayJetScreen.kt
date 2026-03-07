@@ -99,6 +99,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
@@ -1234,13 +1235,39 @@ fun initializePlayer(
     context: Context,
     retryCountRef: MutableState<Int>
 ): ExoPlayer {
+    // Short timeouts: if a segment fetch hangs, fail fast (8 s) and retry
+    // instead of waiting the OS default ~15 s with a black screen.
     val httpDataSourceFactory = DefaultHttpDataSource.Factory()
         .setAllowCrossProtocolRedirects(true)
+        .setConnectTimeoutMs(8_000)
+        .setReadTimeoutMs(8_000)
 //        .setUserAgent(userAgent) //Future Ref
     val mediaSourceFactory =
-        DefaultMediaSourceFactory(context).setDataSourceFactory(httpDataSourceFactory)
+        DefaultMediaSourceFactory(context)
+            .setDataSourceFactory(httpDataSourceFactory)
 
-    val player = ExoPlayer.Builder(context).setMediaSourceFactory(mediaSourceFactory).build()
+    // Buffer tuning for smooth live-stream playback:
+    //   minBufferMs  20 s  – start refilling as soon as ahead-buffer < 20 s
+    //   maxBufferMs  60 s  – keep up to 60 s downloaded ahead
+    //   bufferForPlaybackMs  2.5 s  – fast cold start
+    //   bufferForPlaybackAfterRebufferMs  6 s  – after a stall, wait for 6 s
+    //       before resuming so we don't stutter again 2 s later
+    //   setPrioritizeTimeOverSizeThresholds  – buffer is measured in time not
+    //       bytes, so behaviour is consistent across bitrate switches
+    val loadControl = DefaultLoadControl.Builder()
+        .setBufferDurationsMs(
+            /* minBufferMs                     */ 20_000,
+            /* maxBufferMs                     */ 60_000,
+            /* bufferForPlaybackMs             */ 2_500,
+            /* bufferForPlaybackAfterRebufferMs */ 6_000
+        )
+        .setPrioritizeTimeOverSizeThresholds(true)
+        .build()
+
+    val player = ExoPlayer.Builder(context)
+        .setMediaSourceFactory(mediaSourceFactory)
+        .setLoadControl(loadControl)
+        .build()
     var resumePosition: Long
     retryCountRef.value = 0
     val retryHandler = Handler(Looper.getMainLooper())
