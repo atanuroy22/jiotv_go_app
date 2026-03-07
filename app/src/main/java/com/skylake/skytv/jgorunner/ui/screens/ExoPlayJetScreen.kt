@@ -647,7 +647,7 @@ fun ExoPlayJetScreen(
                     setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
                     // Keep the last rendered frame frozen on screen during buffering,
                     // retries, and player resets — this is the primary fix for black screens.
-                    keepContentOnPlayerReset = true
+                    setKeepContentOnPlayerReset(true)
                     controllerAutoShow = false
                     controllerShowTimeoutMs = 3000
                     setResizeMode(resizeModes[resizeModeIndex].first)
