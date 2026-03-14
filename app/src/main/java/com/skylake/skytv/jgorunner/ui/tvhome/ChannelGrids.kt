@@ -186,15 +186,17 @@ private fun openM3UChannel(
         return
     }
 
-    val currentIndex = channels.indexOf(channel).coerceAtLeast(0)
-    val channelInfoList = ArrayList(
-        channels.map { item -> ChannelInfo(item.url, item.logo ?: "", item.name) }
+    val absoluteIndex = channels.indexOf(channel).coerceAtLeast(0)
+    val (channelInfoList, relativeIndex) = buildM3UChannelInfoWindow(
+        channels = channels,
+        centerIndex = absoluteIndex,
+        maxItems = 180
     )
     val intent = Intent(context, ExoPlayJet::class.java).apply {
         putExtra("zone", zoneSignature)
         putExtra("channel_list_kind", "m3u")
         putParcelableArrayListExtra("channel_list_data", channelInfoList)
-        putExtra("current_channel_index", currentIndex)
+        putExtra("current_channel_index", relativeIndex)
         putExtra("video_url", channel.url)
         putExtra("logo_url", channel.logo ?: "")
         putExtra("ch_name", channel.name)
@@ -202,6 +204,29 @@ private fun openM3UChannel(
         if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
     context.startActivity(intent)
+}
+
+private fun buildM3UChannelInfoWindow(
+    channels: List<M3UChannelExp>,
+    centerIndex: Int,
+    maxItems: Int = 180
+): Pair<ArrayList<ChannelInfo>, Int> {
+    if (channels.isEmpty()) return Pair(arrayListOf(), 0)
+
+    val safeCenter = centerIndex.coerceIn(0, channels.lastIndex)
+    val safeMax = maxItems.coerceAtLeast(1).coerceAtMost(channels.size)
+    val half = safeMax / 2
+    val start = (safeCenter - half).coerceIn(0, (channels.size - safeMax).coerceAtLeast(0))
+    val endExclusive = (start + safeMax).coerceAtMost(channels.size)
+    val slice = channels.subList(start, endExclusive)
+
+    val list = ArrayList(
+        slice.map { ch ->
+            ChannelInfo(ch.url, ch.logo ?: "", ch.name)
+        }
+    )
+    val relativeIndex = safeCenter - start
+    return Pair(list, relativeIndex)
 }
 
 @OptIn(ExperimentalGlideComposeApi::class)

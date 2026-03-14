@@ -208,16 +208,10 @@ fun Main_Layout_3rd(
                     putExtra("external_url", firstChannel.url)
                 }
             } else {
-                val channelInfoList = ArrayList(
-                    filteredChannels.map { channel ->
-                        ChannelInfo(channel.url, channel.logo ?: "", channel.name)
-                    }
-                )
                 Intent(context, ExoPlayJet::class.java).apply {
                     putExtra("zone", zoneSignature)
                     putExtra("channel_list_kind", "m3u")
-                    putParcelableArrayListExtra("channel_list_data", channelInfoList)
-                    putExtra("current_channel_index", 0)
+                    putExtra("current_channel_index", -1)
                     putExtra("video_url", firstChannel.url)
                     putExtra("logo_url", firstChannel.logo ?: "")
                     putExtra("ch_name", firstChannel.name)
