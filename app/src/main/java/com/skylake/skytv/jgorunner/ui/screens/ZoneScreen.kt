@@ -72,10 +72,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Request
 import kotlin.random.Random
 
-private const val DYNAMIC_ZONE_TAB_REFRESH_INTERVAL_MS = 60L * 60L * 1000L
+private const val DYNAMIC_ZONE_TAB_REFRESH_INTERVAL_MS = 10L * 60L * 1000L
 
 @SuppressLint("NewApi")
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalMaterial3Api::class)
@@ -87,7 +88,6 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
     var showModeDialog by remember { mutableStateOf(false) }
 
     var reloadChannelsTrigger by remember { mutableIntStateOf(0) }
-    var forceDynamicRefreshOnStart by remember { mutableStateOf(true) }
 
 
     val isRemoteNavigation =
@@ -189,7 +189,18 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
         try {
             val body = withContext(Dispatchers.IO) {
                 val client = OkHttpClient()
-                val request = Request.Builder().url(url).build()
+                val refreshUrl = url.toHttpUrlOrNull()
+                    ?.newBuilder()
+                    ?.setQueryParameter("_ts", System.currentTimeMillis().toString())
+                    ?.build()
+                    ?.toString()
+                    ?: url
+
+                val request = Request.Builder()
+                    .url(refreshUrl)
+                    .header("Cache-Control", "no-cache, no-store, max-age=0")
+                    .header("Pragma", "no-cache")
+                    .build()
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) return@use null
                     response.body?.string()
@@ -208,43 +219,44 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
         }
     }
 
-    LaunchedEffect(reloadChannelsTrigger) {
+    suspend fun refreshDynamicTabConfig(): Boolean {
         val url = preferenceManager.myPrefs.dynamicZoneTabUrl?.trim().orEmpty()
         if (url.isBlank()) {
-            forceDynamicRefreshOnStart = false
             if (preferenceManager.myPrefs.dynamicZoneTabEnabled ||
-                !preferenceManager.myPrefs.dynamicZoneTabName.isNullOrBlank()
+                !preferenceManager.myPrefs.dynamicZoneTabName.isNullOrBlank() ||
+                !preferenceManager.myPrefs.dynamicZoneTabJson.isNullOrBlank()
             ) {
                 preferenceManager.myPrefs.dynamicZoneTabEnabled = false
                 preferenceManager.myPrefs.dynamicZoneTabName = ""
+                preferenceManager.myPrefs.dynamicZoneTabJson = ""
                 preferenceManager.savePreferences()
-                reloadChannelsTrigger++
+                return true
             }
-            return@LaunchedEffect
-        }
-
-        val lastUpdated = preferenceManager.myPrefs.dynamicZoneTabLastUpdated
-        val existingJson = preferenceManager.myPrefs.dynamicZoneTabJson?.trim().orEmpty()
-        val shouldRefresh = forceDynamicRefreshOnStart ||
-            existingJson.isBlank() ||
-                System.currentTimeMillis() - lastUpdated >= DYNAMIC_ZONE_TAB_REFRESH_INTERVAL_MS
-
-        if (!shouldRefresh) {
-            forceDynamicRefreshOnStart = false
-            return@LaunchedEffect
+            return false
         }
 
         try {
             val body = withContext(Dispatchers.IO) {
                 val client = OkHttpClient()
-                val request = Request.Builder().url(url).build()
+                val refreshUrl = url.toHttpUrlOrNull()
+                    ?.newBuilder()
+                    ?.setQueryParameter("_ts", System.currentTimeMillis().toString())
+                    ?.build()
+                    ?.toString()
+                    ?: url
+
+                val request = Request.Builder()
+                    .url(refreshUrl)
+                    .header("Cache-Control", "no-cache, no-store, max-age=0")
+                    .header("Pragma", "no-cache")
+                    .build()
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) return@use null
                     response.body?.string()
                 }
-            } ?: return@LaunchedEffect
+            } ?: return false
 
-            val config = Gson().fromJson(body, DynamicZoneTabConfig::class.java) ?: return@LaunchedEffect
+            val config = Gson().fromJson(body, DynamicZoneTabConfig::class.java) ?: return false
             val normalizedName = config.name.trim().ifBlank { "Channels" }
             val mergedChannels = buildList {
                 if (config.enableChannels) {
@@ -273,12 +285,24 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
             preferenceManager.myPrefs.dynamicZoneTabLastUpdated = System.currentTimeMillis()
             preferenceManager.savePreferences()
 
-            if (changed) {
+            return changed || true
+        } catch (_: Exception) {
+            return false
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (refreshDynamicTabConfig()) {
+            reloadChannelsTrigger++
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(DYNAMIC_ZONE_TAB_REFRESH_INTERVAL_MS)
+            if (refreshDynamicTabConfig()) {
                 reloadChannelsTrigger++
             }
-        } catch (_: Exception) {
-        } finally {
-            forceDynamicRefreshOnStart = false
         }
     }
 
