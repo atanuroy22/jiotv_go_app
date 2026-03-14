@@ -87,6 +87,7 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
     var showModeDialog by remember { mutableStateOf(false) }
 
     var reloadChannelsTrigger by remember { mutableIntStateOf(0) }
+    var forceDynamicRefreshOnStart by remember { mutableStateOf(true) }
 
 
     val isRemoteNavigation =
@@ -210,6 +211,7 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
     LaunchedEffect(reloadChannelsTrigger) {
         val url = preferenceManager.myPrefs.dynamicZoneTabUrl?.trim().orEmpty()
         if (url.isBlank()) {
+            forceDynamicRefreshOnStart = false
             if (preferenceManager.myPrefs.dynamicZoneTabEnabled ||
                 !preferenceManager.myPrefs.dynamicZoneTabName.isNullOrBlank()
             ) {
@@ -223,10 +225,14 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
 
         val lastUpdated = preferenceManager.myPrefs.dynamicZoneTabLastUpdated
         val existingJson = preferenceManager.myPrefs.dynamicZoneTabJson?.trim().orEmpty()
-        val shouldRefresh = existingJson.isBlank() ||
+        val shouldRefresh = forceDynamicRefreshOnStart ||
+            existingJson.isBlank() ||
                 System.currentTimeMillis() - lastUpdated >= DYNAMIC_ZONE_TAB_REFRESH_INTERVAL_MS
 
-        if (!shouldRefresh) return@LaunchedEffect
+        if (!shouldRefresh) {
+            forceDynamicRefreshOnStart = false
+            return@LaunchedEffect
+        }
 
         try {
             val body = withContext(Dispatchers.IO) {
@@ -271,6 +277,8 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
                 reloadChannelsTrigger++
             }
         } catch (_: Exception) {
+        } finally {
+            forceDynamicRefreshOnStart = false
         }
     }
 
