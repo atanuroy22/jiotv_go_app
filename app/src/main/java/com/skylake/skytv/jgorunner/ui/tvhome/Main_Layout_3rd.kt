@@ -152,6 +152,36 @@ fun Main_Layout_3rd(
                     Gson().fromJson(it, object : TypeToken<List<String>>() {}.type)
                 } ?: listOf("All")
 
+                val validCategorySet = allChannels.mapNotNull { it.category }.toSet()
+                val validLanguageSet = allChannels.mapNotNull { it.language?.lowercase() }.toSet()
+                val validCountrySet = allChannels.mapNotNull { it.country?.uppercase() }.toSet()
+
+                val sanitizedCategories = selectedCategories2
+                    .filter { it == "All" || validCategorySet.contains(it) }
+                    .ifEmpty { listOf("All") }
+
+                val sanitizedLanguages = selectedLanguages
+                    .filter { it == "All" || validLanguageSet.contains(it.lowercase()) }
+                    .ifEmpty { listOf("All") }
+
+                val sanitizedCountries = selectedCountries
+                    .filter { it == "All" || validCountrySet.contains(it.uppercase()) }
+                    .ifEmpty { listOf("All") }
+
+                if (sanitizedCategories != selectedCategories2) {
+                    selectedCategories2 = sanitizedCategories
+                    preferenceManager.myPrefs.lastSelectedCategoriesExp = Gson().toJson(sanitizedCategories)
+                }
+                if (sanitizedLanguages != selectedLanguages) {
+                    selectedLanguages = sanitizedLanguages
+                    preferenceManager.myPrefs.lastSelectedLanguagesExp = Gson().toJson(sanitizedLanguages)
+                }
+                if (sanitizedCountries != selectedCountries) {
+                    selectedCountries = sanitizedCountries
+                    preferenceManager.myPrefs.lastSelectedCountriesExp = Gson().toJson(sanitizedCountries)
+                }
+                preferenceManager.savePreferences()
+
             } else {
                 Log.d("TVChannelsScreen", "Channel list JSON is empty.")
                 selectedCategory = "All"

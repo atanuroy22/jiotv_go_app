@@ -183,8 +183,7 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
         if (!showIptvTab) return@LaunchedEffect
 
         val url = preferenceManager.myPrefs.custURL?.trim().orEmpty()
-        val existingJson = preferenceManager.myPrefs.channelListJson?.trim().orEmpty()
-        if (url.isBlank() || existingJson.isNotBlank()) return@LaunchedEffect
+        if (url.isBlank()) return@LaunchedEffect
 
         try {
             val body = withContext(Dispatchers.IO) {
@@ -212,9 +211,13 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
             val channels = parseM3Uexp(body)
             if (channels.isEmpty()) return@LaunchedEffect
 
-            preferenceManager.myPrefs.channelListJson = Gson().toJson(channels)
-            preferenceManager.savePreferences()
-            reloadChannelsTrigger++
+            val newJson = Gson().toJson(channels)
+            val existingJson = preferenceManager.myPrefs.channelListJson ?: ""
+            if (existingJson != newJson) {
+                preferenceManager.myPrefs.channelListJson = newJson
+                preferenceManager.savePreferences()
+                reloadChannelsTrigger++
+            }
         } catch (_: Exception) {
         }
     }
