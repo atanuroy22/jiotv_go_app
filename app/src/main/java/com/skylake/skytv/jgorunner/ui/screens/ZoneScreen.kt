@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import com.google.gson.Gson
 import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.data.SkySharedPref
+import com.skylake.skytv.jgorunner.ui.tvhome.DynamicZoneTabConfig
 import com.skylake.skytv.jgorunner.ui.tvhome.Main_Layout
 import com.skylake.skytv.jgorunner.ui.tvhome.Main_Layout_3rd
 import com.skylake.skytv.jgorunner.ui.tvhome.Recent_Layout
@@ -74,12 +75,14 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import kotlin.random.Random
 
+private const val DYNAMIC_ZONE_TAB_REFRESH_INTERVAL_MS = 60L * 60L * 1000L
+
 @SuppressLint("NewApi")
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
 
-    data class TabItem(val text: String, val icon: ImageVector)
+    data class TabItem(val key: String, val text: String, val icon: ImageVector)
 
     var showModeDialog by remember { mutableStateOf(false) }
 
@@ -97,16 +100,24 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
 
     val showRecentTab = remember(reloadChannelsTrigger) { preferenceManager.myPrefs.showRecentTab }
     val customPlaylistSupport = remember(reloadChannelsTrigger) { preferenceManager.myPrefs.customPlaylistSupport }
+    val dynamicTabEnabled = remember(reloadChannelsTrigger) { preferenceManager.myPrefs.dynamicZoneTabEnabled }
+    val dynamicTabName = remember(reloadChannelsTrigger) {
+        preferenceManager.myPrefs.dynamicZoneTabName?.trim().orEmpty().ifBlank { "Channels" }
+    }
     val showIptvTab = customPlaylistSupport
+    val showDynamicTab = dynamicTabEnabled && dynamicTabName.isNotBlank()
 
     val tabs = buildList {
-        add(TabItem("TV", Icons.Default.Tv))
+        add(TabItem("TV", "TV", Icons.Default.Tv))
+        if (showDynamicTab) {
+            add(TabItem("DYNAMIC", dynamicTabName, Icons.AutoMirrored.Filled.PlaylistPlay))
+        }
         if (showRecentTab) {
-            add(TabItem("Recent", Icons.Default.Star))
-            add(TabItem("Search", Icons.Default.Search))
+            add(TabItem("RECENT", "Recent", Icons.Default.Star))
+            add(TabItem("SEARCH", "Search", Icons.Default.Search))
         }
         if (showIptvTab) {
-            add(TabItem("IPTV", Icons.AutoMirrored.Filled.PlaylistPlay))
+            add(TabItem("IPTV", "IPTV", Icons.AutoMirrored.Filled.PlaylistPlay))
         }
     }
 
@@ -192,6 +203,73 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
             preferenceManager.myPrefs.channelListJson = Gson().toJson(channels)
             preferenceManager.savePreferences()
             reloadChannelsTrigger++
+        } catch (_: Exception) {
+        }
+    }
+
+    LaunchedEffect(reloadChannelsTrigger) {
+        val url = preferenceManager.myPrefs.dynamicZoneTabUrl?.trim().orEmpty()
+        if (url.isBlank()) {
+            if (preferenceManager.myPrefs.dynamicZoneTabEnabled ||
+                !preferenceManager.myPrefs.dynamicZoneTabName.isNullOrBlank()
+            ) {
+                preferenceManager.myPrefs.dynamicZoneTabEnabled = false
+                preferenceManager.myPrefs.dynamicZoneTabName = ""
+                preferenceManager.savePreferences()
+                reloadChannelsTrigger++
+            }
+            return@LaunchedEffect
+        }
+
+        val lastUpdated = preferenceManager.myPrefs.dynamicZoneTabLastUpdated
+        val existingJson = preferenceManager.myPrefs.dynamicZoneTabJson?.trim().orEmpty()
+        val shouldRefresh = existingJson.isBlank() ||
+                System.currentTimeMillis() - lastUpdated >= DYNAMIC_ZONE_TAB_REFRESH_INTERVAL_MS
+
+        if (!shouldRefresh) return@LaunchedEffect
+
+        try {
+            val body = withContext(Dispatchers.IO) {
+                val client = OkHttpClient()
+                val request = Request.Builder().url(url).build()
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return@use null
+                    response.body?.string()
+                }
+            } ?: return@LaunchedEffect
+
+            val config = Gson().fromJson(body, DynamicZoneTabConfig::class.java) ?: return@LaunchedEffect
+            val normalizedName = config.name.trim().ifBlank { "Channels" }
+            val mergedChannels = buildList {
+                if (config.enableChannels) {
+                    addAll(config.channels)
+                }
+                if (config.enableBrowserChannels) {
+                    addAll(
+                        config.browserChannels.map {
+                            if (it.openInBrowser) it else it.copy(openInBrowser = true)
+                        }
+                    )
+                }
+            }
+            val normalizedChannels = mergedChannels
+                .filter { it.name.isNotBlank() && it.url.isNotBlank() }
+                .distinctBy { it.url }
+            val normalizedJson = Gson().toJson(normalizedChannels)
+
+            val changed = preferenceManager.myPrefs.dynamicZoneTabEnabled != config.enabled ||
+                    preferenceManager.myPrefs.dynamicZoneTabName != normalizedName ||
+                    preferenceManager.myPrefs.dynamicZoneTabJson != normalizedJson
+
+            preferenceManager.myPrefs.dynamicZoneTabEnabled = config.enabled
+            preferenceManager.myPrefs.dynamicZoneTabName = normalizedName
+            preferenceManager.myPrefs.dynamicZoneTabJson = normalizedJson
+            preferenceManager.myPrefs.dynamicZoneTabLastUpdated = System.currentTimeMillis()
+            preferenceManager.savePreferences()
+
+            if (changed) {
+                reloadChannelsTrigger++
+            }
         } catch (_: Exception) {
         }
     }
@@ -296,10 +374,18 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
 
                     // Tab Content
                     when (selectedTabIndex) {
-                        else -> when (tabs[selectedTabIndex].text) {
+                        else -> when (tabs[selectedTabIndex].key) {
                             "TV" -> Main_Layout(context, reloadTrigger = reloadChannelsTrigger)
-                            "Recent" -> Recent_Layout(context)
-                            "Search" -> SearchTabLayout(context, tabFocusRequester)
+                            "DYNAMIC" -> Main_Layout_3rd(
+                                context = context,
+                                reloadTrigger = reloadChannelsTrigger,
+                                channelsJson = preferenceManager.myPrefs.dynamicZoneTabJson,
+                                zoneSignature = dynamicTabName,
+                                emptyStateMessage = "No channels available for $dynamicTabName right now.",
+                                showAddPlaylistButton = false
+                            )
+                            "RECENT" -> Recent_Layout(context)
+                            "SEARCH" -> SearchTabLayout(context, tabFocusRequester)
                             "IPTV" -> Main_Layout_3rd(context, reloadTrigger = reloadChannelsTrigger)
                             else -> Main_Layout(context, reloadTrigger = reloadChannelsTrigger)
                         }

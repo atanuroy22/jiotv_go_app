@@ -37,6 +37,7 @@ import com.bumptech.glide.integration.compose.GlideImage
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
+import com.skylake.skytv.jgorunner.activities.WebPlayerActivity
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.services.player.PlayerCommandBus
@@ -47,7 +48,7 @@ import com.skylake.skytv.jgorunner.utils.withQuality
 fun ChannelGridTV(
     context: Context,
     channels: List<M3UChannelExp>,
-//    selectedChannel: M3UChannelExp?,
+    zoneSignature: String = "TV",
     onSelectedChannelChanged: (M3UChannelExp) -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
@@ -75,18 +76,7 @@ fun ChannelGridTV(
                     .combinedClickable(
                         onClick = {
                             Log.d("ChannelGridTV", "Open fullscreen: ${channel.name}")
-                            val currentIndex = channels.indexOf(channel).coerceAtLeast(0)
-                            val intent = Intent(context, ExoPlayJet::class.java).apply {
-                                putExtra("zone", "TV")
-                                putExtra("channel_list_kind", "m3u")
-                                putExtra("current_channel_index", -1)
-                                putExtra("video_url", channel.url)
-                                putExtra("logo_url", channel.logo ?: "")
-                                putExtra("ch_name", channel.name)
-                                addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                                if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            context.startActivity(intent)
+                            openM3UChannel(context, channels, channel, zoneSignature)
 
 
                             // Update recent channels
@@ -126,25 +116,17 @@ fun ChannelGridTV(
                         },
                         onLongClick = {
                             if (PlayerCommandBus.isInPipMode) {
-                                Log.d(
-                                    "ChannelGridTV",
-                                    "Switch in PiP (long-press): ${channel.name}"
-                                )
-                                PlayerCommandBus.requestSwitch(url = channel.url)
-                            } else {
-                                // Fallback to open fullscreen if not in PiP
-                                val currentIndex = channels.indexOf(channel).coerceAtLeast(0)
-                                val intent = Intent(context, ExoPlayJet::class.java).apply {
-                                    putExtra("zone", "TV")
-                                    putExtra("channel_list_kind", "m3u")
-                                    putExtra("current_channel_index", -1)
-                                    putExtra("video_url", channel.url)
-                                    putExtra("logo_url", channel.logo ?: "")
-                                    putExtra("ch_name", channel.name)
-                                    addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                                    if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                if (shouldOpenInBrowser(channel)) {
+                                    openM3UChannel(context, channels, channel, zoneSignature)
+                                } else {
+                                    Log.d(
+                                        "ChannelGridTV",
+                                        "Switch in PiP (long-press): ${channel.name}"
+                                    )
+                                    PlayerCommandBus.requestSwitch(url = channel.url)
                                 }
-                                context.startActivity(intent)
+                            } else {
+                                openM3UChannel(context, channels, channel, zoneSignature)
 
                             }
                         }
@@ -172,6 +154,54 @@ fun ChannelGridTV(
             }
         }
     }
+}
+
+private fun shouldOpenInBrowser(channel: M3UChannelExp): Boolean {
+    if (channel.openInBrowser) return true
+    val mode = channel.playMode?.trim()?.lowercase()
+    if (mode == "browser" || mode == "web" || mode == "webview") return true
+
+    val lowerUrl = channel.url.trim().lowercase()
+    val isLikelyStream = lowerUrl.contains(".m3u8") ||
+            lowerUrl.contains(".m3u") ||
+            lowerUrl.contains(".mpd") ||
+            lowerUrl.contains("/live/")
+
+    return !isLikelyStream
+}
+
+private fun openM3UChannel(
+    context: Context,
+    channels: List<M3UChannelExp>,
+    channel: M3UChannelExp,
+    zoneSignature: String
+) {
+    if (shouldOpenInBrowser(channel)) {
+        val webIntent = Intent(context, WebPlayerActivity::class.java).apply {
+            putExtra("external_url", channel.url)
+            addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(webIntent)
+        return
+    }
+
+    val currentIndex = channels.indexOf(channel).coerceAtLeast(0)
+    val channelInfoList = ArrayList(
+        channels.map { item -> ChannelInfo(item.url, item.logo ?: "", item.name) }
+    )
+    val intent = Intent(context, ExoPlayJet::class.java).apply {
+        putExtra("zone", zoneSignature)
+        putExtra("channel_list_kind", "m3u")
+        putParcelableArrayListExtra("channel_list_data", channelInfoList)
+        putExtra("current_channel_index", currentIndex)
+        putExtra("video_url", channel.url)
+        putExtra("logo_url", channel.logo ?: "")
+        putExtra("ch_name", channel.name)
+        addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    context.startActivity(intent)
 }
 
 @OptIn(ExperimentalGlideComposeApi::class)

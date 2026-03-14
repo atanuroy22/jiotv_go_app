@@ -40,6 +40,7 @@ class WebPlayerActivity : ComponentActivity() {
     private var currentPlayId: String? = null
     private var currentLogoUrl: String? = null
     private var currentChannelName: String? = null
+    private var isExternalMode: Boolean = false
 
     private val recentChannels: MutableList<Channel> = ArrayList()
 
@@ -52,32 +53,38 @@ class WebPlayerActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_web_player)
 
-        val savedPortNumber = prefManager.myPrefs.jtvGoServerPort
-        val filterQ = prefManager.myPrefs.filterQ
-        val filterL = prefManager.myPrefs.filterL
-        val filterC = prefManager.myPrefs.filterC
-//        val extraFilterUrl = "/?q=$filterQ&language=$filterL&category=$filterC" // "/?q=low&language=6&category=7"
-        val extraFilterUrl = buildString {
-            append("/")
+        val externalUrl = intent.getStringExtra("external_url")?.trim().orEmpty()
+        isExternalMode = externalUrl.startsWith("http://") || externalUrl.startsWith("https://")
 
-            if (!filterQ.isNullOrEmpty()) append("?q=$filterQ")
+        url = if (isExternalMode) {
+            externalUrl
+        } else {
+            val savedPortNumber = prefManager.myPrefs.jtvGoServerPort
+            val filterQ = prefManager.myPrefs.filterQ
+            val filterL = prefManager.myPrefs.filterL
+            val filterC = prefManager.myPrefs.filterC
+            val extraFilterUrl = buildString {
+                append("/")
 
-            if (!filterL.isNullOrEmpty()) {
-                if (isNotEmpty()) append("&")
-                append("language=$filterL")
+                if (!filterQ.isNullOrEmpty()) append("?q=$filterQ")
+
+                if (!filterL.isNullOrEmpty()) {
+                    if (isNotEmpty()) append("&")
+                    append("language=$filterL")
+                }
+
+                if (!filterC.isNullOrEmpty()) {
+                    if (isNotEmpty()) append("&")
+                    append("category=$filterC")
+                }
             }
 
-            if (!filterC.isNullOrEmpty()) {
-                if (isNotEmpty()) append("&")
-                append("category=$filterC")
-            }
+            String.format(
+                Locale.getDefault(),
+                DEFAULT_URL_TEMPLATE,
+                savedPortNumber
+            ) + extraFilterUrl
         }
-
-        url = String.format(
-            Locale.getDefault(),
-            DEFAULT_URL_TEMPLATE,
-            savedPortNumber
-        ) + extraFilterUrl
 
         Log.d("DIX", url!!)
 
@@ -264,7 +271,7 @@ class WebPlayerActivity : ComponentActivity() {
     private inner class CustomWebViewClient : WebViewClient() {
         @Deprecated("Deprecated in Java")
         override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
-            if (url.contains("/play/")) {
+            if (!isExternalMode && url.contains("/play/")) {
                 initURL = webView!!.url
                 Log.d(TAG, "Saving initURL: $initURL")
 
@@ -361,9 +368,11 @@ class WebPlayerActivity : ComponentActivity() {
                 setupFullScreenMode()
                 playVideoInFullScreen(view)
             } else {
-                moveSearchInput(view)
-                extractChannelNumbers()
-                loadRecentChannels()
+                if (!isExternalMode) {
+                    moveSearchInput(view)
+                    extractChannelNumbers()
+                    loadRecentChannels()
+                }
             }
         }
 

@@ -54,6 +54,7 @@ import com.bumptech.glide.integration.compose.GlideImage
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
+import com.skylake.skytv.jgorunner.activities.WebPlayerActivity
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
@@ -62,7 +63,16 @@ import com.skylake.skytv.jgorunner.ui.tvhome.components.TvScreenMenu
 
 @OptIn(ExperimentalGlideComposeApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun Main_Layout_3rd(context: Context, reloadTrigger: Int) {
+fun Main_Layout_3rd(
+    context: Context,
+    reloadTrigger: Int,
+    channelsJson: String? = null,
+    zoneSignature: String = "TV",
+    emptyStateTitle: String = "No channels found",
+    emptyStateMessage: String = "Please add an M3U playlist to get started.",
+    showAddPlaylistButton: Boolean = true,
+    emptyActionLabel: String = "Add M3U Playlist"
+) {
     val preferenceManager = remember { SkySharedPref.getInstance(context) }
     var allChannels by remember { mutableStateOf<List<M3UChannelExp>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -122,7 +132,7 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int) {
     LaunchedEffect(reloadTrigger) {
         isLoading = true
         try {
-            val json = preferenceManager.myPrefs.channelListJson
+            val json = channelsJson ?: preferenceManager.myPrefs.channelListJson
             if (!json.isNullOrBlank()) {
                 val type = object : TypeToken<List<M3UChannelExp>>() {}.type
                 val channels: List<M3UChannelExp> = Gson().fromJson(json, type)
@@ -163,14 +173,25 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int) {
             filteredChannels.isNotEmpty()
         ) {
             val firstChannel = filteredChannels.first()
-
-            val intent = Intent(context, ExoPlayJet::class.java).apply {
-                putExtra("zone", "TV")
-                putExtra("channel_list_kind", "m3u")
-                putExtra("current_channel_index", -1)
-                putExtra("video_url", firstChannel.url)
-                putExtra("logo_url", firstChannel.logo ?: "")
-                putExtra("ch_name", firstChannel.name)
+            val intent = if (shouldOpenInBrowserForAutoStart(firstChannel)) {
+                Intent(context, WebPlayerActivity::class.java).apply {
+                    putExtra("external_url", firstChannel.url)
+                }
+            } else {
+                val channelInfoList = ArrayList(
+                    filteredChannels.map { channel ->
+                        ChannelInfo(channel.url, channel.logo ?: "", channel.name)
+                    }
+                )
+                Intent(context, ExoPlayJet::class.java).apply {
+                    putExtra("zone", zoneSignature)
+                    putExtra("channel_list_kind", "m3u")
+                    putParcelableArrayListExtra("channel_list_data", channelInfoList)
+                    putExtra("current_channel_index", 0)
+                    putExtra("video_url", firstChannel.url)
+                    putExtra("logo_url", firstChannel.logo ?: "")
+                    putExtra("ch_name", firstChannel.name)
+                }
             }
 
             kotlinx.coroutines.delay(1000)
@@ -213,7 +234,7 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int) {
                 modifier = Modifier.padding(16.dp)
             ) {
                 Text(
-                    text = "No channels found",
+                    text = emptyStateTitle,
                     style = MaterialTheme.typography.headlineSmall.copy(
                         fontWeight = FontWeight.Bold
                     ),
@@ -221,55 +242,45 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int) {
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Please add an M3U playlist to get started.",
+                    text = emptyStateMessage,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(horizontal = 24.dp)
                 )
-                ////---
-                Spacer(modifier = Modifier.height(24.dp))
-                Button(
-                    onClick = {
-//                        (context as? Activity)?.let { activity ->
-//                            val intent = activity.intent
-//                            activity.finish()
-//                            activity.startActivity(intent)
-//                        }
-
-                        Log.d("ninit", "hello from m3u")
-
-
-                        showDialog = true
-
-                    },
-                    modifier = Modifier.padding(horizontal = 24.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.AddLink,
-                        contentDescription = "Add Playlist",
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Add M3U Playlist")
-                }
-
-                if (showDialog) {
-                    TvScreenMenu(
-                        showDialog = true,
-                        context = context,
-                        onDismiss = { showDialog = false },
-                        onReset = {
-                            showDialog = false
+                if (showAddPlaylistButton) {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Button(
+                        onClick = {
+                            Log.d("ninit", "hello from m3u")
+                            showDialog = true
                         },
-                        onSelectionsMade = { quality, categoryNames, categoryIds, languageNames, languageIds ->
-                            Toast.makeText(context, "Restarting App!", Toast.LENGTH_LONG).show()
-                            restartAppV1(context)
-                        }
-                    )
-                }
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.AddLink,
+                            contentDescription = "Add Playlist",
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(emptyActionLabel)
+                    }
 
-                ////---
+                    if (showDialog) {
+                        TvScreenMenu(
+                            showDialog = true,
+                            context = context,
+                            onDismiss = { showDialog = false },
+                            onReset = {
+                                showDialog = false
+                            },
+                            onSelectionsMade = { _, _, _, _, _ ->
+                                Toast.makeText(context, "Restarting App!", Toast.LENGTH_LONG).show()
+                                restartAppV1(context)
+                            }
+                        )
+                    }
+                }
             }
         }
 
@@ -396,7 +407,7 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int) {
                 ChannelGridTV(
                     context = context,
                     channels = filteredChannels,
-//                    selectedChannel = selectedChannel,
+                    zoneSignature = zoneSignature,
                     onSelectedChannelChanged = { channel -> selectedChannel = channel }
                 )
 
@@ -410,6 +421,20 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int) {
             }
         }
     }
+}
+
+private fun shouldOpenInBrowserForAutoStart(channel: M3UChannelExp): Boolean {
+    if (channel.openInBrowser) return true
+    val mode = channel.playMode?.trim()?.lowercase()
+    if (mode == "browser" || mode == "web" || mode == "webview") return true
+
+    val lowerUrl = channel.url.trim().lowercase()
+    val isLikelyStream = lowerUrl.contains(".m3u8") ||
+            lowerUrl.contains(".m3u") ||
+            lowerUrl.contains(".mpd") ||
+            lowerUrl.contains("/live/")
+
+    return !isLikelyStream
 }
 
 
