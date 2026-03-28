@@ -145,7 +145,7 @@ fun PreReleaseBinary(
                         label = { Text("Repository") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = repositoryExpanded) },
                         modifier = Modifier
-                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEdge)
+                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                             .fillMaxWidth(),
                         colors = TextFieldDefaults.colors()
                     )
