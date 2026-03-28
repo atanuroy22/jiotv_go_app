@@ -3,10 +3,10 @@ package com.skylake.skytv.jgorunner.core.execution
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import com.google.android.gms.cast.Image
 import com.google.android.gms.cast.MediaInfo
 import com.google.android.gms.cast.MediaLoadRequestData
 import com.google.android.gms.cast.MediaMetadata
+import com.google.android.gms.common.images.WebImage
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.media.RemoteMediaClient
@@ -32,7 +32,7 @@ fun castMediaPlayer(context: Context, videoUrl: String) {
         val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE).apply {
             putString(MediaMetadata.KEY_TITLE, currentChannelName)
             currentChannelLogo?.let { logo ->
-                runCatching { addImage(Image(Uri.parse(logo))) }
+                runCatching { addImage(WebImage(Uri.parse(logo))) }
             }
         }
 
