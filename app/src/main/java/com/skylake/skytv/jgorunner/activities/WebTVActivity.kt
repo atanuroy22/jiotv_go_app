@@ -275,6 +275,13 @@ class WebPlayerActivity : ComponentActivity() {
 
         private fun handleUrlLoading(view: WebView, url: String): Boolean {
             if (url.contains("/play/")) {
+                if (isCatchupRequest(url)) {
+                    val playerUrl = convertPlayUrlToPlayerUrl(url)
+                    Log.d(TAG, "Catchup link detected, loading in WebView player: $playerUrl")
+                    view.loadUrl(playerUrl)
+                    return true
+                }
+
                 initURL = webView!!.url
                 Log.d(TAG, "Saving initURL: $initURL")
 
@@ -353,6 +360,38 @@ class WebPlayerActivity : ComponentActivity() {
             return false
         }
 
+        private fun isCatchupRequest(url: String): Boolean {
+            val parsed = runCatching { Uri.parse(url) }.getOrNull()
+            val queryNames = runCatching { parsed?.queryParameterNames }.getOrNull().orEmpty()
+
+            if (queryNames.any {
+                    it.equals("start", true) ||
+                            it.equals("end", true) ||
+                            it.equals("from", true) ||
+                            it.equals("to", true) ||
+                            it.equals("begin", true) ||
+                            it.equals("starttime", true) ||
+                            it.equals("endtime", true) ||
+                            it.equals("timestamp", true)
+                }) {
+                return true
+            }
+
+            val combined = (parsed?.path.orEmpty() + "?" + parsed?.query.orEmpty()).lowercase()
+            return combined.contains("catchup") || combined.contains("timeshift")
+        }
+
+        private fun convertPlayUrlToPlayerUrl(inputUrl: String): String {
+            val parsed = Uri.parse(inputUrl)
+            val currentPath = parsed.encodedPath.orEmpty()
+            val updatedPath = currentPath.replace("/play/", "/player/")
+
+            return parsed.buildUpon()
+                .encodedPath(updatedPath)
+                .build()
+                .toString()
+        }
+
         private fun convertPlayUrlToLiveM3u8(inputUrl: String): String {
             val parsed = Uri.parse(inputUrl)
             val currentPath = parsed.encodedPath.orEmpty()
@@ -387,11 +426,91 @@ class WebPlayerActivity : ComponentActivity() {
                 Log.d(TAG, "Playing: $url")
                 setupFullScreenMode()
                 playVideoInFullScreen(view)
+            } else if (url.contains("/catchup/")) {
+                injectCatchupUrlFix(view)
+                moveSearchInput(view)
             } else {
                 moveSearchInput(view)
                 extractChannelNumbers()
                 loadRecentChannels()
             }
+        }
+
+        private fun injectCatchupUrlFix(view: WebView) {
+            val script = """
+                (function() {
+                    try {
+                        if (window.__jtvCatchupFixApplied) {
+                            return;
+                        }
+                        window.__jtvCatchupFixApplied = true;
+
+                        function rewriteUrl(input) {
+                            if (!input) return input;
+                            try {
+                                var u = new URL(input, window.location.href);
+                                u.pathname = u.pathname.replace('/catchup/live/', '/live/');
+                                if (u.pathname.startsWith('/catchup/') && u.pathname.indexOf('/live/') === -1 && u.pathname.indexOf('/player/') === -1) {
+                                    // Keep catchup page routes unchanged; only media routes are rewritten.
+                                }
+                                return u.toString();
+                            } catch (e) {
+                                if (typeof input === 'string') {
+                                    return input.replace('/catchup/live/', '/live/');
+                                }
+                                return input;
+                            }
+                        }
+
+                        if (!document.querySelector('base[data-jtv-catchup-fix="1"]')) {
+                            var base = document.createElement('base');
+                            base.href = '/';
+                            base.setAttribute('data-jtv-catchup-fix', '1');
+                            if (document.head) {
+                                document.head.insertBefore(base, document.head.firstChild);
+                            }
+                        }
+
+                        if (window.fetch) {
+                            var originalFetch = window.fetch;
+                            window.fetch = function(input, init) {
+                                try {
+                                    if (typeof input === 'string') {
+                                        input = rewriteUrl(input);
+                                    } else if (input && input.url) {
+                                        input = new Request(rewriteUrl(input.url), input);
+                                    }
+                                } catch (e) {}
+                                return originalFetch.call(this, input, init);
+                            };
+                        }
+
+                        var originalXhrOpen = XMLHttpRequest.prototype.open;
+                        XMLHttpRequest.prototype.open = function(method, url) {
+                            try {
+                                url = rewriteUrl(url);
+                            } catch (e) {}
+
+                            if (arguments.length > 2) {
+                                return originalXhrOpen.call(this, method, url, arguments[2], arguments[3], arguments[4]);
+                            }
+                            return originalXhrOpen.call(this, method, url);
+                        };
+
+                        var mediaElements = document.querySelectorAll('video, source');
+                        for (var i = 0; i < mediaElements.length; i++) {
+                            var el = mediaElements[i];
+                            if (el.src) {
+                                el.src = rewriteUrl(el.src);
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Catchup URL fix failed', e);
+                    }
+                })();
+            """.trimIndent()
+
+            view.evaluateJavascript(script, null)
         }
 
         fun extractChannelNumbers() {
