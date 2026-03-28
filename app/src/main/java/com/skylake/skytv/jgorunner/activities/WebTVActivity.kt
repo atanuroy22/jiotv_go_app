@@ -14,6 +14,7 @@ import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ProgressBar
@@ -24,6 +25,8 @@ import com.skylake.skytv.jgorunner.data.SkySharedPref
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.Locale
 
 class WebPlayerActivity : ComponentActivity() {
@@ -264,6 +267,14 @@ class WebPlayerActivity : ComponentActivity() {
     }
 
     private inner class CustomWebViewClient : WebViewClient() {
+        override fun shouldInterceptRequest(
+            view: WebView,
+            request: WebResourceRequest
+        ): WebResourceResponse? {
+            val rewrittenUrl = rewriteCatchupMediaUrl(request.url.toString()) ?: return null
+            return proxyWebResource(request, rewrittenUrl)
+        }
+
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
             return handleUrlLoading(view, request.url.toString())
         }
@@ -410,6 +421,68 @@ class WebPlayerActivity : ComponentActivity() {
                 .build()
                 .toString()
                 .replace("//.m3u8", ".m3u8")
+        }
+
+        private fun rewriteCatchupMediaUrl(inputUrl: String): String? {
+            val parsed = runCatching { Uri.parse(inputUrl) }.getOrNull() ?: return null
+            val path = parsed.encodedPath.orEmpty()
+            if (!path.contains("/catchup/live/", ignoreCase = true)) {
+                return null
+            }
+
+            val newPath = path.replace("/catchup/live/", "/live/")
+            return parsed.buildUpon()
+                .encodedPath(newPath)
+                .build()
+                .toString()
+        }
+
+        private fun proxyWebResource(
+            request: WebResourceRequest,
+            rewrittenUrl: String
+        ): WebResourceResponse? {
+            return try {
+                val connection = (URL(rewrittenUrl).openConnection() as HttpURLConnection).apply {
+                    requestMethod = request.method
+                    connectTimeout = 15000
+                    readTimeout = 15000
+                    instanceFollowRedirects = true
+                    setRequestProperty("User-Agent", request.requestHeaders["User-Agent"] ?: "Mozilla/5.0")
+                    request.requestHeaders.forEach { (key, value) ->
+                        if (!key.equals("host", ignoreCase = true) &&
+                            !key.equals("connection", ignoreCase = true)
+                        ) {
+                            setRequestProperty(key, value)
+                        }
+                    }
+                }
+
+                val contentTypeRaw = connection.contentType ?: "application/octet-stream"
+                val mimeType = contentTypeRaw.substringBefore(';').ifBlank { "application/octet-stream" }
+                val encoding = connection.contentEncoding ?: "utf-8"
+                val stream = connection.errorStream ?: connection.inputStream
+
+                val responseHeaders = mutableMapOf<String, String>()
+                connection.headerFields
+                    .filterKeys { it != null }
+                    .forEach { (key, values) ->
+                        if (key != null && !values.isNullOrEmpty()) {
+                            responseHeaders[key] = values.joinToString(",")
+                        }
+                    }
+
+                WebResourceResponse(
+                    mimeType,
+                    encoding,
+                    connection.responseCode,
+                    connection.responseMessage ?: "OK",
+                    responseHeaders,
+                    stream
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Catchup media rewrite proxy failed: ${e.message}")
+                null
+            }
         }
 
 
