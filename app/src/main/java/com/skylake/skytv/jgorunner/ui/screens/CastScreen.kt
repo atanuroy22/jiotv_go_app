@@ -6,8 +6,10 @@ import android.content.Context.CONNECTIVITY_SERVICE
 import android.net.ConnectivityManager
 import android.net.LinkProperties
 import android.net.NetworkCapabilities
+import android.net.Uri
 import android.os.Build
 import android.util.Log
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
@@ -217,8 +219,16 @@ private class CustomWebViewClient(
     private var currentLogoUrl: String? = null
     private var currentChannelName: String? = null
 
+    override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+        return handleUrlLoading(view, request.url.toString())
+    }
+
     @Deprecated("Deprecated in Java")
     override fun shouldOverrideUrlLoading(view: WebView, url: String ): Boolean {
+        return handleUrlLoading(view, url)
+    }
+
+    private fun handleUrlLoading(view: WebView, url: String): Boolean {
         if (url.contains("/play/")) {
             initURL = view.url
             Log.d(TAG, "Saving initURL: $initURL")
@@ -266,7 +276,7 @@ private class CustomWebViewClient(
                 }
             }
 
-            val modifiedUrl = url.replace("/play/", "/live/") + ".m3u8"
+            val modifiedUrl = convertPlayUrlToLiveM3u8(url)
             Log.d(TAG2, "Modified URL for intent: $modifiedUrl")
 
             val newPlayerURL = formatVideoUrl(modifiedUrl)
@@ -286,11 +296,21 @@ private class CustomWebViewClient(
 
                     // Direct Streaming - only few channels are working
 
-                     val ipAddress = getPublicJTVServerURL(context)
-                     fun ensureM3U8Suffix(url: String) = url.takeIf { it.endsWith(".m3u8") } ?: "$url.m3u8"
-                     val updatedUrl = ensureM3U8Suffix(newPlayerURL).replace("localhost", ipAddress)
-                     Log.d(TAG2, updatedUrl)
-                     castMediaPlayer(context, updatedUrl)
+                    val ipAddress = getPublicJTVServerURL(context)
+                    val updatedUrl = replaceLocalhostWithLanIp(newPlayerURL, ipAddress)
+                    val host = runCatching { Uri.parse(updatedUrl).host }.getOrNull()
+
+                    if (host != null && (host.equals("localhost", true) || host == "127.0.0.1")) {
+                        Toast.makeText(
+                            context,
+                            "Unable to resolve device IP for casting",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        Log.d(TAG, "Casting skipped due to unresolved LAN host: $updatedUrl")
+                    } else {
+                        Log.d(TAG2, updatedUrl)
+                        castMediaPlayer(context, updatedUrl)
+                    }
 
                  } else {
                     Log.d(TAG,"Not connected to any device")
@@ -309,6 +329,26 @@ private class CustomWebViewClient(
             return false
         }
         return false
+    }
+
+    private fun convertPlayUrlToLiveM3u8(inputUrl: String): String {
+        val parsed = Uri.parse(inputUrl)
+        val currentPath = parsed.encodedPath.orEmpty()
+        var updatedPath = currentPath.replace("/play/", "/live/")
+
+        if (!updatedPath.endsWith(".m3u8", ignoreCase = true) && !updatedPath.endsWith(".m3u", ignoreCase = true)) {
+            updatedPath = if (updatedPath.endsWith('/')) {
+                updatedPath.dropLast(1) + ".m3u8"
+            } else {
+                "$updatedPath.m3u8"
+            }
+        }
+
+        return parsed.buildUpon()
+            .encodedPath(updatedPath)
+            .build()
+            .toString()
+            .replace("//.m3u8", ".m3u8")
     }
 
     private fun saveRecentChannel( playId: String?, logoUrl: String?, channelName: String?) {
@@ -331,16 +371,28 @@ private class CustomWebViewClient(
             videoUrl = videoUrl.replace("/live/", "/live/medium/")
         }
 
-        if (videoUrl.contains(".m3u8")) {
-            val questionMarkIndex = videoUrl.indexOf("?")
-            if (questionMarkIndex != -1) {
-                videoUrl = videoUrl.substring(0, questionMarkIndex)
-            }
-        }
-
         videoUrl = videoUrl.replace("//.m3u8", ".m3u8")
 
         return videoUrl
+    }
+
+    private fun replaceLocalhostWithLanIp(inputUrl: String, lanIp: String): String {
+        if (lanIp.isBlank() || lanIp == "0.0.0.0") return inputUrl
+
+        val parsed = Uri.parse(inputUrl)
+        val host = parsed.host ?: return inputUrl
+        if (!host.equals("localhost", ignoreCase = true) && host != "127.0.0.1") {
+            return inputUrl
+        }
+
+        val userInfoPrefix = parsed.userInfo?.let { "$it@" } ?: ""
+        val portSuffix = if (parsed.port != -1) ":${parsed.port}" else ""
+        val authority = "$userInfoPrefix$lanIp$portSuffix"
+
+        return parsed.buildUpon()
+            .encodedAuthority(authority)
+            .build()
+            .toString()
     }
 
     override fun onPageFinished(view: WebView, url: String) {

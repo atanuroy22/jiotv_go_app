@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -12,6 +13,7 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ProgressBar
@@ -262,8 +264,16 @@ class WebPlayerActivity : ComponentActivity() {
     }
 
     private inner class CustomWebViewClient : WebViewClient() {
+        override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+            return handleUrlLoading(view, request.url.toString())
+        }
+
         @Deprecated("Deprecated in Java")
         override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
+            return handleUrlLoading(view, url)
+        }
+
+        private fun handleUrlLoading(view: WebView, url: String): Boolean {
             if (url.contains("/play/")) {
                 initURL = webView!!.url
                 Log.d(TAG, "Saving initURL: $initURL")
@@ -324,10 +334,7 @@ class WebPlayerActivity : ComponentActivity() {
                     }
                 }
 
-                // Construct the new URL
-                var modifiedUrl = url.replace("/play/", "/live/") + ".m3u8"
-
-                modifiedUrl = modifiedUrl.replace("//.m3u8", ".m3u8")
+                val modifiedUrl = convertPlayUrlToLiveM3u8(url)
 
                 Log.d("DIX", "Modified URL for intent: $modifiedUrl")
 
@@ -344,6 +351,26 @@ class WebPlayerActivity : ComponentActivity() {
                 return false
             }
             return false
+        }
+
+        private fun convertPlayUrlToLiveM3u8(inputUrl: String): String {
+            val parsed = Uri.parse(inputUrl)
+            val currentPath = parsed.encodedPath.orEmpty()
+            var updatedPath = currentPath.replace("/play/", "/live/")
+
+            if (!updatedPath.endsWith(".m3u8", ignoreCase = true) && !updatedPath.endsWith(".m3u", ignoreCase = true)) {
+                updatedPath = if (updatedPath.endsWith('/')) {
+                    updatedPath.dropLast(1) + ".m3u8"
+                } else {
+                    "$updatedPath.m3u8"
+                }
+            }
+
+            return parsed.buildUpon()
+                .encodedPath(updatedPath)
+                .build()
+                .toString()
+                .replace("//.m3u8", ".m3u8")
         }
 
 

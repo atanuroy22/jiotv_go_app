@@ -33,7 +33,9 @@ import com.skylake.skytv.jgorunner.data.SkySharedPref;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -162,36 +164,77 @@ public class ExoplayerActivity extends ComponentActivity {
             return DEFAULT_VIDEO_URL;
         }
 
-        // Replace the "/live/" segment and adjust based on quality
-        if (videoUrl.contains("q=low")) {
-            videoUrl = videoUrl.replace("/live/", "/live/low/");
-        } else if (videoUrl.contains("q=high")) {
-            videoUrl = videoUrl.replace("/live/", "/live/high/");
-        } else if (videoUrl.contains("q=medium")) {
-            videoUrl = videoUrl.replace("/live/", "/live/medium/");
+        Uri parsed = Uri.parse(videoUrl);
+        String path = parsed.getPath();
+        if (path == null) {
+            path = "";
         }
+
+        String qFromUrl = parsed.getQueryParameter("q");
+        String effectiveQuality = qFromUrl;
 
         if ("TV".equals(signatureFallback) && !"auto".equals(filterQX)) {
             Log.d(TAG, "Exo- TV- Redirect-");
-            switch (filterQX) {
-                case "low" -> videoUrl = videoUrl.replace("/live/", "/live/low/");
-                case "high" -> videoUrl = videoUrl.replace("/live/", "/live/high/");
-                case "medium" -> videoUrl = videoUrl.replace("/live/", "/live/medium/");
+            if (filterQX != null && !filterQX.isEmpty()) {
+                effectiveQuality = filterQX;
             }
         }
 
-        // Remove query parameters if URL contains ".m3u8"
-        if (videoUrl.contains(".m3u8")) {
-            int questionMarkIndex = videoUrl.indexOf("?");
-            if (questionMarkIndex != -1) {
-                videoUrl = videoUrl.substring(0, questionMarkIndex);
+        String normalizedPath = path
+                .replace("/live/low/", "/live/")
+                .replace("/live/medium/", "/live/")
+                .replace("/live/high/", "/live/");
+
+        if (effectiveQuality != null) {
+            switch (effectiveQuality.toLowerCase()) {
+                case "low":
+                    normalizedPath = normalizedPath.replace("/live/", "/live/low/");
+                    break;
+                case "high":
+                    normalizedPath = normalizedPath.replace("/live/", "/live/high/");
+                    break;
+                case "medium":
+                    normalizedPath = normalizedPath.replace("/live/", "/live/medium/");
+                    break;
+                default:
+                    break;
             }
         }
 
-        // Fix potential issue with "//.m3u8"
-        videoUrl = videoUrl.replace("//.m3u8", ".m3u8");
+        if (normalizedPath.contains("/live/") &&
+                !normalizedPath.endsWith(".m3u8") &&
+                !normalizedPath.endsWith(".m3u")) {
+            normalizedPath = normalizedPath.endsWith("/")
+                    ? normalizedPath.substring(0, normalizedPath.length() - 1) + ".m3u8"
+                    : normalizedPath + ".m3u8";
+        }
 
-        return videoUrl;
+        Uri.Builder builder = parsed.buildUpon().encodedPath(normalizedPath).clearQuery();
+
+        Map<String, List<String>> queryMap = new LinkedHashMap<>();
+        for (String name : parsed.getQueryParameterNames()) {
+            if ("q".equalsIgnoreCase(name)) {
+                continue;
+            }
+            queryMap.put(name, parsed.getQueryParameters(name));
+        }
+
+        for (Map.Entry<String, List<String>> entry : queryMap.entrySet()) {
+            List<String> values = entry.getValue();
+            if (values == null || values.isEmpty()) {
+                builder.appendQueryParameter(entry.getKey(), null);
+            } else {
+                for (String value : values) {
+                    builder.appendQueryParameter(entry.getKey(), value);
+                }
+            }
+        }
+
+        String formatted = builder.build().toString()
+                .replace(".m3u8.m3u8", ".m3u8")
+                .replace("//.m3u8", ".m3u8");
+
+        return formatted;
     }
 
     @OptIn(markerClass = UnstableApi.class)
