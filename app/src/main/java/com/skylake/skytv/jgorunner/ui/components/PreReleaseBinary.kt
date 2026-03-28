@@ -60,6 +60,16 @@ import java.io.File
 import java.net.URL
 import java.util.concurrent.TimeUnit
 
+private val REPOSITORY_NAMES = mapOf(
+    "atanuroy22" to "github.com/atanuroy22/jiotv_go",
+    "JioTV-Go" to "github.com/JioTV-Go/jiotv_go"
+)
+
+private val REPOSITORY_URLS = mapOf(
+    "atanuroy22" to "https://api.github.com/repos/atanuroy22/jiotv_go",
+    "JioTV-Go" to "https://api.github.com/repos/JioTV-Go/jiotv_go"
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PreReleaseBinary(
@@ -70,10 +80,13 @@ fun PreReleaseBinary(
 ) {
     if (!isVisible) return
     val context = LocalContext.current
+    val preferenceManager = remember { SkySharedPref.getInstance(context) }
 
     val confirmFocusRequester = remember { FocusRequester() }
     val resetFocusRequester = remember { FocusRequester() }
     val cancelFocusRequester = remember { FocusRequester() }
+    var selectedRepository by remember { mutableStateOf(preferenceManager.myPrefs.preReleaseRepo ?: "atanuroy22") }
+    var repositoryExpanded by remember { mutableStateOf(false) }
     var releases by remember { mutableStateOf<List<String>?>(null) }
     var selectedRelease by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
@@ -85,10 +98,10 @@ fun PreReleaseBinary(
         }
     }
 
-    LaunchedEffect(isVisible) {
+    LaunchedEffect(isVisible, selectedRepository) {
         if (isVisible) {
             try {
-                releases = fetchGithubReleases()
+                releases = fetchGithubReleases(selectedRepository)
                 selectedRelease = releases?.firstOrNull() ?: ""
                 errorMessage = ""
             } catch (e: Exception) {
@@ -117,6 +130,44 @@ fun PreReleaseBinary(
         },
         text = {
             Column {
+                // Repository Selection Dropdown
+                ExposedDropdownMenuBox(
+                    expanded = repositoryExpanded,
+                    onExpandedChange = { repositoryExpanded = !repositoryExpanded },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
+                ) {
+                    TextField(
+                        value = REPOSITORY_NAMES[selectedRepository] ?: selectedRepository,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Repository") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = repositoryExpanded) },
+                        modifier = Modifier
+                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEdge)
+                            .fillMaxWidth(),
+                        colors = TextFieldDefaults.colors()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = repositoryExpanded,
+                        onDismissRequest = { repositoryExpanded = false }
+                    ) {
+                        REPOSITORY_NAMES.forEach { (repoKey, repoName) ->
+                            DropdownMenuItem(
+                                text = { Text(repoName) },
+                                onClick = {
+                                    selectedRepository = repoKey
+                                    repositoryExpanded = false
+                                    preferenceManager.myPrefs.preReleaseRepo = repoKey
+                                    preferenceManager.savePreferences()
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // Release Selection Dropdown
                 when {
                     releases == null -> Box(
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -226,11 +277,12 @@ fun PreReleaseBinary(
 
 
 // Use suspend for blocking network calls and optimize ABI/matching
-suspend fun fetchGithubReleases(): List<String> = withContext(Dispatchers.IO) {
+suspend fun fetchGithubReleases(repository: String = "atanuroy22"): List<String> = withContext(Dispatchers.IO) {
     try {
+        val apiUrl = REPOSITORY_URLS[repository] ?: REPOSITORY_URLS["atanuroy22"]!!
         val client = OkHttpClient()
         val request = Request.Builder()
-            .url("https://api.github.com/repos/atanuroy22/jiotv_go/releases")
+            .url("$apiUrl/releases")
             .build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return@withContext emptyList()
@@ -254,10 +306,12 @@ suspend fun fetchGithubReleases(): List<String> = withContext(Dispatchers.IO) {
 suspend fun performSelectedBinaryUpdate(
     context: Context,
     selectedTag: String,
-    onDownloadStatusUpdate: (DownloadModelNew) -> Unit
+    onDownloadStatusUpdate: (DownloadModelNew) -> Unit,
+    repository: String = "atanuroy22"
 ): Boolean = withContext(Dispatchers.IO) {
     try {
-        val releasesResponse = URL("https://api.github.com/repos/atanuroy22/jiotv_go/releases").readText()
+        val apiUrl = REPOSITORY_URLS[repository] ?: REPOSITORY_URLS["atanuroy22"]!!
+        val releasesResponse = URL("$apiUrl/releases").readText()
         val releasesArray = JSONArray(releasesResponse)
         var selectedRelease: JSONObject? = null
         var assetFileName = ""

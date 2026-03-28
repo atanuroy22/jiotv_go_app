@@ -218,8 +218,11 @@ class SkySharedPref(context: Context) {
         @SharedPrefKey("cachedReleaseUrl") var cachedReleaseUrl: String? = null,
         @SharedPrefKey("cachedReleaseSize") var cachedReleaseSize: Long = 0L,
 
+        // Pre-release repository selection
+        @SharedPrefKey("pre_release_repo") var preReleaseRepo: String? = "atanuroy22",
 
         )
+
 
 
     // Annotation class to define the key for SharedPreferences

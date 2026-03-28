@@ -366,9 +366,10 @@ fun DebugScreen(context: Context, onNavigate: (String) -> Unit) {
             onDismiss = { showPreReleaseBinaryDialog = false },
             onConfirm = { ctx, selectedRelease ->
                 CoroutineScope(Dispatchers.Main).launch {
-                    val success = performSelectedBinaryUpdate(ctx, selectedRelease) { status ->
+                    val repository = preferenceManager.myPrefs.preReleaseRepo ?: "atanuroy22"
+                    val success = performSelectedBinaryUpdate(ctx, selectedRelease, { status ->
                         downloadProgress = status
-                    }
+                    }, repository)
                     if (preferenceManager.myPrefs.jtvGoBinaryVersion?.contains(
                             "develop",
                             ignoreCase = true
