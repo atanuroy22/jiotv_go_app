@@ -197,6 +197,7 @@ class SkySharedPref(context: Context) {
         @SharedPrefKey("currChannelUrl") var currChannelUrl: String? = "",
         @SharedPrefKey("unitHolder") var unitHolder: Int = 0,
         @SharedPrefKey("customPlaylistSupport") var customPlaylistSupport: Boolean = true,
+        @SharedPrefKey("enableCatchup") var enableCatchup: Boolean = false,
         @SharedPrefKey("home_iptv_enabled") var homeIptvEnabled: Boolean = true,
         @SharedPrefKey("genericTvIcon") var genericTvIcon: Boolean = false,
         @SharedPrefKey("preRelease") var preRelease: Boolean = false,

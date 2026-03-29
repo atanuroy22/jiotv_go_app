@@ -79,6 +79,7 @@ fun TvScreenMenu(
     var showCustomUrlInputDialog by remember { mutableStateOf(false) }
     var customUrl by remember { mutableStateOf(preferenceManager.myPrefs.custURL ?: "") }
     var showRecentTab by remember { mutableStateOf(preferenceManager.myPrefs.showRecentTab) }
+    var enableCatchup by remember { mutableStateOf(preferenceManager.myPrefs.enableCatchup) }
     var startTvAutomatically by remember { mutableStateOf(preferenceManager.myPrefs.startTvAutomatically) }
     var startTvAutoDelay by remember { mutableStateOf(preferenceManager.myPrefs.startTvAutoDelay) }
     var startTvAutoDelayTime by remember { mutableIntStateOf(preferenceManager.myPrefs.startTvAutoDelayTime) }
@@ -501,6 +502,21 @@ fun TvScreenMenu(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(text = "Show Recent Channels")
                     }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Checkbox(
+                            checked = enableCatchup,
+                            onCheckedChange = { checked ->
+                                enableCatchup = checked
+                            }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "Enable Catchup")
+                    }
                 }
 
 ///////////////////////////////
@@ -692,6 +708,7 @@ fun TvScreenMenu(
                                 myPrefs.selectedRemoteNavTV = "0"
                                 myPrefs.showPLAYLIST = false
                                 myPrefs.showRecentTab = false
+                                myPrefs.enableCatchup = false
                                 myPrefs.startTvAutomatically = false
                                 myPrefs.startTvAutoDelay = false
                                 myPrefs.startTvAutoDelayTime = 0
@@ -723,6 +740,7 @@ fun TvScreenMenu(
                                     myPrefs.showPLAYLIST = showPlaylist
                                 }
                                 myPrefs.showRecentTab = showRecentTab
+                                myPrefs.enableCatchup = enableCatchup
                                 myPrefs.startTvAutomatically = startTvAutomatically
                                 myPrefs.startTvAutoDelay = startTvAutoDelay
                                 myPrefs.startTvAutoDelayTime = startTvAutoDelayTime

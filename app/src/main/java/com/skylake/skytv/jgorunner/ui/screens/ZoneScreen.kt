@@ -97,10 +97,14 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
 
     val showRecentTab = remember(reloadChannelsTrigger) { preferenceManager.myPrefs.showRecentTab }
     val customPlaylistSupport = remember(reloadChannelsTrigger) { preferenceManager.myPrefs.customPlaylistSupport }
+    val enableCatchup = remember(reloadChannelsTrigger) { preferenceManager.myPrefs.enableCatchup }
     val showIptvTab = customPlaylistSupport
 
     val tabs = buildList {
         add(TabItem("TV", Icons.Default.Tv))
+        if (enableCatchup) {
+            add(TabItem("Catchup", Icons.Default.Tv))
+        }
         if (showRecentTab) {
             add(TabItem("Recent", Icons.Default.Star))
             add(TabItem("Search", Icons.Default.Search))
@@ -298,6 +302,7 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
                     when (selectedTabIndex) {
                         else -> when (tabs[selectedTabIndex].text) {
                             "TV" -> Main_Layout(context, reloadTrigger = reloadChannelsTrigger)
+                            "Catchup" -> Main_Layout(context, reloadTrigger = reloadChannelsTrigger, isCatchup = true)
                             "Recent" -> Recent_Layout(context)
                             "Search" -> SearchTabLayout(context, tabFocusRequester)
                             "IPTV" -> Main_Layout_3rd(context, reloadTrigger = reloadChannelsTrigger)

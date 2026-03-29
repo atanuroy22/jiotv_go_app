@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Bitmap
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -13,8 +12,6 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.webkit.WebChromeClient
-import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ProgressBar
@@ -25,8 +22,6 @@ import com.skylake.skytv.jgorunner.data.SkySharedPref
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.Locale
 
 class WebPlayerActivity : ComponentActivity() {
@@ -62,15 +57,20 @@ class WebPlayerActivity : ComponentActivity() {
         val filterL = prefManager.myPrefs.filterL
         val filterC = prefManager.myPrefs.filterC
 //        val extraFilterUrl = "/?q=$filterQ&language=$filterL&category=$filterC" // "/?q=low&language=6&category=7"
-        val queryParams = buildList {
-            if (!filterQ.isNullOrEmpty()) add("q=${Uri.encode(filterQ)}")
-            if (!filterL.isNullOrEmpty()) add("language=${Uri.encode(filterL)}")
-            if (!filterC.isNullOrEmpty()) add("category=${Uri.encode(filterC)}")
-        }
-        val extraFilterUrl = if (queryParams.isEmpty()) {
-            "/"
-        } else {
-            "/?" + queryParams.joinToString("&")
+        val extraFilterUrl = buildString {
+            append("/")
+
+            if (!filterQ.isNullOrEmpty()) append("?q=$filterQ")
+
+            if (!filterL.isNullOrEmpty()) {
+                if (isNotEmpty()) append("&")
+                append("language=$filterL")
+            }
+
+            if (!filterC.isNullOrEmpty()) {
+                if (isNotEmpty()) append("&")
+                append("category=$filterC")
+            }
         }
 
         url = String.format(
@@ -262,40 +262,9 @@ class WebPlayerActivity : ComponentActivity() {
     }
 
     private inner class CustomWebViewClient : WebViewClient() {
-        override fun shouldInterceptRequest(
-            view: WebView,
-            request: WebResourceRequest
-        ): WebResourceResponse? {
-            val rewrittenUrl = rewriteCatchupMediaUrl(request.url.toString()) ?: return null
-            return proxyWebResource(request, rewrittenUrl)
-        }
-
-        override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-            return handleUrlLoading(view, request.url.toString())
-        }
-
         @Deprecated("Deprecated in Java")
         override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
-            return handleUrlLoading(view, url)
-        }
-
-        private fun handleUrlLoading(view: WebView, url: String): Boolean {
-            if (isCatchupRequest(url)) {
-                val catchupUrl = convertCatchupUrlToLiveM3u8(url)
-                val catchupPlayId = extractChannelId(url)
-                Log.d(TAG, "Catchup link detected, opening Exoplayer with URL: $catchupUrl")
-
-                val intent = Intent(this@WebPlayerActivity, ExoplayerActivity::class.java).apply {
-                    putExtra("video_url", catchupUrl)
-                    putExtra("current_play_id", catchupPlayId)
-                    putExtra("channels_list", channelNumbers?.toTypedArray())
-                }
-                startActivity(intent)
-                return true
-            }
-
             if (url.contains("/play/")) {
-
                 initURL = webView!!.url
                 Log.d(TAG, "Saving initURL: $initURL")
 
@@ -355,7 +324,10 @@ class WebPlayerActivity : ComponentActivity() {
                     }
                 }
 
-                val modifiedUrl = convertPlayUrlToLiveM3u8(url)
+                // Construct the new URL
+                var modifiedUrl = url.replace("/play/", "/live/") + ".m3u8"
+
+                modifiedUrl = modifiedUrl.replace("//.m3u8", ".m3u8")
 
                 Log.d("DIX", "Modified URL for intent: $modifiedUrl")
 
@@ -374,181 +346,6 @@ class WebPlayerActivity : ComponentActivity() {
             return false
         }
 
-        private fun isCatchupRequest(url: String): Boolean {
-            val parsed = runCatching { Uri.parse(url) }.getOrNull()
-            val queryNames = runCatching { parsed?.queryParameterNames }.getOrNull().orEmpty()
-
-            if (queryNames.any {
-                    it.equals("start", true) ||
-                            it.equals("end", true) ||
-                            it.equals("from", true) ||
-                            it.equals("to", true) ||
-                            it.equals("begin", true) ||
-                            it.equals("starttime", true) ||
-                            it.equals("endtime", true) ||
-                            it.equals("timestamp", true)
-                }) {
-                return true
-            }
-
-            val combined = (parsed?.path.orEmpty() + "?" + parsed?.query.orEmpty()).lowercase()
-            return combined.contains("catchup") || combined.contains("timeshift")
-        }
-
-        private fun convertPlayUrlToPlayerUrl(inputUrl: String): String {
-            val parsed = Uri.parse(inputUrl)
-            val currentPath = parsed.encodedPath.orEmpty()
-            val updatedPath = currentPath.replace("/play/", "/player/")
-
-            return parsed.buildUpon()
-                .encodedPath(updatedPath)
-                .build()
-                .toString()
-        }
-
-        private fun convertCatchupPlayUrlToPlayerUrl(inputUrl: String): String {
-            val parsed = Uri.parse(inputUrl)
-            val currentPath = parsed.encodedPath.orEmpty()
-
-            val updatedPath = when {
-                currentPath.contains("/catchup/play/", ignoreCase = true) -> {
-                    currentPath.replace("/catchup/play/", "/catchup/player/")
-                }
-
-                currentPath.contains("/catchup/player/", ignoreCase = true) -> {
-                    currentPath
-                }
-
-                currentPath.contains("/play/", ignoreCase = true) -> {
-                    currentPath.replace("/play/", "/catchup/player/")
-                }
-
-                currentPath.contains("/player/", ignoreCase = true) -> {
-                    currentPath.replace("/player/", "/catchup/player/")
-                }
-
-                else -> currentPath
-            }
-
-            return parsed.buildUpon()
-                .encodedPath(updatedPath)
-                .build()
-                .toString()
-        }
-
-        private fun convertCatchupUrlToLiveM3u8(inputUrl: String): String {
-            val parsed = Uri.parse(inputUrl)
-            val currentPath = parsed.encodedPath.orEmpty()
-
-            var updatedPath = currentPath
-                .replace("/catchup/play/", "/live/", ignoreCase = true)
-                .replace("/catchup/player/", "/live/", ignoreCase = true)
-                .replace("/catchup/live/", "/live/", ignoreCase = true)
-                .replace("/play/", "/live/", ignoreCase = true)
-                .replace("/player/", "/live/", ignoreCase = true)
-
-            if (!updatedPath.endsWith(".m3u8", ignoreCase = true) && !updatedPath.endsWith(".m3u", ignoreCase = true)) {
-                updatedPath = if (updatedPath.endsWith('/')) {
-                    updatedPath.dropLast(1) + ".m3u8"
-                } else {
-                    "$updatedPath.m3u8"
-                }
-            }
-
-            return parsed.buildUpon()
-                .encodedPath(updatedPath)
-                .build()
-                .toString()
-                .replace("//.m3u8", ".m3u8")
-        }
-
-        private fun extractChannelId(url: String): String? {
-            val match = Regex(".*/(?:play|player|live)/(\\d+).*", RegexOption.IGNORE_CASE).find(url)
-            return match?.groupValues?.getOrNull(1)
-        }
-
-        private fun convertPlayUrlToLiveM3u8(inputUrl: String): String {
-            val parsed = Uri.parse(inputUrl)
-            val currentPath = parsed.encodedPath.orEmpty()
-            var updatedPath = currentPath.replace("/play/", "/live/")
-
-            if (!updatedPath.endsWith(".m3u8", ignoreCase = true) && !updatedPath.endsWith(".m3u", ignoreCase = true)) {
-                updatedPath = if (updatedPath.endsWith('/')) {
-                    updatedPath.dropLast(1) + ".m3u8"
-                } else {
-                    "$updatedPath.m3u8"
-                }
-            }
-
-            return parsed.buildUpon()
-                .encodedPath(updatedPath)
-                .build()
-                .toString()
-                .replace("//.m3u8", ".m3u8")
-        }
-
-        private fun rewriteCatchupMediaUrl(inputUrl: String): String? {
-            val parsed = runCatching { Uri.parse(inputUrl) }.getOrNull() ?: return null
-            val path = parsed.encodedPath.orEmpty()
-            if (!path.contains("/catchup/live/", ignoreCase = true)) {
-                return null
-            }
-
-            val newPath = path.replace("/catchup/live/", "/live/")
-            return parsed.buildUpon()
-                .encodedPath(newPath)
-                .build()
-                .toString()
-        }
-
-        private fun proxyWebResource(
-            request: WebResourceRequest,
-            rewrittenUrl: String
-        ): WebResourceResponse? {
-            return try {
-                val connection = (URL(rewrittenUrl).openConnection() as HttpURLConnection).apply {
-                    requestMethod = request.method
-                    connectTimeout = 15000
-                    readTimeout = 15000
-                    instanceFollowRedirects = true
-                    setRequestProperty("User-Agent", request.requestHeaders["User-Agent"] ?: "Mozilla/5.0")
-                    request.requestHeaders.forEach { (key, value) ->
-                        if (!key.equals("host", ignoreCase = true) &&
-                            !key.equals("connection", ignoreCase = true)
-                        ) {
-                            setRequestProperty(key, value)
-                        }
-                    }
-                }
-
-                val contentTypeRaw = connection.contentType ?: "application/octet-stream"
-                val mimeType = contentTypeRaw.substringBefore(';').ifBlank { "application/octet-stream" }
-                val encoding = connection.contentEncoding ?: "utf-8"
-                val stream = connection.errorStream ?: connection.inputStream
-
-                val responseHeaders = mutableMapOf<String, String>()
-                connection.headerFields
-                    .filterKeys { it != null }
-                    .forEach { (key, values) ->
-                        if (key != null && !values.isNullOrEmpty()) {
-                            responseHeaders[key] = values.joinToString(",")
-                        }
-                    }
-
-                WebResourceResponse(
-                    mimeType,
-                    encoding,
-                    connection.responseCode,
-                    connection.responseMessage ?: "OK",
-                    responseHeaders,
-                    stream
-                )
-            } catch (e: Exception) {
-                Log.e(TAG, "Catchup media rewrite proxy failed: ${e.message}")
-                null
-            }
-        }
-
 
         override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
             if (prefManager.myPrefs.darkMODE) {
@@ -559,15 +356,7 @@ class WebPlayerActivity : ComponentActivity() {
 
         override fun onPageFinished(view: WebView, url: String) {
             loadingSpinner!!.visibility = View.GONE
-            if (url.contains("/catchup/")) {
-                injectCatchupUrlFix(view)
-                if (url.contains("/player/")) {
-                    Log.d(TAG, "Playing catchup: $url")
-                    setupFullScreenMode()
-                    playVideoInFullScreen(view)
-                }
-                moveSearchInput(view)
-            } else if (url.contains("/player/")) {
+            if (url.contains("/player/")) {
                 Log.d(TAG, "Playing: $url")
                 setupFullScreenMode()
                 playVideoInFullScreen(view)
@@ -576,83 +365,6 @@ class WebPlayerActivity : ComponentActivity() {
                 extractChannelNumbers()
                 loadRecentChannels()
             }
-        }
-
-        private fun injectCatchupUrlFix(view: WebView) {
-            val script = """
-                (function() {
-                    try {
-                        if (window.__jtvCatchupFixApplied) {
-                            return;
-                        }
-                        window.__jtvCatchupFixApplied = true;
-
-                        function rewriteUrl(input) {
-                            if (!input) return input;
-                            try {
-                                var u = new URL(input, window.location.href);
-                                u.pathname = u.pathname.replace('/catchup/live/', '/live/');
-                                if (u.pathname.startsWith('/catchup/') && u.pathname.indexOf('/live/') === -1 && u.pathname.indexOf('/player/') === -1) {
-                                    // Keep catchup page routes unchanged; only media routes are rewritten.
-                                }
-                                return u.toString();
-                            } catch (e) {
-                                if (typeof input === 'string') {
-                                    return input.replace('/catchup/live/', '/live/');
-                                }
-                                return input;
-                            }
-                        }
-
-                        if (!document.querySelector('base[data-jtv-catchup-fix="1"]')) {
-                            var base = document.createElement('base');
-                            base.href = '/';
-                            base.setAttribute('data-jtv-catchup-fix', '1');
-                            if (document.head) {
-                                document.head.insertBefore(base, document.head.firstChild);
-                            }
-                        }
-
-                        if (window.fetch) {
-                            var originalFetch = window.fetch;
-                            window.fetch = function(input, init) {
-                                try {
-                                    if (typeof input === 'string') {
-                                        input = rewriteUrl(input);
-                                    } else if (input && input.url) {
-                                        input = new Request(rewriteUrl(input.url), input);
-                                    }
-                                } catch (e) {}
-                                return originalFetch.call(this, input, init);
-                            };
-                        }
-
-                        var originalXhrOpen = XMLHttpRequest.prototype.open;
-                        XMLHttpRequest.prototype.open = function(method, url) {
-                            try {
-                                url = rewriteUrl(url);
-                            } catch (e) {}
-
-                            if (arguments.length > 2) {
-                                return originalXhrOpen.call(this, method, url, arguments[2], arguments[3], arguments[4]);
-                            }
-                            return originalXhrOpen.call(this, method, url);
-                        };
-
-                        var mediaElements = document.querySelectorAll('video, source');
-                        for (var i = 0; i < mediaElements.length; i++) {
-                            var el = mediaElements[i];
-                            if (el.src) {
-                                el.src = rewriteUrl(el.src);
-                            }
-                        }
-                    } catch (e) {
-                        console.error('Catchup URL fix failed', e);
-                    }
-                })();
-            """.trimIndent()
-
-            view.evaluateJavascript(script, null)
         }
 
         fun extractChannelNumbers() {

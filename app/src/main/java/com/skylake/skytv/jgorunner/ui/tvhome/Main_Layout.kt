@@ -68,7 +68,7 @@ import kotlinx.coroutines.launch
 @SuppressLint("MutableCollectionMutableState")
 @OptIn(ExperimentalGlideComposeApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun Main_Layout(context: Context, reloadTrigger: Int) {
+fun Main_Layout(context: Context, reloadTrigger: Int, isCatchup: Boolean = false) {
     rememberCoroutineScope()
     val channelsResponse = remember { mutableStateOf<ChannelResponse?>(null) }
     val filteredChannels = remember { mutableStateOf<List<Channel>>(emptyList()) }
@@ -128,10 +128,13 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
     // Helper functions for enhanced autoplay
     suspend fun fetchFromBackend(): List<Channel> {
         return try {
-            ChannelUtils.fetchChannels("$basefinURL/channels")?.let { response ->
+            val endpoint = if (isCatchup) "$basefinURL/catchup" else "$basefinURL/channels"
+            val cacheKey = if (isCatchup) "catchup_channels_json" else "channels_json"
+            
+            ChannelUtils.fetchChannels(endpoint)?.let { response ->
                 channelsResponse.value = response
                 context.getSharedPreferences("channel_cache", Context.MODE_PRIVATE).edit().apply {
-                    putString("channels_json", Gson().toJson(response))
+                    putString(cacheKey, Gson().toJson(response))
                     apply()
                 }
                 val categories = preferenceManager.myPrefs.filterCI
@@ -207,19 +210,20 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
     }
 
     // Fetch and filter channels (cache/network)
-    LaunchedEffect(reloadTrigger) {
+    LaunchedEffect(reloadTrigger, isCatchup) {
         val sharedPref = context.getSharedPreferences("channel_cache", Context.MODE_PRIVATE)
         var useCache = true
         var cachedChannels: ChannelResponse? = null
 
-        val cachedJson = sharedPref.getString("channels_json", null)
+        val cacheKey = if (isCatchup) "catchup_channels_json" else "channels_json"
+        val cachedJson = sharedPref.getString(cacheKey, null)
         if (!cachedJson.isNullOrEmpty()) {
             try {
                 cachedChannels = Gson().fromJson(cachedJson, ChannelResponse::class.java)
                 channelsResponse.value = cachedChannels
             } catch (_: Exception) {
                 sharedPref.edit {
-                    remove("channels_json")
+                    remove(cacheKey)
                 }
                 useCache = false
             }
@@ -266,12 +270,13 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
             while (attempts < 2 && !success) {
                 attempts++
                 try {
-                    val response = ChannelUtils.fetchChannels("$basefinURL/channels")
+                    val endpoint = if (isCatchup) "$basefinURL/catchup" else "$basefinURL/channels"
+                    val response = ChannelUtils.fetchChannels(endpoint)
                     channelsResponse.value = response
                     if (response != null) {
                         val responseJsonString = Gson().toJson(response)
                         sharedPref.edit {
-                            putString("channels_json", responseJsonString)
+                            putString(cacheKey, responseJsonString)
                         }
                         val categories = preferenceManager.myPrefs.filterCI
                             ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
