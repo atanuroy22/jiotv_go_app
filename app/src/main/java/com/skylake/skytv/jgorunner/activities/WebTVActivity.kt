@@ -282,7 +282,7 @@ class WebPlayerActivity : ComponentActivity() {
         private fun handleUrlLoading(view: WebView, url: String): Boolean {
             if (url.contains("/play/")) {
                 if (isCatchupRequest(url)) {
-                    val playerUrl = convertPlayUrlToPlayerUrl(url)
+                    val playerUrl = convertCatchupPlayUrlToPlayerUrl(url)
                     Log.d(TAG, "Catchup link detected, loading in WebView player: $playerUrl")
                     view.loadUrl(playerUrl)
                     return true
@@ -398,6 +398,36 @@ class WebPlayerActivity : ComponentActivity() {
                 .toString()
         }
 
+        private fun convertCatchupPlayUrlToPlayerUrl(inputUrl: String): String {
+            val parsed = Uri.parse(inputUrl)
+            val currentPath = parsed.encodedPath.orEmpty()
+
+            val updatedPath = when {
+                currentPath.contains("/catchup/play/", ignoreCase = true) -> {
+                    currentPath.replace("/catchup/play/", "/catchup/player/")
+                }
+
+                currentPath.contains("/catchup/player/", ignoreCase = true) -> {
+                    currentPath
+                }
+
+                currentPath.contains("/play/", ignoreCase = true) -> {
+                    currentPath.replace("/play/", "/catchup/player/")
+                }
+
+                currentPath.contains("/player/", ignoreCase = true) -> {
+                    currentPath.replace("/player/", "/catchup/player/")
+                }
+
+                else -> currentPath
+            }
+
+            return parsed.buildUpon()
+                .encodedPath(updatedPath)
+                .build()
+                .toString()
+        }
+
         private fun convertPlayUrlToLiveM3u8(inputUrl: String): String {
             val parsed = Uri.parse(inputUrl)
             val currentPath = parsed.encodedPath.orEmpty()
@@ -490,13 +520,18 @@ class WebPlayerActivity : ComponentActivity() {
 
         override fun onPageFinished(view: WebView, url: String) {
             loadingSpinner!!.visibility = View.GONE
-            if (url.contains("/player/")) {
+            if (url.contains("/catchup/")) {
+                injectCatchupUrlFix(view)
+                if (url.contains("/player/")) {
+                    Log.d(TAG, "Playing catchup: $url")
+                    setupFullScreenMode()
+                    playVideoInFullScreen(view)
+                }
+                moveSearchInput(view)
+            } else if (url.contains("/player/")) {
                 Log.d(TAG, "Playing: $url")
                 setupFullScreenMode()
                 playVideoInFullScreen(view)
-            } else if (url.contains("/catchup/")) {
-                injectCatchupUrlFix(view)
-                moveSearchInput(view)
             } else {
                 moveSearchInput(view)
                 extractChannelNumbers()
