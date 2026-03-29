@@ -280,13 +280,21 @@ class WebPlayerActivity : ComponentActivity() {
         }
 
         private fun handleUrlLoading(view: WebView, url: String): Boolean {
-            if (url.contains("/play/")) {
-                if (isCatchupRequest(url)) {
-                    val playerUrl = convertCatchupPlayUrlToPlayerUrl(url)
-                    Log.d(TAG, "Catchup link detected, loading in WebView player: $playerUrl")
-                    view.loadUrl(playerUrl)
-                    return true
+            if (isCatchupRequest(url)) {
+                val catchupUrl = convertCatchupUrlToLiveM3u8(url)
+                val catchupPlayId = extractChannelId(url)
+                Log.d(TAG, "Catchup link detected, opening Exoplayer with URL: $catchupUrl")
+
+                val intent = Intent(this@WebPlayerActivity, ExoplayerActivity::class.java).apply {
+                    putExtra("video_url", catchupUrl)
+                    putExtra("current_play_id", catchupPlayId)
+                    putExtra("channels_list", channelNumbers?.toTypedArray())
                 }
+                startActivity(intent)
+                return true
+            }
+
+            if (url.contains("/play/")) {
 
                 initURL = webView!!.url
                 Log.d(TAG, "Saving initURL: $initURL")
@@ -426,6 +434,37 @@ class WebPlayerActivity : ComponentActivity() {
                 .encodedPath(updatedPath)
                 .build()
                 .toString()
+        }
+
+        private fun convertCatchupUrlToLiveM3u8(inputUrl: String): String {
+            val parsed = Uri.parse(inputUrl)
+            val currentPath = parsed.encodedPath.orEmpty()
+
+            var updatedPath = currentPath
+                .replace("/catchup/play/", "/live/", ignoreCase = true)
+                .replace("/catchup/player/", "/live/", ignoreCase = true)
+                .replace("/catchup/live/", "/live/", ignoreCase = true)
+                .replace("/play/", "/live/", ignoreCase = true)
+                .replace("/player/", "/live/", ignoreCase = true)
+
+            if (!updatedPath.endsWith(".m3u8", ignoreCase = true) && !updatedPath.endsWith(".m3u", ignoreCase = true)) {
+                updatedPath = if (updatedPath.endsWith('/')) {
+                    updatedPath.dropLast(1) + ".m3u8"
+                } else {
+                    "$updatedPath.m3u8"
+                }
+            }
+
+            return parsed.buildUpon()
+                .encodedPath(updatedPath)
+                .build()
+                .toString()
+                .replace("//.m3u8", ".m3u8")
+        }
+
+        private fun extractChannelId(url: String): String? {
+            val match = Regex(".*/(?:play|player|live)/(\\d+).*", RegexOption.IGNORE_CASE).find(url)
+            return match?.groupValues?.getOrNull(1)
         }
 
         private fun convertPlayUrlToLiveM3u8(inputUrl: String): String {
