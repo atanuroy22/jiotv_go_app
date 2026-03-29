@@ -52,6 +52,21 @@ class WebPlayerActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_web_player)
 
+        val incomingUrl = intent?.getStringExtra("open_url")?.trim().orEmpty()
+        if (incomingUrl.isNotEmpty()) {
+            url = incomingUrl
+            Log.d(TAG, "Open URL from intent: $url")
+            setupBackPressedCallback()
+            setupFullScreenMode()
+
+            webView = findViewById(R.id.webview)
+            loadingSpinner = findViewById(R.id.loading_spinner)
+
+            setupWebView()
+            loadUrl()
+            return
+        }
+
         val savedPortNumber = prefManager.myPrefs.jtvGoServerPort
         val filterQ = prefManager.myPrefs.filterQ
         val filterL = prefManager.myPrefs.filterL

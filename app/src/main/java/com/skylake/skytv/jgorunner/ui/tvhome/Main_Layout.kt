@@ -124,17 +124,31 @@ fun Main_Layout(context: Context, reloadTrigger: Int, isCatchup: Boolean = false
         listOf(allCategoryName) + selectedOtherCategories + unselectedOtherCategories
     }
 
+    fun mapCatchupUrl(url: String): String {
+        return if (!isCatchup) url else url.replace("/play/", "/catchup/")
+    }
+
+    fun mapResponseForMode(response: ChannelResponse): ChannelResponse {
+        if (!isCatchup) return response
+        return response.copy(
+            result = response.result.map { channel ->
+                channel.copy(channel_url = mapCatchupUrl(channel.channel_url))
+            }
+        )
+    }
+
 
     // Helper functions for enhanced autoplay
     suspend fun fetchFromBackend(): List<Channel> {
         return try {
-            val endpoint = if (isCatchup) "$basefinURL/catchup" else "$basefinURL/channels"
+            val endpoint = "$basefinURL/channels"
             val cacheKey = if (isCatchup) "catchup_channels_json" else "channels_json"
             
             ChannelUtils.fetchChannels(endpoint)?.let { response ->
-                channelsResponse.value = response
+                val mappedResponse = mapResponseForMode(response)
+                channelsResponse.value = mappedResponse
                 context.getSharedPreferences("channel_cache", Context.MODE_PRIVATE).edit().apply {
-                    putString(cacheKey, Gson().toJson(response))
+                    putString(cacheKey, Gson().toJson(mappedResponse))
                     apply()
                 }
                 val categories = preferenceManager.myPrefs.filterCI
@@ -144,23 +158,23 @@ fun Main_Layout(context: Context, reloadTrigger: Int, isCatchup: Boolean = false
 
                 val filtered = when {
                     categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                        response
+                        mappedResponse
                     )
 
                     categories.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                        response,
+                        mappedResponse,
                         languageIds = languages?.mapNotNull { it.toIntOrNull() }
                             ?.takeIf { it.isNotEmpty() }
                     )
 
                     languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                        response,
+                        mappedResponse,
                         categoryIds = categories.mapNotNull { it.toIntOrNull() }
                             .takeIf { it.isNotEmpty() }
                     )
 
                     else -> ChannelUtils.filterChannels(
-                        response,
+                        mappedResponse,
                         categoryIds = categories.mapNotNull { it.toIntOrNull() }
                             .takeIf { it.isNotEmpty() },
                         languageIds = languages.mapNotNull { it.toIntOrNull() }
@@ -219,7 +233,9 @@ fun Main_Layout(context: Context, reloadTrigger: Int, isCatchup: Boolean = false
         val cachedJson = sharedPref.getString(cacheKey, null)
         if (!cachedJson.isNullOrEmpty()) {
             try {
-                cachedChannels = Gson().fromJson(cachedJson, ChannelResponse::class.java)
+                cachedChannels = mapResponseForMode(
+                    Gson().fromJson(cachedJson, ChannelResponse::class.java)
+                )
                 channelsResponse.value = cachedChannels
             } catch (_: Exception) {
                 sharedPref.edit {
@@ -270,11 +286,12 @@ fun Main_Layout(context: Context, reloadTrigger: Int, isCatchup: Boolean = false
             while (attempts < 2 && !success) {
                 attempts++
                 try {
-                    val endpoint = if (isCatchup) "$basefinURL/catchup" else "$basefinURL/channels"
+                    val endpoint = "$basefinURL/channels"
                     val response = ChannelUtils.fetchChannels(endpoint)
-                    channelsResponse.value = response
+                    val mappedResponse = response?.let { mapResponseForMode(it) }
+                    channelsResponse.value = mappedResponse
                     if (response != null) {
-                        val responseJsonString = Gson().toJson(response)
+                        val responseJsonString = Gson().toJson(mappedResponse)
                         sharedPref.edit {
                             putString(cacheKey, responseJsonString)
                         }
@@ -285,23 +302,23 @@ fun Main_Layout(context: Context, reloadTrigger: Int, isCatchup: Boolean = false
 
                         val filtered = when {
                             categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                                response
+                                mappedResponse
                             )
 
                             categories.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                                response,
+                                mappedResponse,
                                 languageIds = languages?.mapNotNull { it.toIntOrNull() }
                                     ?.takeIf { it.isNotEmpty() }
                             )
 
                             languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                                response,
+                                mappedResponse,
                                 categoryIds = categories.mapNotNull { it.toIntOrNull() }
                                     .takeIf { it.isNotEmpty() }
                             )
 
                             else -> ChannelUtils.filterChannels(
-                                response,
+                                mappedResponse,
                                 categoryIds = categories.mapNotNull { it.toIntOrNull() }
                                     .takeIf { it.isNotEmpty() },
                                 languageIds = languages.mapNotNull { it.toIntOrNull() }
@@ -701,7 +718,8 @@ fun Main_Layout(context: Context, reloadTrigger: Int, isCatchup: Boolean = false
             filteredChannels = filteredChannels.value,
             selectedChannelSetter = { selectedChannel = it },
             localPORT = localPORT,
-            preferenceManager = preferenceManager
+            preferenceManager = preferenceManager,
+            isCatchup = isCatchup
         )
 
 

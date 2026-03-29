@@ -37,6 +37,7 @@ import com.bumptech.glide.integration.compose.GlideImage
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
+import com.skylake.skytv.jgorunner.activities.WebPlayerActivity
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.services.player.PlayerCommandBus
@@ -181,7 +182,8 @@ fun ChannelGridMain(
     filteredChannels: List<Channel>,
     selectedChannelSetter: (Channel) -> Unit,
     localPORT: Int,
-    preferenceManager: SkySharedPref
+    preferenceManager: SkySharedPref,
+    isCatchup: Boolean = false
 ) {
     val basefinURL = "http://localhost:$localPORT"
     LazyVerticalGrid(
@@ -205,16 +207,24 @@ fun ChannelGridMain(
                     .combinedClickable(
                         onClick = {
                             val absoluteIndex = filteredChannels.indexOf(channel).coerceAtLeast(0)
-                            val intent = Intent(context, ExoPlayJet::class.java).apply {
-                                putExtra("video_url", channel.channel_url)
-                                putExtra("zone", "TV")
-                                if (channel.channel_id.all { it.isDigit() }) putExtra("channel_list_kind", "jio")
-                                putExtra("current_channel_index", -1)
-                                putExtra("logo_url", if (channel.logoUrl.startsWith("http")) channel.logoUrl else "$basefinURL/jtvimage/${channel.logoUrl}")
-                                putExtra("ch_name", channel.channel_name)
+                            val intent = if (isCatchup) {
+                                Intent(context, WebPlayerActivity::class.java).apply {
+                                    putExtra("open_url", channel.channel_url)
+                                    addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                    if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                            } else {
+                                Intent(context, ExoPlayJet::class.java).apply {
+                                    putExtra("video_url", channel.channel_url)
+                                    putExtra("zone", "TV")
+                                    if (channel.channel_id.all { it.isDigit() }) putExtra("channel_list_kind", "jio")
+                                    putExtra("current_channel_index", -1)
+                                    putExtra("logo_url", if (channel.logoUrl.startsWith("http")) channel.logoUrl else "$basefinURL/jtvimage/${channel.logoUrl}")
+                                    putExtra("ch_name", channel.channel_name)
 
-                                addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                                if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                    if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
                             }
                             context.startActivity(intent)
 
@@ -268,13 +278,21 @@ fun ChannelGridMain(
                             } else {
                                 val absoluteIndex = filteredChannels.indexOf(channel).coerceAtLeast(0)
                                 // Fallback to normal open if not in PiP
-                                val intent = Intent(context, ExoPlayJet::class.java).apply {
-                                    putExtra("video_url", channel.channel_url)
-                                    putExtra("zone", "TV")
-                                    if (channel.channel_id.all { it.isDigit() }) putExtra("channel_list_kind", "jio")
-                                    putExtra("current_channel_index", -1)
-                                    addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                                    if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                val intent = if (isCatchup) {
+                                    Intent(context, WebPlayerActivity::class.java).apply {
+                                        putExtra("open_url", channel.channel_url)
+                                        addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                        if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                } else {
+                                    Intent(context, ExoPlayJet::class.java).apply {
+                                        putExtra("video_url", channel.channel_url)
+                                        putExtra("zone", "TV")
+                                        if (channel.channel_id.all { it.isDigit() }) putExtra("channel_list_kind", "jio")
+                                        putExtra("current_channel_index", -1)
+                                        addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                        if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
                                 }
 
                                 context.startActivity(intent)
