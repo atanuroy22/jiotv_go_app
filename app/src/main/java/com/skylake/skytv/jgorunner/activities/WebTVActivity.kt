@@ -62,20 +62,15 @@ class WebPlayerActivity : ComponentActivity() {
         val filterL = prefManager.myPrefs.filterL
         val filterC = prefManager.myPrefs.filterC
 //        val extraFilterUrl = "/?q=$filterQ&language=$filterL&category=$filterC" // "/?q=low&language=6&category=7"
-        val extraFilterUrl = buildString {
-            append("/")
-
-            if (!filterQ.isNullOrEmpty()) append("?q=$filterQ")
-
-            if (!filterL.isNullOrEmpty()) {
-                if (isNotEmpty()) append("&")
-                append("language=$filterL")
-            }
-
-            if (!filterC.isNullOrEmpty()) {
-                if (isNotEmpty()) append("&")
-                append("category=$filterC")
-            }
+        val queryParams = buildList {
+            if (!filterQ.isNullOrEmpty()) add("q=${Uri.encode(filterQ)}")
+            if (!filterL.isNullOrEmpty()) add("language=${Uri.encode(filterL)}")
+            if (!filterC.isNullOrEmpty()) add("category=${Uri.encode(filterC)}")
+        }
+        val extraFilterUrl = if (queryParams.isEmpty()) {
+            "/"
+        } else {
+            "/?" + queryParams.joinToString("&")
         }
 
         url = String.format(

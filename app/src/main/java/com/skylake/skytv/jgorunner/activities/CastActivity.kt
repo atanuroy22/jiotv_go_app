@@ -1,6 +1,7 @@
 package com.skylake.skytv.jgorunner.activities
 
 import androidx.appcompat.app.AppCompatActivity
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import com.skylake.skytv.jgorunner.data.SkySharedPref
@@ -19,20 +20,15 @@ class CastActivity : AppCompatActivity() {
         val filterL = prefManager.myPrefs.filterL
         val filterC = prefManager.myPrefs.filterC
 
-        val extraFilterUrl = buildString {
-            append("/")
-
-            if (!filterQ.isNullOrEmpty()) append("?q=$filterQ")
-
-            if (!filterL.isNullOrEmpty()) {
-                if (isNotEmpty()) append("&")
-                append("language=$filterL")
-            }
-
-            if (!filterC.isNullOrEmpty()) {
-                if (isNotEmpty()) append("&")
-                append("category=$filterC")
-            }
+        val queryParams = buildList {
+            if (!filterQ.isNullOrEmpty()) add("q=${Uri.encode(filterQ)}")
+            if (!filterL.isNullOrEmpty()) add("language=${Uri.encode(filterL)}")
+            if (!filterC.isNullOrEmpty()) add("category=${Uri.encode(filterC)}")
+        }
+        val extraFilterUrl = if (queryParams.isEmpty()) {
+            "/"
+        } else {
+            "/?" + queryParams.joinToString("&")
         }
 
         url = String.format(Locale.getDefault(), defaultUrlTemplate, savedPortNumber) + extraFilterUrl
