@@ -136,23 +136,23 @@ import java.util.concurrent.TimeUnit
 
 const val TAG = "ExoJetScreen"
 
-// Aggressive live-stream tuning to minimize periodic pauses
-// Shorter offsets + faster timeout failures reduce "hanging on bad segment" delays
-private const val LIVE_TARGET_OFFSET_MS = 10_000L   // target ~10s behind live (not 22s)
-private const val LIVE_MIN_OFFSET_MS = 6_000L       // min 6s behind
-private const val LIVE_MAX_OFFSET_MS = 18_000L      // max 18s behind
-private const val LIVE_MIN_PLAYBACK_SPEED = 0.99f
-private const val LIVE_MAX_PLAYBACK_SPEED = 1.01f
+// Disable adaptive bitrate + MASSIVE pre-buffer to survive 4-5 min network timeouts
+// Browser plays smoothly because it either uses fixed bitrate or larger buffers
+private const val LIVE_TARGET_OFFSET_MS = 15_000L   // target ~15s behind live
+private const val LIVE_MIN_OFFSET_MS = 8_000L       // min 8s behind
+private const val LIVE_MAX_OFFSET_MS = 30_000L      // max 30s behind for network resilience
+private const val LIVE_MIN_PLAYBACK_SPEED = 0.97f
+private const val LIVE_MAX_PLAYBACK_SPEED = 1.03f
 
-// Fail fast on stuck manifests/segments; retry is cheaper than waiting
-private const val HTTP_CONNECT_TIMEOUT_MS = 6_000   // was 12s → 6s (fail faster)
-private const val HTTP_READ_TIMEOUT_MS = 8_000      // was 20s → 8s (original tuned value)
+// HTTP timeouts: fail fast and retry rather than wait
+private const val HTTP_CONNECT_TIMEOUT_MS = 5_000
+private const val HTTP_READ_TIMEOUT_MS = 10_000
 
-// Larger buffer to absorb manifest fetch delays without audio dropout
-private const val MIN_BUFFER_MS = 40_000            // 40s minimum before refill needed
-private const val MAX_BUFFER_MS = 90_000            // 90s max to allow large pre-fetch
-private const val BUFFER_FOR_PLAYBACK_MS = 1_500   // 1.5s for fast start
-private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 8_000  // 8s after stall before resume
+// MASSIVE buffer to absorb 4-5 min timeouts: pre-buffer 2-5 minutes of content
+private const val MIN_BUFFER_MS = 120_000           // 2 min minimum always buffered
+private const val MAX_BUFFER_MS = 300_000           // 5 min max buffer
+private const val BUFFER_FOR_PLAYBACK_MS = 3_000
+private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 15_000
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(UnstableApi::class)
@@ -264,6 +264,7 @@ fun ExoPlayJetScreen(
     val playbackHlsMediaSourceFactory = remember(playbackHttpDataSourceFactory) {
         HlsMediaSource.Factory(playbackHttpDataSourceFactory)
             .setAllowChunklessPreparation(true)
+            .setPlaylistParsingRetryDelayMs(1000)
     }
 
     val exoPlayer = remember {
@@ -1296,13 +1297,13 @@ private fun inferPlaybackMimeType(url: String): String? {
 
 @UnstableApi
 private fun createPlaybackHttpDataSourceFactory(): OkHttpDataSource.Factory {
-    // Use OkHttp with aggressive keep-alive to prevent idle connection drops
-    // that cause 4-5 min stalls on some networks/ISPs
+    // Maximum aggression: keep-alive at HTTP + socket level to prevent 4-5 min timeout stalls
     val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(6, TimeUnit.SECONDS)
-        .readTimeout(8, TimeUnit.SECONDS)
-        .writeTimeout(8, TimeUnit.SECONDS)
-        .connectionPool(ConnectionPool(4, 5, TimeUnit.MINUTES))
+        .connectTimeout(HTTP_CONNECT_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+        .readTimeout(HTTP_READ_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+        .writeTimeout(HTTP_READ_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+        .connectionPool(ConnectionPool(8, 10, TimeUnit.MINUTES))
+        .retryOnConnectionFailure(true)
         .build()
     
     return OkHttpDataSource.Factory(okHttpClient)
