@@ -256,15 +256,14 @@ fun ExoPlayJetScreen(
     }
 
     val playbackHttpDataSourceFactory = remember { createPlaybackHttpDataSourceFactory() }
-    val playbackMediaSourceFactory = remember(playbackHttpDataSourceFactory) {
+    val playbackMediaSourceFactory: DefaultMediaSourceFactory = remember(playbackHttpDataSourceFactory) {
         DefaultMediaSourceFactory(context)
             .setDataSourceFactory(playbackHttpDataSourceFactory)
             .setLiveTargetOffsetMs(LIVE_TARGET_OFFSET_MS)
     }
-    val playbackHlsMediaSourceFactory = remember(playbackHttpDataSourceFactory) {
+    val playbackHlsMediaSourceFactory: HlsMediaSource.Factory = remember(playbackHttpDataSourceFactory) {
         HlsMediaSource.Factory(playbackHttpDataSourceFactory)
             .setAllowChunklessPreparation(true)
-            .setPlaylistParsingRetryDelayMs(1000)
     }
 
     val exoPlayer = remember {
