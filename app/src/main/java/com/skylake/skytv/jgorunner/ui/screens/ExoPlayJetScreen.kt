@@ -321,6 +321,8 @@ fun ExoPlayJetScreen(
         }
     }
 
+    // --- Custom Buffering ---
+    var isBuffering by remember { mutableStateOf(false) }
     DisposableEffect(exoPlayer) {
         val bufferHandler = android.os.Handler(android.os.Looper.getMainLooper())
         val showBufferingRunnable = Runnable { isBuffering = true }
@@ -1304,7 +1306,6 @@ private fun createPlaybackHttpDataSourceFactory(): OkHttpDataSource.Factory {
         .build()
     
     return OkHttpDataSource.Factory(okHttpClient)
-        .setAllowCrossProtocolRedirects(true)
 }
 
 @UnstableApi
