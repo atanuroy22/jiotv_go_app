@@ -9,8 +9,24 @@ private val specialIds = listOf(
     "697", "872", "873", "874", "891", "892", "1146", "1393", "1396", "1772", "1773", "1774", "1775", "3351"
 )
 
-fun String.containsAnyId(): Boolean =
-    specialIds.any { this.contains(it, ignoreCase = true) }
+private val liveChannelIdRegex = Regex("""/live/(?:low/|medium/|high/)?(\d+)(?:\.m3u8)?(?:\?.*)?$""")
+
+private fun String.extractLiveChannelIdOrNull(): String? =
+    liveChannelIdRegex.find(this)?.groupValues?.getOrNull(1)
+
+private fun String.isLikelyLiveStreamUrl(): Boolean {
+    val lower = lowercase()
+    return lower.contains(".m3u8") || lower.contains("/live/")
+}
+
+fun String.containsAnyId(): Boolean {
+    val liveChannelId = extractLiveChannelIdOrNull()
+    if (!liveChannelId.isNullOrBlank()) {
+        return specialIds.contains(liveChannelId)
+    }
+
+    return false
+}
 
 // Tracks the single active listener per player so we can remove it before
 // adding a new one. Without this, every channel switch accumulates a new
@@ -37,11 +53,12 @@ fun setupCustomPlaybackLogic(
     activeListeners.remove(exoPlayer)?.let { exoPlayer.removeListener(it) }
 
     var hasSeeked = false
+    val shouldForceSeek = videoUrl.containsAnyId() && !videoUrl.isLikelyLiveStreamUrl()
 
     val listener = object : Player.Listener {
 
         override fun onPlaybackStateChanged(state: Int) {
-            if (state == Player.STATE_READY && !hasSeeked && videoUrl.containsAnyId()) {
+            if (state == Player.STATE_READY && !hasSeeked && shouldForceSeek) {
                 exoPlayer.seekTo(14_500)
                 hasSeeked = true
             }
@@ -49,7 +66,11 @@ fun setupCustomPlaybackLogic(
             if (state == Player.STATE_ENDED) {
                 hasSeeked = false
                 onReplay?.invoke() ?: run {
-                    exoPlayer.seekTo(14_500)
+                    if (shouldForceSeek) {
+                        exoPlayer.seekTo(14_500)
+                    } else {
+                        exoPlayer.seekTo(0)
+                    }
                     exoPlayer.playWhenReady = true
                 }
             }
