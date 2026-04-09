@@ -99,6 +99,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SeekParameters
@@ -128,23 +129,30 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.ConnectionPool
+import okhttp3.OkHttpClient
 import java.util.Calendar
+import java.util.concurrent.TimeUnit
 
 const val TAG = "ExoJetScreen"
 
-private const val LIVE_TARGET_OFFSET_MS = 22_000L
-private const val LIVE_MIN_OFFSET_MS = 12_000L
-private const val LIVE_MAX_OFFSET_MS = 40_000L
-private const val LIVE_MIN_PLAYBACK_SPEED = 0.98f
-private const val LIVE_MAX_PLAYBACK_SPEED = 1.02f
+// Aggressive live-stream tuning to minimize periodic pauses
+// Shorter offsets + faster timeout failures reduce "hanging on bad segment" delays
+private const val LIVE_TARGET_OFFSET_MS = 10_000L   // target ~10s behind live (not 22s)
+private const val LIVE_MIN_OFFSET_MS = 6_000L       // min 6s behind
+private const val LIVE_MAX_OFFSET_MS = 18_000L      // max 18s behind
+private const val LIVE_MIN_PLAYBACK_SPEED = 0.99f
+private const val LIVE_MAX_PLAYBACK_SPEED = 1.01f
 
-private const val HTTP_CONNECT_TIMEOUT_MS = 12_000
-private const val HTTP_READ_TIMEOUT_MS = 20_000
+// Fail fast on stuck manifests/segments; retry is cheaper than waiting
+private const val HTTP_CONNECT_TIMEOUT_MS = 6_000   // was 12s → 6s (fail faster)
+private const val HTTP_READ_TIMEOUT_MS = 8_000      // was 20s → 8s (original tuned value)
 
-private const val MIN_BUFFER_MS = 30_000
-private const val MAX_BUFFER_MS = 120_000
-private const val BUFFER_FOR_PLAYBACK_MS = 2_500
-private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 10_000
+// Larger buffer to absorb manifest fetch delays without audio dropout
+private const val MIN_BUFFER_MS = 40_000            // 40s minimum before refill needed
+private const val MAX_BUFFER_MS = 90_000            // 90s max to allow large pre-fetch
+private const val BUFFER_FOR_PLAYBACK_MS = 1_500   // 1.5s for fast start
+private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 8_000  // 8s after stall before resume
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(UnstableApi::class)
@@ -313,36 +321,41 @@ fun ExoPlayJetScreen(
         }
     }
 
-    // --- Custom Buffering ---
-    var isBuffering by remember { mutableStateOf(false) }
     DisposableEffect(exoPlayer) {
         val bufferHandler = android.os.Handler(android.os.Looper.getMainLooper())
         val showBufferingRunnable = Runnable { isBuffering = true }
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
+                val stateStr = when (state) {
+                    Player.STATE_IDLE -> "IDLE"
+                    Player.STATE_BUFFERING -> "BUFFERING"
+                    Player.STATE_READY -> "READY"
+                    Player.STATE_ENDED -> "ENDED"
+                    else -> "STATE_$state"
+                }
+                Log.d(TAG, "Playback state → $stateStr | pos=${exoPlayer.currentPosition}ms duration=${exoPlayer.duration}ms")
+                
                 if (state == Player.STATE_BUFFERING) {
-                    // Debounce: only show spinner if buffering persists > 1500ms.
-                    // seekTo() and normal HLS segment fetches complete well within
-                    // that window, so they never show the spinner at all.
                     bufferHandler.postDelayed(showBufferingRunnable, 1500)
                 } else {
                     bufferHandler.removeCallbacks(showBufferingRunnable)
                     isBuffering = false
                 }
-                // Update PiP actions as play/pause state may have effectively changed
+                PlayerCommandBus.notifyStateChanged()
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                Log.e(TAG, "Player error: code=${error.errorCode} msg=${error.message} pos=${exoPlayer.currentPosition}ms")
                 PlayerCommandBus.notifyStateChanged()
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                PlayerCommandBus.notifyStateChanged()
-            }
-
-            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                if (!isPlaying) Log.w(TAG, "Playback stopped at pos=${exoPlayer.currentPosition}ms")
                 PlayerCommandBus.notifyStateChanged()
             }
 
             override fun onPositionDiscontinuity(reason: Int) {
-                // Seek or track changes can flip playing state; refresh PiP actions
+                Log.d(TAG, "Position discontinuity: reason=$reason fromPos=${exoPlayer.currentPosition}ms")
                 PlayerCommandBus.notifyStateChanged()
             }
         }
@@ -1280,11 +1293,18 @@ private fun inferPlaybackMimeType(url: String): String? {
 }
 
 @UnstableApi
-private fun createPlaybackHttpDataSourceFactory(): DefaultHttpDataSource.Factory {
-    return DefaultHttpDataSource.Factory()
+private fun createPlaybackHttpDataSourceFactory(): OkHttpDataSource.Factory {
+    // Use OkHttp with aggressive keep-alive to prevent idle connection drops
+    // that cause 4-5 min stalls on some networks/ISPs
+    val okHttpClient = OkHttpClient.Builder()
+        .connectTimeout(6, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
+        .writeTimeout(8, TimeUnit.SECONDS)
+        .connectionPool(ConnectionPool(4, 5, TimeUnit.MINUTES))
+        .build()
+    
+    return OkHttpDataSource.Factory(okHttpClient)
         .setAllowCrossProtocolRedirects(true)
-        .setConnectTimeoutMs(HTTP_CONNECT_TIMEOUT_MS)
-        .setReadTimeoutMs(HTTP_READ_TIMEOUT_MS)
 }
 
 @UnstableApi
@@ -1310,14 +1330,12 @@ fun initializePlayer(
     mediaSourceFactory: DefaultMediaSourceFactory,
     hlsMediaSourceFactory: HlsMediaSource.Factory
 ): ExoPlayer {
-    // Buffer tuning for smooth live-stream playback:
-    //   minBufferMs  30 s  – start refilling as soon as ahead-buffer < 30 s
-    //   maxBufferMs 120 s  – keep up to 120 s downloaded ahead
-    //   bufferForPlaybackMs  2.5 s  – fast cold start
-    //   bufferForPlaybackAfterRebufferMs 10 s  – after a stall, wait longer
-    //       before resuming so we don't stutter again 2 s later
-    //   setPrioritizeTimeOverSizeThresholds  – buffer is measured in time not
-    //       bytes, so behaviour is consistent across bitrate switches
+    // Buffer tuning to absorb segment/manifest fetch jitter without pauses:
+    //   minBufferMs  40 s  – start refilling as soon as ahead-buffer < 40 s (more headroom)
+    //   maxBufferMs  90 s  – keep up to 90 s downloaded ahead (less memory pressure than 120s)
+    //   bufferForPlaybackMs  1.5 s  – fast startup
+    //   bufferForPlaybackAfterRebufferMs  8 s  – after stall, wait 8s for safety
+    //   setPrioritizeTimeOverSizeThresholds  – time-based, not byte-based (consistent across bitrate)
     val loadControl = DefaultLoadControl.Builder()
         .setBufferDurationsMs(
             /* minBufferMs                     */ MIN_BUFFER_MS,
