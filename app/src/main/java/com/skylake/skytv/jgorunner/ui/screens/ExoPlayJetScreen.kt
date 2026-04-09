@@ -101,6 +101,8 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.SeekParameters
+import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
 import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
@@ -129,6 +131,20 @@ import kotlinx.coroutines.withContext
 import java.util.Calendar
 
 const val TAG = "ExoJetScreen"
+
+private const val LIVE_TARGET_OFFSET_MS = 22_000L
+private const val LIVE_MIN_OFFSET_MS = 12_000L
+private const val LIVE_MAX_OFFSET_MS = 40_000L
+private const val LIVE_MIN_PLAYBACK_SPEED = 0.98f
+private const val LIVE_MAX_PLAYBACK_SPEED = 1.02f
+
+private const val HTTP_CONNECT_TIMEOUT_MS = 12_000
+private const val HTTP_READ_TIMEOUT_MS = 20_000
+
+private const val MIN_BUFFER_MS = 30_000
+private const val MAX_BUFFER_MS = 120_000
+private const val BUFFER_FOR_PLAYBACK_MS = 2_500
+private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 10_000
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(UnstableApi::class)
@@ -231,11 +247,24 @@ fun ExoPlayJetScreen(
         showNumericOverlay = false
     }
 
+    val playbackHttpDataSourceFactory = remember { createPlaybackHttpDataSourceFactory() }
+    val playbackMediaSourceFactory = remember(playbackHttpDataSourceFactory) {
+        DefaultMediaSourceFactory(context)
+            .setDataSourceFactory(playbackHttpDataSourceFactory)
+            .setLiveTargetOffsetMs(LIVE_TARGET_OFFSET_MS)
+    }
+    val playbackHlsMediaSourceFactory = remember(playbackHttpDataSourceFactory) {
+        HlsMediaSource.Factory(playbackHttpDataSourceFactory)
+            .setAllowChunklessPreparation(true)
+    }
+
     val exoPlayer = remember {
         initializePlayer(
             getCurrentVideoUrl = { overrideVideoUrl ?: channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl },
             context = context,
-            retryCountRef = retryCountRef
+            retryCountRef = retryCountRef,
+            mediaSourceFactory = playbackMediaSourceFactory,
+            hlsMediaSourceFactory = playbackHlsMediaSourceFactory
         )
     }
 
@@ -351,7 +380,7 @@ fun ExoPlayJetScreen(
             }
 
             val mediaItem = buildMediaItemForPlaybackUrl(currentUrl)
-            exoPlayer.setMediaItem(mediaItem)
+            setPlaybackMediaItem(exoPlayer, mediaItem, playbackHlsMediaSourceFactory)
             exoPlayer.prepare()
             exoPlayer.playWhenReady = true
 
@@ -464,7 +493,7 @@ fun ExoPlayJetScreen(
                     // Do NOT stop() — stop() blanks the surface. Set the new item
                     // directly; keepContentOnPlayerReset keeps the last frame
                     // visible until the new channel's first frame arrives.
-                    exoPlayer.setMediaItem(mediaItem)
+                    setPlaybackMediaItem(exoPlayer, mediaItem, playbackHlsMediaSourceFactory)
                     exoPlayer.prepare()
                     exoPlayer.playWhenReady = true
                 }
@@ -1038,7 +1067,7 @@ fun ExoPlayJetScreen(
             val url = normalizePlaybackUrl(context, rawUrl)
             if (url.isBlank()) return@LaunchedEffect
             val mediaItem = buildMediaItemForPlaybackUrl(url)
-            exoPlayer.setMediaItem(mediaItem)
+            setPlaybackMediaItem(exoPlayer, mediaItem, playbackHlsMediaSourceFactory)
             exoPlayer.prepare()
             exoPlayer.playWhenReady = true
         }
@@ -1220,19 +1249,17 @@ private fun buildMediaItemForPlaybackUrl(url: String): MediaItem {
     val mimeType = inferPlaybackMimeType(url)
     if (!mimeType.isNullOrBlank()) builder.setMimeType(mimeType)
 
-    // For HLS live streams: stay 15 s behind the live edge.
-    // ExoPlayer silently pre-fetches the next 15 s of segments in the background,
-    // so any network hiccup shorter than 15 s is absorbed with zero stall or black
-    // screen. Playback may start 15 s delayed (acceptable for TV live streams).
+    // For HLS live streams: stay behind live edge with a larger safety window
+    // so short network jitter is absorbed without visible pauses.
     val isLikelyLive = mimeType == MimeTypes.APPLICATION_M3U8 || mimeType == null
     if (isLikelyLive) {
         builder.setLiveConfiguration(
             MediaItem.LiveConfiguration.Builder()
-                .setTargetOffsetMs(15_000)   // play 15 s behind live edge
-                .setMinOffsetMs(8_000)       // never closer than 8 s to live edge
-                .setMaxOffsetMs(25_000)      // never further than 25 s behind
-                .setMinPlaybackSpeed(0.97f)  // allow slight slowdown to hold offset
-                .setMaxPlaybackSpeed(1.03f)  // allow slight speedup to catch up
+                .setTargetOffsetMs(LIVE_TARGET_OFFSET_MS)
+                .setMinOffsetMs(LIVE_MIN_OFFSET_MS)
+                .setMaxOffsetMs(LIVE_MAX_OFFSET_MS)
+                .setMinPlaybackSpeed(LIVE_MIN_PLAYBACK_SPEED)
+                .setMaxPlaybackSpeed(LIVE_MAX_PLAYBACK_SPEED)
                 .build()
         )
     }
@@ -1253,39 +1280,50 @@ private fun inferPlaybackMimeType(url: String): String? {
 }
 
 @UnstableApi
+private fun createPlaybackHttpDataSourceFactory(): DefaultHttpDataSource.Factory {
+    return DefaultHttpDataSource.Factory()
+        .setAllowCrossProtocolRedirects(true)
+        .setConnectTimeoutMs(HTTP_CONNECT_TIMEOUT_MS)
+        .setReadTimeoutMs(HTTP_READ_TIMEOUT_MS)
+}
+
+@UnstableApi
+private fun setPlaybackMediaItem(
+    player: ExoPlayer,
+    mediaItem: MediaItem,
+    hlsMediaSourceFactory: HlsMediaSource.Factory
+) {
+    val mimeType = mediaItem.localConfiguration?.mimeType
+    val treatAsHls = mimeType == MimeTypes.APPLICATION_M3U8 || mimeType.isNullOrBlank()
+    if (treatAsHls) {
+        player.setMediaSource(hlsMediaSourceFactory.createMediaSource(mediaItem))
+    } else {
+        player.setMediaItem(mediaItem)
+    }
+}
+
+@UnstableApi
 fun initializePlayer(
     getCurrentVideoUrl: () -> String,
     context: Context,
-    retryCountRef: MutableState<Int>
+    retryCountRef: MutableState<Int>,
+    mediaSourceFactory: DefaultMediaSourceFactory,
+    hlsMediaSourceFactory: HlsMediaSource.Factory
 ): ExoPlayer {
-    // Short timeouts: if a segment fetch hangs, fail fast (8 s) and retry
-    // instead of waiting the OS default ~15 s with a black screen.
-    val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-        .setAllowCrossProtocolRedirects(true)
-        .setConnectTimeoutMs(8_000)
-        .setReadTimeoutMs(8_000)
-//        .setUserAgent(userAgent) //Future Ref
-    val mediaSourceFactory =
-            DefaultMediaSourceFactory(context)
-                .setDataSourceFactory(httpDataSourceFactory)
-                // Pre-fetch segments 15 s ahead of playback position at the factory level
-                // (complements the per-MediaItem live configuration below).
-                .setLiveTargetOffsetMs(15_000)
-
     // Buffer tuning for smooth live-stream playback:
-    //   minBufferMs  20 s  – start refilling as soon as ahead-buffer < 20 s
-    //   maxBufferMs  60 s  – keep up to 60 s downloaded ahead
+    //   minBufferMs  30 s  – start refilling as soon as ahead-buffer < 30 s
+    //   maxBufferMs 120 s  – keep up to 120 s downloaded ahead
     //   bufferForPlaybackMs  2.5 s  – fast cold start
-    //   bufferForPlaybackAfterRebufferMs  6 s  – after a stall, wait for 6 s
+    //   bufferForPlaybackAfterRebufferMs 10 s  – after a stall, wait longer
     //       before resuming so we don't stutter again 2 s later
     //   setPrioritizeTimeOverSizeThresholds  – buffer is measured in time not
     //       bytes, so behaviour is consistent across bitrate switches
     val loadControl = DefaultLoadControl.Builder()
         .setBufferDurationsMs(
-            /* minBufferMs                     */ 20_000,
-            /* maxBufferMs                     */ 60_000,
-            /* bufferForPlaybackMs             */ 2_500,
-            /* bufferForPlaybackAfterRebufferMs */ 6_000
+            /* minBufferMs                     */ MIN_BUFFER_MS,
+            /* maxBufferMs                     */ MAX_BUFFER_MS,
+            /* bufferForPlaybackMs             */ BUFFER_FOR_PLAYBACK_MS,
+            /* bufferForPlaybackAfterRebufferMs */ BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS
         )
         .setPrioritizeTimeOverSizeThresholds(true)
         .build()
@@ -1294,6 +1332,7 @@ fun initializePlayer(
         .setMediaSourceFactory(mediaSourceFactory)
         .setLoadControl(loadControl)
         .build()
+    player.setSeekParameters(SeekParameters.CLOSEST_SYNC)
     retryCountRef.value = 0
     val retryHandler = Handler(Looper.getMainLooper())
 
@@ -1301,7 +1340,7 @@ fun initializePlayer(
         val normalizedUrl = normalizePlaybackUrl(context, getCurrentVideoUrl())
         if (normalizedUrl.isBlank()) return
         val mediaItem = buildMediaItemForPlaybackUrl(normalizedUrl)
-        player.setMediaItem(mediaItem)
+        setPlaybackMediaItem(player, mediaItem, hlsMediaSourceFactory)
         player.prepare()
         if (seekToPosition > 0L) {
             player.seekTo(seekToPosition)
@@ -1314,6 +1353,18 @@ fun initializePlayer(
     // Always Retry
     player.addListener(object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
+            if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
+                retryHandler.removeCallbacksAndMessages(null)
+                retryCountRef.value = 0
+                try {
+                    player.seekToDefaultPosition()
+                    player.prepare()
+                    player.playWhenReady = true
+                } catch (_: Exception) {
+                }
+                return
+            }
+
             val attempt = retryCountRef.value + 1
             retryCountRef.value = attempt
             if (attempt > 12) {
