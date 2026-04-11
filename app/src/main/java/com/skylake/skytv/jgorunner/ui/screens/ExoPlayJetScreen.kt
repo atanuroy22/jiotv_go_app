@@ -145,7 +145,7 @@ private const val LIVE_MIN_PLAYBACK_SPEED = 1.0f    // Fixed speed, never adjust
 private const val LIVE_MAX_PLAYBACK_SPEED = 1.0f
 
 // Cap adaptive bitrate to avoid aggressive up-switch stalls.
-private const val MAX_STABLE_VIDEO_BITRATE = 2_000_000
+private const val MAX_STABLE_VIDEO_BITRATE = 1_900_000
 
 // HTTP timeouts: avoid overly short read timeout that can trigger periodic live stalls.
 private const val HTTP_CONNECT_TIMEOUT_MS = 5_000
@@ -510,6 +510,17 @@ fun ExoPlayJetScreen(
                     retryCountRef.value = 0
                     val finalUrl = normalizePlaybackUrl(context, targetUrl)
                     if (finalUrl.isBlank()) return@setOnSwitchRequest
+
+                    // If this is just a periodic token/URL refresh for the same live channel,
+                    // do not reset media source+prepare, because that creates a visible pause.
+                    val incomingId = extractChannelIdFromPlayUrl(finalUrl)
+                    val currentPlaybackUrl = exoPlayer.currentMediaItem?.localConfiguration?.uri?.toString().orEmpty()
+                    val currentId = extractChannelIdFromPlayUrl(normalizePlaybackUrl(context, currentPlaybackUrl))
+                    val isSameLiveChannelRefresh = incomingId != null && incomingId == currentId && index == null
+                    if (isSameLiveChannelRefresh) {
+                        return@setOnSwitchRequest
+                    }
+
                     val mediaItem = buildMediaItemForPlaybackUrl(finalUrl)
                     // Do NOT stop() — stop() blanks the surface. Set the new item
                     // directly; keepContentOnPlayerReset keeps the last frame
