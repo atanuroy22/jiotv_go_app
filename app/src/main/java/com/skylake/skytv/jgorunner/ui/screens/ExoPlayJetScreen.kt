@@ -105,6 +105,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
 import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
 import androidx.media3.ui.PlayerView
@@ -136,23 +137,27 @@ import java.util.concurrent.TimeUnit
 
 const val TAG = "ExoJetScreen"
 
-// Disable adaptive bitrate + MASSIVE pre-buffer to survive 4-5 min network timeouts
-// Browser plays smoothly because it either uses fixed bitrate or larger buffers
-private const val LIVE_TARGET_OFFSET_MS = 15_000L   // target ~15s behind live
-private const val LIVE_MIN_OFFSET_MS = 8_000L       // min 8s behind
-private const val LIVE_MAX_OFFSET_MS = 30_000L      // max 30s behind for network resilience
-private const val LIVE_MIN_PLAYBACK_SPEED = 0.97f
-private const val LIVE_MAX_PLAYBACK_SPEED = 1.03f
+// Live playback stability tuning:
+// keep a safer delay from the live edge to absorb short network jitter
+// without visible rebuffering.
+private const val LIVE_TARGET_OFFSET_MS = 55_000L
+private const val LIVE_MIN_OFFSET_MS = 35_000L
+private const val LIVE_MAX_OFFSET_MS = 120_000L
+private const val LIVE_MIN_PLAYBACK_SPEED = 1.0f
+private const val LIVE_MAX_PLAYBACK_SPEED = 1.0f
 
-// HTTP timeouts: fail fast and retry rather than wait
+// Stability-first cap to reduce periodic ABR upswitch stalls on live streams.
+private const val MAX_STABLE_VIDEO_BITRATE = 2_500_000
+
+// HTTP timeouts: avoid overly short read timeout that can trigger periodic live stalls.
 private const val HTTP_CONNECT_TIMEOUT_MS = 5_000
-private const val HTTP_READ_TIMEOUT_MS = 10_000
+private const val HTTP_READ_TIMEOUT_MS = 30_000
 
-// MASSIVE buffer to absorb 4-5 min timeouts: pre-buffer 2-5 minutes of content
-private const val MIN_BUFFER_MS = 120_000           // 2 min minimum always buffered
-private const val MAX_BUFFER_MS = 300_000           // 5 min max buffer
-private const val BUFFER_FOR_PLAYBACK_MS = 3_000
-private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 15_000
+// Practical live buffers for smoother playback with lower memory pressure.
+private const val MIN_BUFFER_MS = 45_000
+private const val MAX_BUFFER_MS = 120_000
+private const val BUFFER_FOR_PLAYBACK_MS = 1_500
+private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 3_000
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(UnstableApi::class)
@@ -1296,7 +1301,7 @@ private fun inferPlaybackMimeType(url: String): String? {
 
 @UnstableApi
 private fun createPlaybackHttpDataSourceFactory(): OkHttpDataSource.Factory {
-    // Maximum aggression: keep-alive at HTTP + socket level to prevent 4-5 min timeout stalls
+    // Keep connections warm and tolerate slower segment delivery on live streams.
     val okHttpClient = OkHttpClient.Builder()
         .connectTimeout(HTTP_CONNECT_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
         .readTimeout(HTTP_READ_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
@@ -1332,10 +1337,10 @@ fun initializePlayer(
     hlsMediaSourceFactory: HlsMediaSource.Factory
 ): ExoPlayer {
     // Buffer tuning to absorb segment/manifest fetch jitter without pauses:
-    //   minBufferMs  40 s  – start refilling as soon as ahead-buffer < 40 s (more headroom)
-    //   maxBufferMs  90 s  – keep up to 90 s downloaded ahead (less memory pressure than 120s)
+    //   minBufferMs  45 s  – start refilling early to maintain steady ahead-buffer
+    //   maxBufferMs 120 s  – retain enough data for jitter bursts on unstable links
     //   bufferForPlaybackMs  1.5 s  – fast startup
-    //   bufferForPlaybackAfterRebufferMs  8 s  – after stall, wait 8s for safety
+    //   bufferForPlaybackAfterRebufferMs  3 s  – resume quickly after transient stalls
     //   setPrioritizeTimeOverSizeThresholds  – time-based, not byte-based (consistent across bitrate)
     val loadControl = DefaultLoadControl.Builder()
         .setBufferDurationsMs(
@@ -1347,8 +1352,16 @@ fun initializePlayer(
         .setPrioritizeTimeOverSizeThresholds(true)
         .build()
 
+    val trackSelector = DefaultTrackSelector(context).apply {
+        parameters = buildUponParameters()
+            .setForceHighestSupportedBitrate(false)
+            .setMaxVideoBitrate(MAX_STABLE_VIDEO_BITRATE)
+            .build()
+    }
+
     val player = ExoPlayer.Builder(context)
         .setMediaSourceFactory(mediaSourceFactory)
+        .setTrackSelector(trackSelector)
         .setLoadControl(loadControl)
         .build()
     player.setSeekParameters(SeekParameters.CLOSEST_SYNC)
