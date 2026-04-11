@@ -1425,7 +1425,6 @@ fun initializePlayer(
                 }
                 return
             }
-            val currentUrl = getCurrentVideoUrl()
             val retryDelayMs = (attempt * 350L).coerceAtMost(2500L)
             retryHandler.removeCallbacksAndMessages(null)
             retryHandler.postDelayed(
