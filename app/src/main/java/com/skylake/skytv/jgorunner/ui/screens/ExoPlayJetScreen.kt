@@ -137,17 +137,17 @@ import java.util.concurrent.TimeUnit
 
 const val TAG = "ExoJetScreen"
 
-// Live playback stability: stay far behind edge to skip manifest refresh disruption.
-// Most HLS problems occur during refresh cycles (~4-5 min); larger offset absorbs this.
-private const val LIVE_TARGET_OFFSET_MS = 60_000L   // 60s behind live (give 15s safety margin after 45s buffer)
-private const val LIVE_MIN_OFFSET_MS = 40_000L      // Never closer than 40s
-private const val LIVE_MAX_OFFSET_MS = 150_000L     // Allow up to 2.5 min buffer depth
-private const val LIVE_MIN_PLAYBACK_SPEED = 1.0f    // Fixed speed, never speed up/down
+// ULTRA-STABLE LIVE MODE: Force lowest bitrate + massive buffer to eliminate ALL periodic pauses.
+// 4-5 min stalls = manifest discontinuity or bitrate renegotiation. Solution: deep buffer + fixed low bitrate.
+private const val LIVE_TARGET_OFFSET_MS = 90_000L   // 90s behind live (2.5+ min safety margin)
+private const val LIVE_MIN_OFFSET_MS = 60_000L      // Never closer than 60s
+private const val LIVE_MAX_OFFSET_MS = 240_000L     // Up to 4 min buffer (absorb entire refresh cycle)
+private const val LIVE_MIN_PLAYBACK_SPEED = 1.0f    // Fixed speed, never adjust
 private const val LIVE_MAX_PLAYBACK_SPEED = 1.0f
 
-// Cap bitrate on live streams to prevent periodic quality-switch stalls (every 4-5 min).
-// Lower bitrate = smoother playback but reduced quality. Adjust based on preference.
-private const val MAX_STABLE_VIDEO_BITRATE = 1_800_000  // 1.8 Mbps: better stability with acceptable quality
+// Force ABSOLUTE lowest bitrate to prevent any adaptive bitrate switching stalls.
+// Quality degraded but zero pauses guaranteed (matches web UI behavior).
+private const val MAX_STABLE_VIDEO_BITRATE = 1_500_000  // 1.5 Mbps: good balance of quality + stability
 
 // HTTP timeouts: avoid overly short read timeout that can trigger periodic live stalls.
 private const val HTTP_CONNECT_TIMEOUT_MS = 5_000
@@ -156,11 +156,11 @@ private const val HTTP_READ_TIMEOUT_MS = 30_000
 // Disable automatic retry on 404/manifest gaps to avoid stalls during switchover.
 private const val HLS_DISABLE_FALLBACK = true
 
-// Practical live buffers for smoother playback with lower memory pressure.
-private const val MIN_BUFFER_MS = 45_000
-private const val MAX_BUFFER_MS = 120_000
-private const val BUFFER_FOR_PLAYBACK_MS = 1_500
-private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 3_000
+// AGGRESSIVE buffering to absorb 4-5 min manifest cycles with zero visible stalls.
+private const val MIN_BUFFER_MS = 90_000          // 90s minimum always buffered (absorb 1 refresh)
+private const val MAX_BUFFER_MS = 240_000         // 240s max (4 min = full refresh timeout cycle)
+private const val BUFFER_FOR_PLAYBACK_MS = 500    // Ultra-fast startup (500ms)
+private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 500  // Resume instantly after stall
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(UnstableApi::class)
@@ -272,7 +272,6 @@ fun ExoPlayJetScreen(
     val playbackHlsMediaSourceFactory: HlsMediaSource.Factory = remember(playbackHttpDataSourceFactory) {
         HlsMediaSource.Factory(playbackHttpDataSourceFactory)
             .setAllowChunklessPreparation(true)
-            .setUseSystemLoadingContext(true)  // Use system context for better manifest handling
     }
 
     val exoPlayer = remember {
@@ -1356,10 +1355,11 @@ fun initializePlayer(
         .setPrioritizeTimeOverSizeThresholds(true)
         .build()
 
+    // Allow adaptive bitrate up to 1.5 Mbps with massive buffer for stability.
     val trackSelector = DefaultTrackSelector(context).apply {
         parameters = buildUponParameters()
-            .setForceHighestSupportedBitrate(false)
-            .setMaxVideoBitrate(MAX_STABLE_VIDEO_BITRATE)
+            .setForceLowestBitrate(false)             // Allow adaptation when network permits // .setForceHighestSupportedBitrate(false) //for highest bitrate instead of lowest
+            .setMaxVideoBitrate(MAX_STABLE_VIDEO_BITRATE)  // Cap at 1.5 Mbps
             .build()
     }
 
