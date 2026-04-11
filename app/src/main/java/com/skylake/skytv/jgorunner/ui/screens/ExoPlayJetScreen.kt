@@ -137,17 +137,15 @@ import java.util.concurrent.TimeUnit
 
 const val TAG = "ExoJetScreen"
 
-// ULTRA-STABLE LIVE MODE: Force lowest bitrate + massive buffer to eliminate ALL periodic pauses.
-// 4-5 min stalls = manifest discontinuity or bitrate renegotiation. Solution: deep buffer + fixed low bitrate.
-private const val LIVE_TARGET_OFFSET_MS = 90_000L   // 90s behind live (2.5+ min safety margin)
-private const val LIVE_MIN_OFFSET_MS = 60_000L      // Never closer than 60s
-private const val LIVE_MAX_OFFSET_MS = 240_000L     // Up to 4 min buffer (absorb entire refresh cycle)
+// Live stability mode tuned for fast recovery and acceptable quality.
+private const val LIVE_TARGET_OFFSET_MS = 70_000L
+private const val LIVE_MIN_OFFSET_MS = 45_000L
+private const val LIVE_MAX_OFFSET_MS = 180_000L
 private const val LIVE_MIN_PLAYBACK_SPEED = 1.0f    // Fixed speed, never adjust
 private const val LIVE_MAX_PLAYBACK_SPEED = 1.0f
 
-// Force ABSOLUTE lowest bitrate to prevent any adaptive bitrate switching stalls.
-// Quality degraded but zero pauses guaranteed (matches web UI behavior).
-private const val MAX_STABLE_VIDEO_BITRATE = 2_500_000  // 2.5 Mbps: higher quality with aggressive buffer protection
+// Cap adaptive bitrate to avoid aggressive up-switch stalls.
+private const val MAX_STABLE_VIDEO_BITRATE = 2_000_000
 
 // HTTP timeouts: avoid overly short read timeout that can trigger periodic live stalls.
 private const val HTTP_CONNECT_TIMEOUT_MS = 5_000
@@ -156,11 +154,11 @@ private const val HTTP_READ_TIMEOUT_MS = 30_000
 // Disable automatic retry on 404/manifest gaps to avoid stalls during switchover.
 private const val HLS_DISABLE_FALLBACK = true
 
-// AGGRESSIVE buffering to absorb 4-5 min manifest cycles with zero visible stalls.
-private const val MIN_BUFFER_MS = 90_000          // 90s minimum always buffered (absorb 1 refresh)
-private const val MAX_BUFFER_MS = 240_000         // 240s max (4 min = full refresh timeout cycle)
-private const val BUFFER_FOR_PLAYBACK_MS = 500    // Ultra-fast startup (500ms)
-private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 500  // Resume instantly after stall
+// Deep but practical buffers for live streams.
+private const val MIN_BUFFER_MS = 60_000
+private const val MAX_BUFFER_MS = 180_000
+private const val BUFFER_FOR_PLAYBACK_MS = 1_000
+private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 2_000
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(UnstableApi::class)
@@ -1355,11 +1353,11 @@ fun initializePlayer(
         .setPrioritizeTimeOverSizeThresholds(true)
         .build()
 
-    // Allow adaptive bitrate up to 2.5 Mbps with massive buffer for stability.
+    // Allow adaptive bitrate within a stable quality cap.
     val trackSelector = DefaultTrackSelector(context).apply {
         parameters = buildUponParameters()
             .setForceLowestBitrate(false)             // Allow adaptation
-            .setMaxVideoBitrate(MAX_STABLE_VIDEO_BITRATE)  // Cap at 2.5 Mbps for better quality
+            .setMaxVideoBitrate(MAX_STABLE_VIDEO_BITRATE)  // Cap at 1.8 Mbps for stability
             .build()
     }
 
@@ -1389,29 +1387,25 @@ fun initializePlayer(
     // Always Retry
     player.addListener(object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
-            // For live streams, NEVER retry on BEHIND_LIVE_WINDOW — this causes the 4-5 min pause cycle.
-            // Deep buffer + high live offset will handle manifest gaps silently.
+            // Fast recovery for live-window edge errors to avoid long visible stalls.
             val currentUrl = getCurrentVideoUrl()
             val isLive = currentUrl.contains(".m3u8") || currentUrl.contains("/live/")
             
             if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
-                if (isLive) {
-                    // For live: do NOT retry, just let buffer catch up silently
-                    Log.d(TAG, "BEHIND_LIVE_WINDOW on live stream — skipping retry (buffer will absorb)")
-                    retryCountRef.value = 0
-                    return
-                } else {
-                    // For VOD: recover with seek
-                    retryHandler.removeCallbacksAndMessages(null)
-                    retryCountRef.value = 0
-                    try {
+                retryHandler.removeCallbacksAndMessages(null)
+                retryCountRef.value = 0
+                try {
+                    if (isLive) {
+                        // Jump to current live edge and resume immediately.
                         player.seekToDefaultPosition()
-                        player.prepare()
-                        player.playWhenReady = true
-                    } catch (_: Exception) {
+                    } else {
+                        player.seekToDefaultPosition()
                     }
-                    return
+                    player.prepare()
+                    player.playWhenReady = true
+                } catch (_: Exception) {
                 }
+                return
             }
 
             val attempt = retryCountRef.value + 1
@@ -1425,7 +1419,7 @@ fun initializePlayer(
                 }
                 return
             }
-            val retryDelayMs = (attempt * 350L).coerceAtMost(2500L)
+            val retryDelayMs = (attempt * 250L).coerceAtMost(1200L)
             retryHandler.removeCallbacksAndMessages(null)
             retryHandler.postDelayed(
                 {
