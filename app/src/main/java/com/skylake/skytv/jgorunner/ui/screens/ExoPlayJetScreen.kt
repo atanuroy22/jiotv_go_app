@@ -147,7 +147,7 @@ private const val LIVE_MAX_PLAYBACK_SPEED = 1.0f
 
 // Force ABSOLUTE lowest bitrate to prevent any adaptive bitrate switching stalls.
 // Quality degraded but zero pauses guaranteed (matches web UI behavior).
-private const val MAX_STABLE_VIDEO_BITRATE = 1_500_000  // 1.5 Mbps: good balance of quality + stability
+private const val MAX_STABLE_VIDEO_BITRATE = 1_800_000  // 1.8 Mbps: good balance of quality + stability
 
 // HTTP timeouts: avoid overly short read timeout that can trigger periodic live stalls.
 private const val HTTP_CONNECT_TIMEOUT_MS = 5_000
