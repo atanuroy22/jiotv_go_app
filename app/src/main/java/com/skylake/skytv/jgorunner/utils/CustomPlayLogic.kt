@@ -52,8 +52,11 @@ fun setupCustomPlaybackLogic(
     // Remove any listener registered for this player by a previous channel
     activeListeners.remove(exoPlayer)?.let { exoPlayer.removeListener(it) }
 
+    // NEVER force seeks on live HLS streams — manifest updates every ~4-5s cause periodic disruption.
+    // Only apply forced seeks for non-live VOD/special content.
     var hasSeeked = false
-    val shouldForceSeek = videoUrl.containsAnyId() && !videoUrl.isLikelyLiveStreamUrl()
+    val isLive = videoUrl.isLikelyLiveStreamUrl()
+    val shouldForceSeek = !isLive && videoUrl.containsAnyId()
 
     val listener = object : Player.Listener {
 

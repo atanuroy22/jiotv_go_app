@@ -137,21 +137,24 @@ import java.util.concurrent.TimeUnit
 
 const val TAG = "ExoJetScreen"
 
-// Live playback stability tuning:
-// keep a safer delay from the live edge to absorb short network jitter
-// without visible rebuffering.
-private const val LIVE_TARGET_OFFSET_MS = 55_000L
-private const val LIVE_MIN_OFFSET_MS = 35_000L
-private const val LIVE_MAX_OFFSET_MS = 120_000L
-private const val LIVE_MIN_PLAYBACK_SPEED = 1.0f
+// Live playback stability: stay far behind edge to skip manifest refresh disruption.
+// Most HLS problems occur during refresh cycles (~4-5 min); larger offset absorbs this.
+private const val LIVE_TARGET_OFFSET_MS = 60_000L   // 60s behind live (give 15s safety margin after 45s buffer)
+private const val LIVE_MIN_OFFSET_MS = 40_000L      // Never closer than 40s
+private const val LIVE_MAX_OFFSET_MS = 150_000L     // Allow up to 2.5 min buffer depth
+private const val LIVE_MIN_PLAYBACK_SPEED = 1.0f    // Fixed speed, never speed up/down
 private const val LIVE_MAX_PLAYBACK_SPEED = 1.0f
 
-// Stability-first cap to reduce periodic ABR upswitch stalls on live streams.
-private const val MAX_STABLE_VIDEO_BITRATE = 2_500_000
+// Cap bitrate on live streams to prevent periodic quality-switch stalls (every 4-5 min).
+// Lower bitrate = smoother playback but reduced quality. Adjust based on preference.
+private const val MAX_STABLE_VIDEO_BITRATE = 1_800_000  // 1.8 Mbps: better stability with acceptable quality
 
 // HTTP timeouts: avoid overly short read timeout that can trigger periodic live stalls.
 private const val HTTP_CONNECT_TIMEOUT_MS = 5_000
 private const val HTTP_READ_TIMEOUT_MS = 30_000
+
+// Disable automatic retry on 404/manifest gaps to avoid stalls during switchover.
+private const val HLS_DISABLE_FALLBACK = true
 
 // Practical live buffers for smoother playback with lower memory pressure.
 private const val MIN_BUFFER_MS = 45_000
@@ -269,6 +272,7 @@ fun ExoPlayJetScreen(
     val playbackHlsMediaSourceFactory: HlsMediaSource.Factory = remember(playbackHttpDataSourceFactory) {
         HlsMediaSource.Factory(playbackHttpDataSourceFactory)
             .setAllowChunklessPreparation(true)
+            .setUseSystemLoadingContext(true)  // Use system context for better manifest handling
     }
 
     val exoPlayer = remember {
