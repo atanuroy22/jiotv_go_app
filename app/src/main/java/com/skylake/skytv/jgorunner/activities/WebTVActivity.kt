@@ -18,6 +18,7 @@ import android.widget.ProgressBar
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import com.skylake.skytv.jgorunner.R
+import com.skylake.skytv.jgorunner.core.data.JTVConfigurationManager
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import org.json.JSONArray
 import org.json.JSONException
@@ -44,6 +45,7 @@ class WebPlayerActivity : ComponentActivity() {
     private val recentChannels: MutableList<Channel> = ArrayList()
 
     private val prefManager = SkySharedPref.getInstance(this)
+    private val jtvConfigManager by lazy { JTVConfigurationManager.getInstance(this) }
 
     private class Channel(var playId: String?, var logoUrl: String?, var channelName: String?)
 
@@ -73,11 +75,26 @@ class WebPlayerActivity : ComponentActivity() {
             }
         }
 
-        url = String.format(
+        val defaultUrl = String.format(
             Locale.getDefault(),
             DEFAULT_URL_TEMPLATE,
             savedPortNumber
         ) + extraFilterUrl
+
+        val startupUrl = intent?.getStringExtra("startup_url")?.trim().orEmpty()
+        url = if (startupUrl.isNotEmpty()) {
+            if (startupUrl.startsWith("http://", ignoreCase = true) || startupUrl.startsWith("https://", ignoreCase = true)) {
+                startupUrl
+            } else {
+                if (startupUrl.startsWith("/")) {
+                    String.format(Locale.getDefault(), DEFAULT_URL_TEMPLATE, savedPortNumber) + startupUrl
+                } else {
+                    String.format(Locale.getDefault(), DEFAULT_URL_TEMPLATE, savedPortNumber) + "/$startupUrl"
+                }
+            }
+        } else {
+            defaultUrl
+        }
 
         Log.d("DIX", url!!)
 
@@ -197,6 +214,23 @@ class WebPlayerActivity : ComponentActivity() {
 //        webView!!.loadUrl(url!!)
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val startupUrl = intent.getStringExtra("startup_url")?.trim().orEmpty()
+        if (startupUrl.isNotEmpty()) {
+            val localPort = prefManager.myPrefs.jtvGoServerPort
+            val resolved = if (startupUrl.startsWith("http://", ignoreCase = true) || startupUrl.startsWith("https://", ignoreCase = true)) {
+                startupUrl
+            } else {
+                val base = String.format(Locale.getDefault(), DEFAULT_URL_TEMPLATE, localPort)
+                if (startupUrl.startsWith("/")) "$base$startupUrl" else "$base/$startupUrl"
+            }
+            url = resolved
+            webView?.loadUrl(resolved)
+        }
+    }
+
 
     @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -264,7 +298,27 @@ class WebPlayerActivity : ComponentActivity() {
     private inner class CustomWebViewClient : WebViewClient() {
         @Deprecated("Deprecated in Java")
         override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
+            val isDrmLikeUrl = url.contains("/play/", ignoreCase = true) ||
+                    url.contains("/mpd/", ignoreCase = true) ||
+                    url.contains(".mpd", ignoreCase = true) ||
+                    url.contains("render.dash", ignoreCase = true) ||
+                    url.contains("widevine", ignoreCase = true)
+
+            if (isDrmLikeUrl) {
+                val drmEnabled = try {
+                    jtvConfigManager.jtvConfiguration.drm
+                } catch (_: Exception) {
+                    false
+                }
+
+                if (drmEnabled) {
+                    // Keep DRM routes in WebView so the server-side Shaka player handles playback.
+                    return false
+                }
+            }
+
             if (url.contains("/play/")) {
+
                 initURL = webView!!.url
                 Log.d(TAG, "Saving initURL: $initURL")
 

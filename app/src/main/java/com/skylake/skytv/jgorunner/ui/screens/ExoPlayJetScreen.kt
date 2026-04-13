@@ -1282,10 +1282,10 @@ fun initializePlayer(
     //       bytes, so behaviour is consistent across bitrate switches
     val loadControl = DefaultLoadControl.Builder()
         .setBufferDurationsMs(
-            /* minBufferMs                     */ 20_000,
-            /* maxBufferMs                     */ 60_000,
-            /* bufferForPlaybackMs             */ 2_500,
-            /* bufferForPlaybackAfterRebufferMs */ 6_000
+            /* minBufferMs                     */ 14_000,
+            /* maxBufferMs                     */ 45_000,
+            /* bufferForPlaybackMs             */ 1_200,
+            /* bufferForPlaybackAfterRebufferMs */ 1_200
         )
         .setPrioritizeTimeOverSizeThresholds(true)
         .build()
@@ -1296,6 +1296,10 @@ fun initializePlayer(
         .build()
     retryCountRef.value = 0
     val retryHandler = Handler(Looper.getMainLooper())
+    val stallHandler = Handler(Looper.getMainLooper())
+    val fastStallThresholdMs = 1_800L
+    var stallRecoveries = 0
+    val maxStallRecoveries = 8
 
     fun prepareAndPlay(seekToPosition: Long = 0L) {
         val normalizedUrl = normalizePlaybackUrl(context, getCurrentVideoUrl())
@@ -1313,6 +1317,27 @@ fun initializePlayer(
 
     // Always Retry
     player.addListener(object : Player.Listener {
+        private var isBufferingLong = false
+        private val bufferingStallRunnable = Runnable {
+            if (!player.playWhenReady || player.playbackState != Player.STATE_BUFFERING) return@Runnable
+            isBufferingLong = true
+            if (stallRecoveries >= maxStallRecoveries) return@Runnable
+            stallRecoveries += 1
+
+            val currentUrl = getCurrentVideoUrl()
+            try {
+                // Exo can get stuck in STATE_BUFFERING without emitting onPlayerError.
+                // Re-preparing the current media item forces a playlist refresh and
+                // usually recovers from token/segment expiry stalls.
+                if (currentUrl.containsAnyId()) {
+                    prepareAndPlay(player.currentPosition)
+                } else {
+                    prepareAndPlay()
+                }
+            } catch (_: Exception) {
+            }
+        }
+
         override fun onPlayerError(error: PlaybackException) {
             val attempt = retryCountRef.value + 1
             retryCountRef.value = attempt
@@ -1326,7 +1351,7 @@ fun initializePlayer(
                 return
             }
             val currentUrl = getCurrentVideoUrl()
-            val retryDelayMs = (attempt * 350L).coerceAtMost(2500L)
+            val retryDelayMs = (attempt * 150L).coerceAtMost(900L)
             retryHandler.removeCallbacksAndMessages(null)
             retryHandler.postDelayed(
                 {
@@ -1345,6 +1370,36 @@ fun initializePlayer(
                 },
                 retryDelayMs
             )
+        }
+
+        override fun onPlaybackStateChanged(state: Int) {
+            when (state) {
+                Player.STATE_BUFFERING -> {
+                    if (player.playWhenReady) {
+                        stallHandler.removeCallbacks(bufferingStallRunnable)
+                        stallHandler.postDelayed(bufferingStallRunnable, fastStallThresholdMs)
+                    }
+                }
+
+                Player.STATE_READY -> {
+                    isBufferingLong = false
+                    stallRecoveries = 0
+                    stallHandler.removeCallbacks(bufferingStallRunnable)
+                }
+
+                Player.STATE_IDLE, Player.STATE_ENDED -> {
+                    stallHandler.removeCallbacks(bufferingStallRunnable)
+                }
+            }
+        }
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying) {
+                stallHandler.removeCallbacks(bufferingStallRunnable)
+            } else if (player.playWhenReady && player.playbackState == Player.STATE_BUFFERING && !isBufferingLong) {
+                stallHandler.removeCallbacks(bufferingStallRunnable)
+                stallHandler.postDelayed(bufferingStallRunnable, fastStallThresholdMs)
+            }
         }
     })
 
