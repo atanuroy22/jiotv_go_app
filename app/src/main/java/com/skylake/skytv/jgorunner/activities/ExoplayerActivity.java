@@ -20,9 +20,13 @@ import androidx.annotation.OptIn;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DefaultHttpDataSource;
+import androidx.media3.drm.DefaultDrmSessionManager;
+import androidx.media3.drm.FrameworkMediaDrm;
+import androidx.media3.drm.HttpMediaDrmCallback;
 import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.SeekParameters;
+import androidx.media3.exoplayer.dash.DashMediaSource;
 import androidx.media3.exoplayer.hls.HlsMediaSource;
 import androidx.media3.exoplayer.source.MediaSource;
 import androidx.media3.ui.AspectRatioFrameLayout;
@@ -108,15 +112,34 @@ public class ExoplayerActivity extends ComponentActivity {
         // Pre-buffer more data so normal network hiccups don't stall playback.
         DefaultLoadControl loadControl = new DefaultLoadControl.Builder()
                 .setBufferDurationsMs(
-                        /* minBufferMs                     */ 20_000,
-                        /* maxBufferMs                     */ 60_000,
-                        /* bufferForPlaybackMs             */ 2_500,
-                        /* bufferForPlaybackAfterRebufferMs */ 6_000
+                        /* minBufferMs                     */ 14_000,
+                        /* maxBufferMs                     */ 45_000,
+                        /* bufferForPlaybackMs             */ 1_200,
+                        /* bufferForPlaybackAfterRebufferMs */ 1_200
                 )
                 .setPrioritizeTimeOverSizeThresholds(true)
                 .build();
 
-        player = new ExoPlayer.Builder(this).setLoadControl(loadControl).build();
+        // Check if this is a DRM URL (MPD/DASH)
+        boolean isDrmUrl = isDrmUrl(videoUrl);
+        
+        ExoPlayer.Builder playerBuilder = new ExoPlayer.Builder(this).setLoadControl(loadControl);
+        
+        if (isDrmUrl) {
+            try {
+                // Setup DRM for Widevine
+                DefaultDrmSessionManager drmSessionManager = 
+                    new DefaultDrmSessionManager.Builder()
+                        .setKeyRequestParameters(null)
+                        .build(new FrameworkMediaDrm.Factory());
+                playerBuilder.setDrmSessionManager(drmSessionManager);
+                Log.d(TAG, "DRM session manager configured for Widevine");
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to setup DRM: " + e.getMessage());
+            }
+        }
+        
+        player = playerBuilder.build();
         playerView.setPlayer(player);
         // Keep the last rendered frame frozen on screen during buffering and
         // retries — prevents the surface going black on network hiccups.
@@ -128,33 +151,54 @@ public class ExoplayerActivity extends ComponentActivity {
                 .setConnectTimeoutMs(8_000)
                 .setReadTimeoutMs(8_000)
                 .setAllowCrossProtocolRedirects(true);
-        // Live offset targeting: stay 15 s behind the live edge so the next
-        // 15 s of segments are always pre-fetched before they're needed.
-        // Any network hiccup shorter than 15 s is absorbed with zero stall.
+        
         MediaItem mediaItem = new MediaItem.Builder()
                 .setUri(Uri.parse(videoUrl))
-                .setMimeType("application/x-mpegURL")
-                .setLiveConfiguration(
-                        new MediaItem.LiveConfiguration.Builder()
-                                .setTargetOffsetMs(15_000)
-                                .setMinOffsetMs(8_000)
-                                .setMaxOffsetMs(25_000)
-                                .setMinPlaybackSpeed(0.97f)
-                                .setMaxPlaybackSpeed(1.03f)
-                                .build()
-                )
+                .setMimeType(isDrmUrl ? "application/dash+xml" : "application/x-mpegURL")
                 .build();
-        MediaSource hlsMediaSource = new HlsMediaSource.Factory(dataSourceFactory)
-                .setAllowChunklessPreparation(true)
-                .createMediaSource(mediaItem);
+        
+        if (isDrmUrl) {
+            // DASH/MPD with DRM support
+            DashMediaSource dashMediaSource = new DashMediaSource.Factory(dataSourceFactory)
+                    .createMediaSource(mediaItem);
+            player.setMediaSource(dashMediaSource);
+            Log.d(TAG, "Using DASH MediaSource for DRM playback");
+        } else {
+            // HLS playback with live configuration
+            MediaItem.LiveConfiguration liveConfig = new MediaItem.LiveConfiguration.Builder()
+                    .setTargetOffsetMs(15_000)
+                    .setMinOffsetMs(8_000)
+                    .setMaxOffsetMs(25_000)
+                    .setMinPlaybackSpeed(0.97f)
+                    .setMaxPlaybackSpeed(1.03f)
+                    .build();
+            mediaItem = new MediaItem.Builder()
+                    .setUri(Uri.parse(videoUrl))
+                    .setMimeType("application/x-mpegURL")
+                    .setLiveConfiguration(liveConfig)
+                    .build();
+            
+            MediaSource hlsMediaSource = new HlsMediaSource.Factory(dataSourceFactory)
+                    .setAllowChunklessPreparation(true)
+                    .createMediaSource(mediaItem);
+            player.setMediaSource(hlsMediaSource);
+        }
 
-        player.setMediaSource(hlsMediaSource);
         playerView.setResizeMode(AspectRatioFrameLayout.RESIZE_MODE_FIT);
         playerView.setShowNextButton(false);
         playerView.setShowPreviousButton(false);
         player.setSeekParameters(SeekParameters.CLOSEST_SYNC);
         player.prepare();
         player.setPlayWhenReady(true);
+    }
+    
+    private boolean isDrmUrl(String url) {
+        if (url == null) return false;
+        String lowerUrl = url.toLowerCase();
+        return lowerUrl.contains(".mpd") || 
+               lowerUrl.contains("/mpd/") ||
+               lowerUrl.contains("widevine") ||
+               lowerUrl.contains("render.dash");
     }
 
     private String formatVideoUrl(String videoUrl, String signatureFallback) {
