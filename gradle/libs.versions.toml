@@ -40,6 +40,8 @@ okhttp = "5.3.0"
 ketch = "2.0.2"
 gson = "2.13.2"
 media3ExoplayerHls = "1.8.0"
+media3Common = "1.8.0"
+media3Decoder = "1.8.0"
 appcompat = "1.7.1"
 material3Jvmstubs = "1.5.0-alpha01"
 
@@ -92,6 +94,8 @@ okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhtt
 ketch = { group = "com.github.khushpanchal", name = "ketch", version.ref = "ketch" }
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 androidx-media3-exoplayer-hls = { group = "androidx.media3", name = "media3-exoplayer-hls", version.ref = "media3ExoplayerHls" }
+androidx-media3-common = { group = "androidx.media3", name = "media3-common", version.ref = "media3Common" }
+androidx-media3-decoder = { group = "androidx.media3", name = "media3-decoder", version.ref = "media3Decoder" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 androidx-material3-jvmstubs = { group = "androidx.compose.material3", name = "material3-jvmstubs", version.ref = "material3Jvmstubs" }
 
