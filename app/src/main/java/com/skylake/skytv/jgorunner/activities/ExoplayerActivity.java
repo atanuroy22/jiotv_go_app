@@ -20,9 +20,6 @@ import androidx.annotation.OptIn;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DefaultHttpDataSource;
-import androidx.media3.drm.DefaultDrmSessionManager;
-import androidx.media3.drm.FrameworkMediaDrm;
-import androidx.media3.drm.HttpMediaDrmCallback;
 import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.SeekParameters;
@@ -123,23 +120,10 @@ public class ExoplayerActivity extends ComponentActivity {
         // Check if this is a DRM URL (MPD/DASH)
         boolean isDrmUrl = isDrmUrl(videoUrl);
         
-        ExoPlayer.Builder playerBuilder = new ExoPlayer.Builder(this).setLoadControl(loadControl);
-        
-        if (isDrmUrl) {
-            try {
-                // Setup DRM for Widevine
-                DefaultDrmSessionManager drmSessionManager = 
-                    new DefaultDrmSessionManager.Builder()
-                        .setKeyRequestParameters(null)
-                        .build(new FrameworkMediaDrm.Factory());
-                playerBuilder.setDrmSessionManager(drmSessionManager);
-                Log.d(TAG, "DRM session manager configured for Widevine");
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to setup DRM: " + e.getMessage());
-            }
-        }
-        
-        player = playerBuilder.build();
+        // Create ExoPlayer with aggressive buffering config
+        player = new ExoPlayer.Builder(this)
+                .setLoadControl(loadControl)
+                .build();
         playerView.setPlayer(player);
         // Keep the last rendered frame frozen on screen during buffering and
         // retries — prevents the surface going black on network hiccups.
@@ -158,11 +142,11 @@ public class ExoplayerActivity extends ComponentActivity {
                 .build();
         
         if (isDrmUrl) {
-            // DASH/MPD with DRM support
+            // DASH/MPD with DRM support - media3 automatically handles Widevine
             DashMediaSource dashMediaSource = new DashMediaSource.Factory(dataSourceFactory)
                     .createMediaSource(mediaItem);
             player.setMediaSource(dashMediaSource);
-            Log.d(TAG, "Using DASH MediaSource for DRM playback");
+            Log.d(TAG, "Using DASH MediaSource for DRM playback (Widevine handled by ExoPlayer)");
         } else {
             // HLS playback with live configuration
             MediaItem.LiveConfiguration liveConfig = new MediaItem.LiveConfiguration.Builder()
