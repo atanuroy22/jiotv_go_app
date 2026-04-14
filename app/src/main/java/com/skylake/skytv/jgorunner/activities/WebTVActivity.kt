@@ -9,6 +9,8 @@ import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
+import android.webkit.ConsoleMessage
+import android.webkit.PermissionRequest
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.webkit.WebChromeClient
@@ -178,7 +180,36 @@ class WebPlayerActivity : ComponentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
         webView!!.webViewClient = CustomWebViewClient()
-        webView!!.webChromeClient = WebChromeClient()
+        webView!!.webChromeClient = object : WebChromeClient() {
+            override fun onPermissionRequest(request: PermissionRequest?) {
+                // Shaka/Widevine in WebView may request protected media. Granting on the UI
+                // thread prevents silent DRM-denied fallback to non-DRM playback paths.
+                if (request == null) return
+                runOnUiThread {
+                    try {
+                        request.grant(request.resources)
+                        Log.d(TAG, "Granted WebView permission request: ${request.resources.joinToString()}")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to grant WebView permission request", e)
+                        request.deny()
+                    }
+                }
+            }
+
+            override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
+                if (consoleMessage.messageLevel() == ConsoleMessage.MessageLevel.ERROR ||
+                    consoleMessage.message().contains("drm", ignoreCase = true) ||
+                    consoleMessage.message().contains("widevine", ignoreCase = true) ||
+                    consoleMessage.message().contains("eme", ignoreCase = true)
+                ) {
+                    Log.e(
+                        TAG,
+                        "WebConsole ${consoleMessage.messageLevel()}: ${consoleMessage.message()} @${consoleMessage.sourceId()}:${consoleMessage.lineNumber()}"
+                    )
+                }
+                return super.onConsoleMessage(consoleMessage)
+            }
+        }
 
         val webSettings = webView!!.settings
         webSettings.javaScriptEnabled = true
@@ -188,6 +219,9 @@ class WebPlayerActivity : ComponentActivity() {
         webSettings.defaultTextEncodingName = "utf-8"
         webSettings.mixedContentMode = 0
         webSettings.mediaPlaybackRequiresUserGesture = false // Allow autoplay
+
+        // Ensure hardware accelerated rendering path is used for video/DRM playback.
+        webView!!.setLayerType(View.LAYER_TYPE_HARDWARE, null)
     }
 
     private fun loadUrl() {
