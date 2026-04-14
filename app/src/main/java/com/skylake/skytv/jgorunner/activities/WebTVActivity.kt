@@ -82,7 +82,7 @@ class WebPlayerActivity : ComponentActivity() {
         ) + extraFilterUrl
 
         val startupUrl = intent?.getStringExtra("startup_url")?.trim().orEmpty()
-        url = if (startupUrl.isNotEmpty()) {
+        val resolvedStartupUrl = if (startupUrl.isNotEmpty()) {
             if (startupUrl.startsWith("http://", ignoreCase = true) || startupUrl.startsWith("https://", ignoreCase = true)) {
                 startupUrl
             } else {
@@ -95,6 +95,8 @@ class WebPlayerActivity : ComponentActivity() {
         } else {
             defaultUrl
         }
+
+        url = rewriteDrmPlayUrlToMpdIfNeeded(resolvedStartupUrl)
 
         Log.d("DIX", url!!)
 
@@ -226,9 +228,31 @@ class WebPlayerActivity : ComponentActivity() {
                 val base = String.format(Locale.getDefault(), DEFAULT_URL_TEMPLATE, localPort)
                 if (startupUrl.startsWith("/")) "$base$startupUrl" else "$base/$startupUrl"
             }
-            url = resolved
-            webView?.loadUrl(resolved)
+            val rewritten = rewriteDrmPlayUrlToMpdIfNeeded(resolved)
+            url = rewritten
+            webView?.loadUrl(rewritten)
         }
+    }
+
+    private fun rewriteDrmPlayUrlToMpdIfNeeded(input: String): String {
+        val drmEnabled = try {
+            jtvConfigManager.jtvConfiguration.drm
+        } catch (_: Exception) {
+            false
+        }
+        if (!drmEnabled) return input
+
+        val playRegex = Regex(".*/play/(\\d+)(?:[/?].*)?$")
+        val match = playRegex.find(input) ?: return input
+        val playId = match.groupValues.getOrNull(1).orEmpty()
+        if (playId.isBlank()) return input
+
+        val quality = prefManager.myPrefs.filterQX?.takeIf { it.isNotBlank() } ?: "high"
+        val localPort = prefManager.myPrefs.jtvGoServerPort
+        val base = String.format(Locale.getDefault(), DEFAULT_URL_TEMPLATE, localPort)
+        val rewritten = "$base/mpd/$playId?q=$quality&pm=hd"
+        Log.d(TAG, "Rewriting DRM /play/ URL to direct MPD URL: $rewritten")
+        return rewritten
     }
 
 
@@ -312,6 +336,12 @@ class WebPlayerActivity : ComponentActivity() {
                 }
 
                 if (drmEnabled) {
+                    val rewrittenUrl = rewriteDrmPlayUrlToMpdIfNeeded(url)
+                    if (rewrittenUrl != url) {
+                        Log.d(TAG, "DRM enabled, forcing direct MPD route: $rewrittenUrl")
+                        view.loadUrl(rewrittenUrl)
+                        return true
+                    }
                     // Keep DRM routes in WebView so the server-side Shaka player handles playback.
                     Log.d(TAG, "DRM enabled, keeping URL in WebView: $url")
                     return false
