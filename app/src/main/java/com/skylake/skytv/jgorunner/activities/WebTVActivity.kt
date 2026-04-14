@@ -298,7 +298,27 @@ class WebPlayerActivity : ComponentActivity() {
     private inner class CustomWebViewClient : WebViewClient() {
         @Deprecated("Deprecated in Java")
         override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
-            // DRM is now handled natively in ExoPlayer, so always redirect /play/ URLs
+            val isDrmLikeUrl = url.contains("/play/", ignoreCase = true) ||
+                    url.contains("/mpd/", ignoreCase = true) ||
+                    url.contains(".mpd", ignoreCase = true) ||
+                    url.contains("render.dash", ignoreCase = true) ||
+                    url.contains("widevine", ignoreCase = true)
+
+            if (isDrmLikeUrl) {
+                val drmEnabled = try {
+                    jtvConfigManager.jtvConfiguration.drm
+                } catch (_: Exception) {
+                    false
+                }
+
+                if (drmEnabled) {
+                    // Keep DRM routes in WebView so the server-side Shaka player handles playback.
+                    Log.d(TAG, "DRM enabled, keeping URL in WebView: $url")
+                    return false
+                }
+            }
+
+            // Only redirect /play/ URLs to ExoPlayer if DRM is disabled.
             if (url.contains("/play/")) {
                 initURL = webView!!.url
                 Log.d(TAG, "Saving initURL: $initURL")
@@ -359,10 +379,14 @@ class WebPlayerActivity : ComponentActivity() {
                     }
                 }
 
-                // Send the play URL directly to ExoplayerActivity
-                // It will detect if it's DRM (MPD) or HLS and handle accordingly
+                // Construct the HLS URL only for non-DRM route.
+                var modifiedUrl = url.replace("/play/", "/live/") + ".m3u8"
+                modifiedUrl = modifiedUrl.replace("//.m3u8", ".m3u8")
+
+                Log.d("DIX", "Modified URL for intent: $modifiedUrl")
+
                 val intent = Intent(this@WebPlayerActivity, ExoplayerActivity::class.java).apply {
-                    putExtra("video_url", url)
+                    putExtra("video_url", modifiedUrl)
                     putExtra("current_play_id", playId?.substringBefore("?") ?: playId)
                     putExtra("channels_list", channelNumbers?.toTypedArray())
                 }
