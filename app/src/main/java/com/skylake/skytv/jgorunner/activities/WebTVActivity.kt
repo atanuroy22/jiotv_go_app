@@ -501,9 +501,6 @@ class WebPlayerActivity : ComponentActivity() {
                                 padding: 0 !important;
                                 background: black !important;
                                 overflow: hidden !important;
-                                display: flex !important;
-                                align-items: center !important;
-                                justify-content: center !important;
                             }
                             .shaka-video-container,
                             .shaka-player-container,
@@ -514,7 +511,8 @@ class WebPlayerActivity : ComponentActivity() {
                                 height: 100% !important;
                                 max-width: 100% !important;
                                 max-height: 100% !important;
-                                margin: 0 auto !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
                             }
                             video {
                                 width: 100% !important;
@@ -523,7 +521,10 @@ class WebPlayerActivity : ComponentActivity() {
                                 max-height: 100% !important;
                                 object-fit: contain !important;
                                 display: block !important;
-                                margin: auto !important;
+                                margin: 0 auto !important;
+                                opacity: 1 !important;
+                                visibility: visible !important;
+                                background: black !important;
                             }
                         `;
 

@@ -775,7 +775,7 @@ fun ExoPlayJetScreen(
                                     """
                                     (function() {
                                       try {
-                                                                                var cssId = 'zone-shaka-hide-ui';
+                                                                                var cssId = 'zone-shaka-layout-fix';
                                                                                 var css = `
                                                                                     body, html {
                                                                                         background: black !important; 
@@ -784,9 +784,6 @@ fun ExoPlayJetScreen(
                                                                                         height: 100% !important;
                                                                                         margin: 0 !important;
                                                                                         padding: 0 !important;
-                                                                                        display: flex !important;
-                                                                                        align-items: center !important;
-                                                                                        justify-content: center !important;
                                                                                     }
                                                                                     .shaka-video-container,
                                                                                     .shaka-player-container,
@@ -797,7 +794,8 @@ fun ExoPlayJetScreen(
                                                                                         height: 100% !important;
                                                                                         max-width: 100% !important;
                                                                                         max-height: 100% !important;
-                                                                                        margin: 0 auto !important;
+                                                                                        margin: 0 !important;
+                                                                                        padding: 0 !important;
                                                                                     }
                                                                                     video { 
                                                                                         width: 100% !important; 
@@ -806,7 +804,10 @@ fun ExoPlayJetScreen(
                                                                                         max-height: 100% !important;
                                                                                         object-fit: contain !important;
                                                                                         display: block !important;
-                                                                                        margin: auto !important;
+                                                                                        margin: 0 auto !important;
+                                                                                        opacity: 1 !important;
+                                                                                        visibility: visible !important;
+                                                                                        background: black !important;
                                                                                     }
                                                                                 `;
 
@@ -830,10 +831,6 @@ fun ExoPlayJetScreen(
                                                                                         v.style.opacity = '1';
                                                                                         v.style.visibility = 'visible';
                                                                                         v.style.display = 'block';
-                                                                                        if (v.paused) {
-                                                                                            var p = v.play();
-                                                                                            if (p && p.catch) p.catch(function(){});
-                                                                                        }
                                                                                     }
                                                                                     
                                                                                     var iframes = document.querySelectorAll('iframe');
@@ -842,7 +839,7 @@ fun ExoPlayJetScreen(
                                                                                         iframes[j].style.height = '100%';
                                                                                         iframes[j].style.maxWidth = '100%';
                                                                                         iframes[j].style.maxHeight = '100%';
-                                                                                        iframes[j].style.margin = '0 auto';
+                                                                                        iframes[j].style.margin = '0';
                                                                                     }
                                                                                 };
                                                                                 tryShowVideo();
