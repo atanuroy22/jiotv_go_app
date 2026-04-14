@@ -177,6 +177,7 @@ fun ExoPlayJetScreen(
     var isControllerVisible by remember { mutableStateOf(false) }
     var zoneWebView: WebView? by remember { mutableStateOf(null) }
     var isWebLoading by remember { mutableStateOf(false) }
+    var lastLoadedZoneDrmUrl by remember { mutableStateOf<String?>(null) }
 
     val activeUrlRaw = overrideVideoUrl ?: channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
     val normalizedActiveUrl = remember(activeUrlRaw, currentIndex, channelList, videoUrl) {
@@ -735,8 +736,6 @@ fun ExoPlayJetScreen(
                         isLongClickable = false
                         isHapticFeedbackEnabled = false
                         setOnLongClickListener { true }
-                        // Keep interaction model consistent: Zone overlays/keys drive controls.
-                        setOnTouchListener { _, _ -> true }
 
                         webChromeClient = object : WebChromeClient() {
                             override fun onPermissionRequest(request: PermissionRequest?) {
@@ -788,7 +787,8 @@ fun ExoPlayJetScreen(
                                                                                         visibility: hidden !important;
                                                                                         pointer-events: none !important;
                                                                                     }
-                                                                                    body, html { background: black !important; overflow: hidden !important; }
+                                                                                    body, html { background: black !important; overflow: hidden !important; width: 100% !important; height: 100% !important; margin: 0 !important; }
+                                                                                    iframe, .player, .shaka-video-container { width: 100vw !important; height: 100vh !important; max-width: 100vw !important; max-height: 100vh !important; margin: 0 auto !important; }
                                                                                     video { width: 100vw !important; height: 100vh !important; object-fit: contain !important; }
                                                                                 `;
 
@@ -800,12 +800,24 @@ fun ExoPlayJetScreen(
                                                                                 }
                                                                                 style.textContent = css;
 
-                                                                                var v = document.querySelector('video');
-                                                                                if (v) {
+                                                                                var tryPlayAndCenter = function() {
+                                                                                    var v = document.querySelector('video');
+                                                                                    if (!v) return;
                                                                                     v.controls = false;
+                                                                                    v.style.width = '100vw';
+                                                                                    v.style.height = '100vh';
+                                                                                    v.style.maxWidth = '100vw';
+                                                                                    v.style.maxHeight = '100vh';
+                                                                                    v.style.objectFit = 'contain';
+                                                                                    v.muted = true;
                                                                                     var p = v.play();
-                                                                                    if (p && p.catch) p.catch(function(){});
-                                                                                }
+                                                                                    if (p && p.then) {
+                                                                                        p.then(function() {
+                                                                                            setTimeout(function() { v.muted = false; }, 300);
+                                                                                        }).catch(function() {});
+                                                                                    }
+                                                                                };
+                                                                                tryPlayAndCenter();
 
                                                                                 if (!window.__zoneShellUiObserverInstalled) {
                                                                                     window.__zoneShellUiObserverInstalled = true;
@@ -815,12 +827,18 @@ fun ExoPlayJetScreen(
                                                                                             vv.controls = false;
                                                                                             vv.style.width = '100vw';
                                                                                             vv.style.height = '100vh';
+                                                                                            vv.style.maxWidth = '100vw';
+                                                                                            vv.style.maxHeight = '100vh';
                                                                                             vv.style.objectFit = 'contain';
+                                                                                            if (vv.paused) {
+                                                                                                var pp = vv.play();
+                                                                                                if (pp && pp.catch) pp.catch(function(){});
+                                                                                            }
                                                                                         }
                                                                                     };
                                                                                     var obs = new MutationObserver(applyHide);
                                                                                     obs.observe(document.documentElement || document.body, { childList: true, subtree: true, attributes: true });
-                                                                                    setInterval(applyHide, 1200);
+                                                                                    setInterval(applyHide, 800);
                                                                                 }
                                       } catch(e) {}
                                     })();
@@ -833,14 +851,15 @@ fun ExoPlayJetScreen(
                         zoneWebView = this
                         if (zoneDrmStartupUrl.isNotBlank()) {
                             loadUrl(zoneDrmStartupUrl)
+                            lastLoadedZoneDrmUrl = zoneDrmStartupUrl
                         }
                     }
                 },
                 update = { webView ->
                     zoneWebView = webView
-                    val current = webView.url.orEmpty()
-                    if (zoneDrmStartupUrl.isNotBlank() && current != zoneDrmStartupUrl) {
+                    if (zoneDrmStartupUrl.isNotBlank() && zoneDrmStartupUrl != lastLoadedZoneDrmUrl) {
                         webView.loadUrl(zoneDrmStartupUrl)
+                        lastLoadedZoneDrmUrl = zoneDrmStartupUrl
                     }
                 },
                 modifier = Modifier

@@ -531,8 +531,23 @@ class WebPlayerActivity : ComponentActivity() {
                     body.style.overflow = 'hidden';
                 }
 
-                var video = document.querySelector('video');
-                if (video) {
+                var ensureLayout = function() {
+                    try {
+                        var containers = document.querySelectorAll('iframe, .player, .shaka-video-container, .video-container');
+                        for (var i = 0; i < containers.length; i++) {
+                            containers[i].style.width = '100vw';
+                            containers[i].style.height = '100vh';
+                            containers[i].style.maxWidth = '100vw';
+                            containers[i].style.maxHeight = '100vh';
+                            containers[i].style.margin = '0 auto';
+                        }
+                    } catch (e) {}
+                };
+                ensureLayout();
+
+                var ensureVideo = function() {
+                    var video = document.querySelector('video');
+                    if (!video) return false;
                     video.style.width = '100vw';
                     video.style.height = '100vh';
                     video.style.maxWidth = '100vw';
@@ -540,7 +555,10 @@ class WebPlayerActivity : ComponentActivity() {
                     video.style.objectFit = 'contain';
                     video.style.display = 'block';
                     video.controls = true;
-                    video.play();
+                    if (video.paused) {
+                        var p = video.play();
+                        if (p && p.catch) p.catch(function(){});
+                    }
 
                     var fsBtn = document.getElementById('zone-fs-btn');
                     if (!fsBtn) {
@@ -568,8 +586,18 @@ class WebPlayerActivity : ComponentActivity() {
                         };
                         document.body.appendChild(fsBtn);
                     }
-                } else {
-                    console.error('No video element found');
+                    return true;
+                };
+
+                if (!ensureVideo()) {
+                    var tries = 0;
+                    var timer = setInterval(function() {
+                        ensureLayout();
+                        tries++;
+                        if (ensureVideo() || tries > 20) {
+                            clearInterval(timer);
+                        }
+                    }, 500);
                 }
             } catch (e) {
                 console.error('Error in full-screen script:', e);
