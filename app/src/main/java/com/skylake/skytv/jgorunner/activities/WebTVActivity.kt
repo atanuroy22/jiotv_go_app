@@ -16,7 +16,6 @@ import android.view.WindowInsetsController
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.ImageButton
 import android.widget.ProgressBar
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
@@ -36,7 +35,6 @@ class WebPlayerActivity : ComponentActivity() {
 
     private var webView: WebView? = null
     private var loadingSpinner: ProgressBar? = null
-    private var fullscreenButton: ImageButton? = null
     private var url: String? = null
 
     private var channelNumbers: List<String>? = null
@@ -111,16 +109,6 @@ class WebPlayerActivity : ComponentActivity() {
 
         webView = findViewById(R.id.webview)
         loadingSpinner = findViewById(R.id.loading_spinner)
-        fullscreenButton = findViewById(R.id.fullscreen_button)
-
-        fullscreenButton?.setOnClickListener {
-            try {
-                setupFullScreenMode()
-                webView?.requestFocus()
-                webView?.post { playVideoInFullScreen(webView ?: return@post) }
-            } catch (_: Exception) {
-            }
-        }
 
         setupWebView()
         loadUrl()
@@ -491,7 +479,6 @@ class WebPlayerActivity : ComponentActivity() {
             if (isPlayerLikeUrl) {
                 Log.d(TAG, "Playing: $url")
                 setupFullScreenMode()
-                playVideoInFullScreen(view)
             } else {
                 moveSearchInput(view)
                 extractChannelNumbers()
@@ -515,10 +502,6 @@ class WebPlayerActivity : ComponentActivity() {
                     )
                 }
             }
-        }
-
-        fun playVideoInFullScreen(view: WebView) {
-            this@WebPlayerActivity.playVideoInFullScreen(view)
         }
 
         fun moveSearchInput(view: WebView) {
@@ -683,91 +666,5 @@ class WebPlayerActivity : ComponentActivity() {
             }
         }
 
-    }
-
-    private fun playVideoInFullScreen(view: WebView) {
-        val script = """
-        javascript:(function() {
-            try {
-                var html = document.documentElement;
-                var body = document.body;
-                if (html) {
-                    html.style.width = '100%';
-                    html.style.height = '100%';
-                    html.style.margin = '0';
-                    html.style.padding = '0';
-                    html.style.background = 'black';
-                    html.style.overflow = 'hidden';
-                }
-                if (body) {
-                    body.style.width = '100%';
-                    body.style.height = '100%';
-                    body.style.margin = '0';
-                    body.style.padding = '0';
-                    body.style.background = 'black';
-                    body.style.display = 'flex';
-                    body.style.alignItems = 'center';
-                    body.style.justifyContent = 'center';
-                    body.style.overflow = 'hidden';
-                }
-
-                var ensureLayout = function() {
-                    try {
-                        var containers = document.querySelectorAll('iframe, .player, .shaka-video-container, .video-container, .shaka-player-container');
-                        for (var i = 0; i < containers.length; i++) {
-                            containers[i].style.width = '100vw';
-                            containers[i].style.height = '100vh';
-                            containers[i].style.maxWidth = '100vw';
-                            containers[i].style.maxHeight = '100vh';
-                            containers[i].style.margin = '0 auto';
-                            containers[i].style.position = 'relative';
-                            containers[i].style.zIndex = '2147483646';
-                        }
-                    } catch (e) {}
-                };
-                ensureLayout();
-
-                var ensureVideo = function() {
-                    var videos = document.querySelectorAll('video');
-                    if (!videos || !videos.length) return false;
-                    for (var i = 0; i < videos.length; i++) {
-                        var video = videos[i];
-                        video.style.width = '100vw';
-                        video.style.height = '100vh';
-                        video.style.maxWidth = '100vw';
-                        video.style.maxHeight = '100vh';
-                        video.style.objectFit = 'contain';
-                        video.style.display = 'block';
-                        video.style.opacity = '1';
-                        video.style.visibility = 'visible';
-                        video.style.position = 'relative';
-                        video.style.zIndex = '2147483646';
-                        video.controls = true;
-                        if (video.paused) {
-                            var p = video.play();
-                            if (p && p.catch) p.catch(function(){});
-                        }
-                    }
-
-                    return true;
-                };
-
-                if (!ensureVideo()) {
-                    var tries = 0;
-                    var timer = setInterval(function() {
-                        ensureLayout();
-                        tries++;
-                        if (ensureVideo() || tries > 20) {
-                            clearInterval(timer);
-                        }
-                    }, 500);
-                }
-            } catch (e) {
-                console.error('Error in full-screen script:', e);
-            }
-        })()
-    """.trimIndent()
-
-        view.evaluateJavascript(script, null)
     }
 }

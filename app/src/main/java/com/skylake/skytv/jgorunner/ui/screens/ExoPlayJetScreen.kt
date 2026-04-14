@@ -772,40 +772,87 @@ fun ExoPlayJetScreen(
 
                             override fun onPageFinished(view: WebView, url: String) {
                                 isWebLoading = false
-                                                                // Hard-hide page/chrome/shaka controls to keep a Zone-like shell UI.
+                                                                // Hide Shaka UI but keep video layer visible
                                 view.evaluateJavascript(
                                     """
                                     (function() {
                                       try {
-                                                                                var cssId = 'zone-shell-hide-ui';
+                                                                                var cssId = 'zone-shaka-hide-ui';
                                                                                 var css = `
-                                                                                    * { box-sizing: border-box; }
                                                                                     body, html { 
                                                                                         background: black !important; 
                                                                                         overflow: hidden !important; 
-                                                                                        width: 100% !important; 
-                                                                                        height: 100% !important; 
-                                                                                        margin: 0 !important; 
-                                                                                        padding: 0 !important;
-                                                                                        position: fixed !important;
-                                                                                        top: 0 !important;
-                                                                                        left: 0 !important;
-                                                                                        z-index: 0 !important;
                                                                                     }
-                                                                                    header, nav, .navbar, .sticky, .top-0, .bottom-0,
-                                                                                    .shaka-controls-container, .shaka-overflow-menu,
-                                                                                    .shaka-settings-menu, .shaka-context-menu,
-                                                                                    [class*="controls"], [class*="player-controls"],
-                                                                                    [class*="header"], [class*="footer"],
-                                                                                    .splash, .overlay, .modal, [class*="loader"],
-                                                                                    [class*="spinner"], [class*="loading"],
-                                                                                    [data-fullscreen], [class*="fullscreen"] {
+                                                                                    .shaka-controls-container, 
+                                                                                    .shaka-overflow-menu,
+                                                                                    .shaka-settings-menu, 
+                                                                                    .shaka-context-menu,
+                                                                                    [class*="shaka-"][class*="menu"],
+                                                                                    [class*="shaka-"][class*="control"] {
                                                                                         display: none !important;
                                                                                         opacity: 0 !important;
                                                                                         visibility: hidden !important;
-                                                                                        pointer-events: none !important;
                                                                                     }
-                                                                                    iframe { 
+                                                                                    video { 
+                                                                                        width: 100% !important; 
+                                                                                        height: 100% !important; 
+                                                                                        object-fit: contain !important;
+                                                                                    }
+                                                                                `;
+
+                                                                                var style = document.getElementById(cssId);
+                                                                                if (!style) {
+                                                                                    style = document.createElement('style');
+                                                                                    style.id = cssId;
+                                                                                    document.head.appendChild(style);
+                                                                                }
+                                                                                style.textContent = css;
+
+                                                                                var tryShowVideo = function() {
+                                                                                    var videos = document.querySelectorAll('video');
+                                                                                    for (var i = 0; i < videos.length; i++) {
+                                                                                        var v = videos[i];
+                                                                                        v.controls = false;
+                                                                                        v.style.opacity = '1';
+                                                                                        v.style.visibility = 'visible';
+                                                                                        v.style.display = 'block';
+                                                                                        if (v.paused) {
+                                                                                            var p = v.play();
+                                                                                            if (p && p.catch) p.catch(function(){});
+                                                                                        }
+                                                                                    }
+                                                                                    
+                                                                                    var iframes = document.querySelectorAll('iframe');
+                                                                                    for (var j = 0; j < iframes.length; j++) {
+                                                                                        iframes[j].style.width = '100%';
+                                                                                        iframes[j].style.height = '100%';
+                                                                                    }
+                                                                                };
+                                                                                tryShowVideo();
+
+                                                                                if (!window.__zoneShakaUIInstalled) {
+                                                                                    window.__zoneShakaUIInstalled = true;
+                                                                                    var observer = new MutationObserver(function() {
+                                                                                        tryShowVideo();
+                                                                                    });
+                                                                                    observer.observe(document.documentElement, { 
+                                                                                        childList: true, 
+                                                                                        subtree: true, 
+                                                                                        attributes: false 
+                                                                                    });
+                                                                                }
+                                      } catch(e) {}
+                                    })();
+                                    """.trimIndent(),
+                                    null
+                                )
+                            }
+                        }
+
+                        zoneWebView = this
+                        if (zoneDrmStartupUrl.isNotBlank()) {
+                            loadUrl(zoneDrmStartupUrl)
+                            lastLoadedZoneDrmUrl = zoneDrmStartupUrl 
                                                                                         width: 100vw !important; 
                                                                                         height: 100vh !important; 
                                                                                         max-width: 100vw !important; 
@@ -1213,14 +1260,11 @@ fun ExoPlayJetScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(16.dp),
-                contentAlignment = Alignment.BottomCenter
+                contentAlignment = Alignment.TopEnd
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .padding(bottom = 32.dp)
-                        .align(Alignment.BottomCenter)
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(
                         onClick = {
