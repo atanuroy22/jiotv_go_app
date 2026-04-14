@@ -16,6 +16,7 @@ import android.view.WindowInsetsController
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.ImageButton
 import android.widget.ProgressBar
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
@@ -35,6 +36,7 @@ class WebPlayerActivity : ComponentActivity() {
 
     private var webView: WebView? = null
     private var loadingSpinner: ProgressBar? = null
+    private var fullscreenButton: ImageButton? = null
     private var url: String? = null
 
     private var channelNumbers: List<String>? = null
@@ -109,6 +111,16 @@ class WebPlayerActivity : ComponentActivity() {
 
         webView = findViewById(R.id.webview)
         loadingSpinner = findViewById(R.id.loading_spinner)
+        fullscreenButton = findViewById(R.id.fullscreen_button)
+
+        fullscreenButton?.setOnClickListener {
+            try {
+                setupFullScreenMode()
+                webView?.requestFocus()
+                webView?.post { playVideoInFullScreen(webView ?: return@post) }
+            } catch (_: Exception) {
+            }
+        }
 
         setupWebView()
         loadUrl()
@@ -540,6 +552,8 @@ class WebPlayerActivity : ComponentActivity() {
                             containers[i].style.maxWidth = '100vw';
                             containers[i].style.maxHeight = '100vh';
                             containers[i].style.margin = '0 auto';
+                            containers[i].style.position = 'relative';
+                            containers[i].style.zIndex = '2147483646';
                         }
                     } catch (e) {}
                 };
@@ -558,6 +572,8 @@ class WebPlayerActivity : ComponentActivity() {
                         video.style.display = 'block';
                         video.style.opacity = '1';
                         video.style.visibility = 'visible';
+                        video.style.position = 'relative';
+                        video.style.zIndex = '2147483646';
                         video.controls = true;
                         if (video.paused) {
                             var p = video.play();
@@ -565,32 +581,6 @@ class WebPlayerActivity : ComponentActivity() {
                         }
                     }
 
-                    var fsBtn = document.getElementById('zone-fs-btn');
-                    if (!fsBtn) {
-                        fsBtn = document.createElement('button');
-                        fsBtn.id = 'zone-fs-btn';
-                        fsBtn.innerText = '\u26F6';
-                        fsBtn.style.position = 'fixed';
-                        fsBtn.style.right = '18px';
-                        fsBtn.style.bottom = '18px';
-                        fsBtn.style.width = '44px';
-                        fsBtn.style.height = '44px';
-                        fsBtn.style.borderRadius = '22px';
-                        fsBtn.style.border = '1px solid rgba(255,255,255,0.35)';
-                        fsBtn.style.background = 'rgba(0,0,0,0.55)';
-                        fsBtn.style.color = '#fff';
-                        fsBtn.style.fontSize = '20px';
-                        fsBtn.style.zIndex = '2147483647';
-                        fsBtn.style.cursor = 'pointer';
-                        fsBtn.onclick = function() {
-                            try {
-                                var target = video || document.documentElement;
-                                if (target.requestFullscreen) target.requestFullscreen();
-                                else if (target.webkitRequestFullscreen) target.webkitRequestFullscreen();
-                            } catch (e) {}
-                        };
-                        document.body.appendChild(fsBtn);
-                    }
                     return true;
                 };
 
