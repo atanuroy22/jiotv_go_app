@@ -473,7 +473,10 @@ class WebPlayerActivity : ComponentActivity() {
 
         override fun onPageFinished(view: WebView, url: String) {
             loadingSpinner!!.visibility = View.GONE
-            if (url.contains("/player/")) {
+            val isPlayerLikeUrl = url.contains("/player/") ||
+                    url.contains("/mpd/", ignoreCase = true) ||
+                    url.contains(".mpd", ignoreCase = true)
+            if (isPlayerLikeUrl) {
                 Log.d(TAG, "Playing: $url")
                 setupFullScreenMode()
                 playVideoInFullScreen(view)
@@ -503,19 +506,68 @@ class WebPlayerActivity : ComponentActivity() {
         }
 
         fun playVideoInFullScreen(view: WebView) {
-            val width = "100vw"
-            val height = "auto"
-            val objectFit = "contain"
-
             val script = """
         javascript:(function() {
             try {
-                var video = document.getElementsByTagName('video')[0];
+                var html = document.documentElement;
+                var body = document.body;
+                if (html) {
+                    html.style.width = '100%';
+                    html.style.height = '100%';
+                    html.style.margin = '0';
+                    html.style.padding = '0';
+                    html.style.background = 'black';
+                    html.style.overflow = 'hidden';
+                }
+                if (body) {
+                    body.style.width = '100%';
+                    body.style.height = '100%';
+                    body.style.margin = '0';
+                    body.style.padding = '0';
+                    body.style.background = 'black';
+                    body.style.display = 'flex';
+                    body.style.alignItems = 'center';
+                    body.style.justifyContent = 'center';
+                    body.style.overflow = 'hidden';
+                }
+
+                var video = document.querySelector('video');
                 if (video) {
-                    video.style.width = '$width';
-                    video.style.height = '$height';
-                    video.style.objectFit = '$objectFit';
+                    video.style.width = '100vw';
+                    video.style.height = '100vh';
+                    video.style.maxWidth = '100vw';
+                    video.style.maxHeight = '100vh';
+                    video.style.objectFit = 'contain';
+                    video.style.display = 'block';
+                    video.controls = true;
                     video.play();
+
+                    var fsBtn = document.getElementById('zone-fs-btn');
+                    if (!fsBtn) {
+                        fsBtn = document.createElement('button');
+                        fsBtn.id = 'zone-fs-btn';
+                        fsBtn.innerText = '\u26F6';
+                        fsBtn.style.position = 'fixed';
+                        fsBtn.style.right = '18px';
+                        fsBtn.style.bottom = '18px';
+                        fsBtn.style.width = '44px';
+                        fsBtn.style.height = '44px';
+                        fsBtn.style.borderRadius = '22px';
+                        fsBtn.style.border = '1px solid rgba(255,255,255,0.35)';
+                        fsBtn.style.background = 'rgba(0,0,0,0.55)';
+                        fsBtn.style.color = '#fff';
+                        fsBtn.style.fontSize = '20px';
+                        fsBtn.style.zIndex = '2147483647';
+                        fsBtn.style.cursor = 'pointer';
+                        fsBtn.onclick = function() {
+                            try {
+                                var target = video || document.documentElement;
+                                if (target.requestFullscreen) target.requestFullscreen();
+                                else if (target.webkitRequestFullscreen) target.webkitRequestFullscreen();
+                            } catch (e) {}
+                        };
+                        document.body.appendChild(fsBtn);
+                    }
                 } else {
                     console.error('No video element found');
                 }

@@ -182,12 +182,13 @@ fun ExoPlayJetScreen(
     val normalizedActiveUrl = remember(activeUrlRaw, currentIndex, channelList, videoUrl) {
         normalizePlaybackUrl(context, activeUrlRaw)
     }
-    val useZoneDrmWebPlayer = remember(normalizedActiveUrl) {
-        isLikelyDrmRoute(normalizedActiveUrl)
+    val useZoneDrmWebPlayer = remember(activeUrlRaw, normalizedActiveUrl) {
+        // Detect DRM from raw URL first; normalization can transform /play/ into /live/*.m3u8.
+        isLikelyDrmRoute(activeUrlRaw) || isLikelyDrmRoute(normalizedActiveUrl)
     }
-    val zoneDrmStartupUrl = remember(normalizedActiveUrl, localPORT, preferenceManager.myPrefs.filterQX) {
+    val zoneDrmStartupUrl = remember(activeUrlRaw, localPORT, preferenceManager.myPrefs.filterQX) {
         toZoneDrmUrl(
-            inputUrl = normalizedActiveUrl,
+            inputUrl = activeUrlRaw,
             localPort = localPORT,
             quality = preferenceManager.myPrefs.filterQX
         )
@@ -389,7 +390,8 @@ fun ExoPlayJetScreen(
                 return@LaunchedEffect
             }
 
-            if (isLikelyDrmRoute(currentUrl)) {
+            val isDrmRoute = isLikelyDrmRoute(currentUrlRaw) || isLikelyDrmRoute(currentUrl)
+            if (isDrmRoute) {
                 // DRM channels are rendered in embedded Shaka WebView to keep Zone UI shell.
                 try {
                     exoPlayer.stop()
@@ -1240,7 +1242,8 @@ fun ExoPlayJetScreen(
             val rawUrl = channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
             val url = normalizePlaybackUrl(context, rawUrl)
             if (url.isBlank()) return@LaunchedEffect
-            if (isLikelyDrmRoute(url)) return@LaunchedEffect
+            val isDrmRoute = isLikelyDrmRoute(rawUrl) || isLikelyDrmRoute(url)
+            if (isDrmRoute) return@LaunchedEffect
             val mediaItem = buildMediaItemForPlaybackUrl(url)
             exoPlayer.setMediaItem(mediaItem)
             exoPlayer.prepare()
