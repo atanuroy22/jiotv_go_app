@@ -770,92 +770,19 @@ fun ExoPlayJetScreen(
 
                             override fun onPageFinished(view: WebView, url: String) {
                                 isWebLoading = false
-                                                                // Keep Shaka controls and force centered video layout.
+                                // Do not force DOM/CSS in Shaka pages; aggressive overrides can hide video while audio continues.
                                 view.evaluateJavascript(
                                     """
                                     (function() {
                                       try {
-                                                                                var cssId = 'zone-shaka-layout-fix';
-                                                                                var css = `
-                                                                                    body, html {
-                                                                                        background: black !important; 
-                                                                                        overflow: hidden !important; 
-                                                                                        width: 100% !important;
-                                                                                        height: 100% !important;
-                                                                                        margin: 0 !important;
-                                                                                        padding: 0 !important;
-                                                                                    }
-                                                                                    .shaka-video-container,
-                                                                                    .shaka-player-container,
-                                                                                    .player,
-                                                                                    .video-container,
-                                                                                    iframe {
-                                                                                        width: 100% !important;
-                                                                                        height: 100% !important;
-                                                                                        max-width: 100% !important;
-                                                                                        max-height: 100% !important;
-                                                                                        margin: 0 !important;
-                                                                                        padding: 0 !important;
-                                                                                    }
-                                                                                    video { 
-                                                                                        width: 100% !important; 
-                                                                                        height: 100% !important; 
-                                                                                        max-width: 100% !important;
-                                                                                        max-height: 100% !important;
-                                                                                        object-fit: contain !important;
-                                                                                        display: block !important;
-                                                                                        margin: 0 auto !important;
-                                                                                        opacity: 1 !important;
-                                                                                        visibility: visible !important;
-                                                                                        background: black !important;
-                                                                                    }
-                                                                                `;
-
-                                                                                var style = document.getElementById(cssId);
-                                                                                if (!style) {
-                                                                                    style = document.createElement('style');
-                                                                                    style.id = cssId;
-                                                                                    document.head.appendChild(style);
-                                                                                }
-                                                                                style.textContent = css;
-
-                                                                                var tryShowVideo = function() {
-                                                                                    var videos = document.querySelectorAll('video');
-                                                                                    for (var i = 0; i < videos.length; i++) {
-                                                                                        var v = videos[i];
-                                                                                        v.style.width = '100%';
-                                                                                        v.style.height = '100%';
-                                                                                        v.style.maxWidth = '100%';
-                                                                                        v.style.maxHeight = '100%';
-                                                                                        v.style.objectFit = 'contain';
-                                                                                        v.style.opacity = '1';
-                                                                                        v.style.visibility = 'visible';
-                                                                                        v.style.display = 'block';
-                                                                                    }
-                                                                                    
-                                                                                    var iframes = document.querySelectorAll('iframe');
-                                                                                    for (var j = 0; j < iframes.length; j++) {
-                                                                                        iframes[j].style.width = '100%';
-                                                                                        iframes[j].style.height = '100%';
-                                                                                        iframes[j].style.maxWidth = '100%';
-                                                                                        iframes[j].style.maxHeight = '100%';
-                                                                                        iframes[j].style.margin = '0';
-                                                                                    }
-                                                                                };
-                                                                                tryShowVideo();
-
-                                                                                if (!window.__zoneShakaUIInstalled) {
-                                                                                    window.__zoneShakaUIInstalled = true;
-                                                                                    var observer = new MutationObserver(function() {
-                                                                                        tryShowVideo();
-                                                                                    });
-                                                                                    observer.observe(document.documentElement, { 
-                                                                                        childList: true, 
-                                                                                        subtree: true, 
-                                                                                        attributes: false 
-                                                                                    });
-                                                                                }
-                                      } catch(e) {}
+                                        var ids = ['zone-shaka-layout-fix', 'zone-shaka-hide-ui', 'zone-shell-hide-ui'];
+                                        for (var i = 0; i < ids.length; i++) {
+                                          var el = document.getElementById(ids[i]);
+                                          if (el && el.parentNode) el.parentNode.removeChild(el);
+                                        }
+                                        window.__zoneShakaUIInstalled = false;
+                                        window.__zoneShellUiObserverInstalled = false;
+                                      } catch (e) {}
                                     })();
                                     """.trimIndent(),
                                     null
