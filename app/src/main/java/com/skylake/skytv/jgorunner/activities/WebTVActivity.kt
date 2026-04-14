@@ -533,7 +533,7 @@ class WebPlayerActivity : ComponentActivity() {
 
                 var ensureLayout = function() {
                     try {
-                        var containers = document.querySelectorAll('iframe, .player, .shaka-video-container, .video-container');
+                        var containers = document.querySelectorAll('iframe, .player, .shaka-video-container, .video-container, .shaka-player-container');
                         for (var i = 0; i < containers.length; i++) {
                             containers[i].style.width = '100vw';
                             containers[i].style.height = '100vh';
@@ -546,18 +546,23 @@ class WebPlayerActivity : ComponentActivity() {
                 ensureLayout();
 
                 var ensureVideo = function() {
-                    var video = document.querySelector('video');
-                    if (!video) return false;
-                    video.style.width = '100vw';
-                    video.style.height = '100vh';
-                    video.style.maxWidth = '100vw';
-                    video.style.maxHeight = '100vh';
-                    video.style.objectFit = 'contain';
-                    video.style.display = 'block';
-                    video.controls = true;
-                    if (video.paused) {
-                        var p = video.play();
-                        if (p && p.catch) p.catch(function(){});
+                    var videos = document.querySelectorAll('video');
+                    if (!videos || !videos.length) return false;
+                    for (var i = 0; i < videos.length; i++) {
+                        var video = videos[i];
+                        video.style.width = '100vw';
+                        video.style.height = '100vh';
+                        video.style.maxWidth = '100vw';
+                        video.style.maxHeight = '100vh';
+                        video.style.objectFit = 'contain';
+                        video.style.display = 'block';
+                        video.style.opacity = '1';
+                        video.style.visibility = 'visible';
+                        video.controls = true;
+                        if (video.paused) {
+                            var p = video.play();
+                            if (p && p.catch) p.catch(function(){});
+                        }
                     }
 
                     var fsBtn = document.getElementById('zone-fs-btn');

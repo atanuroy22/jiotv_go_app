@@ -49,6 +49,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesomeMotion
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularWavyProgressIndicator
@@ -789,7 +791,7 @@ fun ExoPlayJetScreen(
                                                                                     }
                                                                                     body, html { background: black !important; overflow: hidden !important; width: 100% !important; height: 100% !important; margin: 0 !important; }
                                                                                     iframe, .player, .shaka-video-container { width: 100vw !important; height: 100vh !important; max-width: 100vw !important; max-height: 100vh !important; margin: 0 auto !important; }
-                                                                                    video { width: 100vw !important; height: 100vh !important; object-fit: contain !important; }
+                                                                                    video, canvas { width: 100vw !important; height: 100vh !important; max-width: 100vw !important; max-height: 100vh !important; object-fit: contain !important; opacity: 1 !important; visibility: visible !important; }
                                                                                 `;
 
                                                                                 var style = document.getElementById(cssId);
@@ -801,20 +803,28 @@ fun ExoPlayJetScreen(
                                                                                 style.textContent = css;
 
                                                                                 var tryPlayAndCenter = function() {
-                                                                                    var v = document.querySelector('video');
-                                                                                    if (!v) return;
-                                                                                    v.controls = false;
-                                                                                    v.style.width = '100vw';
-                                                                                    v.style.height = '100vh';
-                                                                                    v.style.maxWidth = '100vw';
-                                                                                    v.style.maxHeight = '100vh';
-                                                                                    v.style.objectFit = 'contain';
-                                                                                    v.muted = true;
-                                                                                    var p = v.play();
-                                                                                    if (p && p.then) {
-                                                                                        p.then(function() {
-                                                                                            setTimeout(function() { v.muted = false; }, 300);
-                                                                                        }).catch(function() {});
+                                                                                    var videos = document.querySelectorAll('video');
+                                                                                    if (!videos || !videos.length) return;
+                                                                                    for (var i = 0; i < videos.length; i++) {
+                                                                                        var v = videos[i];
+                                                                                        v.controls = false;
+                                                                                        v.style.width = '100vw';
+                                                                                        v.style.height = '100vh';
+                                                                                        v.style.maxWidth = '100vw';
+                                                                                        v.style.maxHeight = '100vh';
+                                                                                        v.style.objectFit = 'contain';
+                                                                                        v.style.opacity = '1';
+                                                                                        v.style.visibility = 'visible';
+                                                                                        v.style.display = 'block';
+                                                                                        v.muted = true;
+                                                                                        var p = v.play();
+                                                                                        if (p && p.then) {
+                                                                                            (function(videoRef) {
+                                                                                                p.then(function() {
+                                                                                                    setTimeout(function() { videoRef.muted = false; }, 300);
+                                                                                                }).catch(function() {});
+                                                                                            })(v);
+                                                                                        }
                                                                                     }
                                                                                 };
                                                                                 tryPlayAndCenter();
@@ -822,18 +832,29 @@ fun ExoPlayJetScreen(
                                                                                 if (!window.__zoneShellUiObserverInstalled) {
                                                                                     window.__zoneShellUiObserverInstalled = true;
                                                                                     var applyHide = function() {
-                                                                                        var vv = document.querySelector('video');
-                                                                                        if (vv) {
+                                                                                        var vids = document.querySelectorAll('video');
+                                                                                        for (var i = 0; i < vids.length; i++) {
+                                                                                            var vv = vids[i];
                                                                                             vv.controls = false;
                                                                                             vv.style.width = '100vw';
                                                                                             vv.style.height = '100vh';
                                                                                             vv.style.maxWidth = '100vw';
                                                                                             vv.style.maxHeight = '100vh';
                                                                                             vv.style.objectFit = 'contain';
+                                                                                            vv.style.opacity = '1';
+                                                                                            vv.style.visibility = 'visible';
+                                                                                            vv.style.display = 'block';
                                                                                             if (vv.paused) {
                                                                                                 var pp = vv.play();
                                                                                                 if (pp && pp.catch) pp.catch(function(){});
                                                                                             }
+                                                                                        }
+                                                                                        var iframes = document.querySelectorAll('iframe');
+                                                                                        for (var j = 0; j < iframes.length; j++) {
+                                                                                            iframes[j].style.width = '100vw';
+                                                                                            iframes[j].style.height = '100vh';
+                                                                                            iframes[j].style.maxWidth = '100vw';
+                                                                                            iframes[j].style.maxHeight = '100vh';
                                                                                         }
                                                                                     };
                                                                                     var obs = new MutationObserver(applyHide);
@@ -1080,6 +1101,54 @@ fun ExoPlayJetScreen(
                     gapSize = 8.dp,
                     amplitude = 0.75f,
                 )
+            }
+        }
+
+        if (useZoneDrmWebPlayer) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                contentAlignment = Alignment.TopEnd
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = {
+                            zoneWebView?.evaluateJavascript(
+                                """
+                                (function() {
+                                  var v = document.querySelector('video');
+                                  if (!v) return;
+                                  if (v.paused) { v.play(); } else { v.pause(); }
+                                })();
+                                """.trimIndent(),
+                                null
+                            )
+                        }
+                    ) {
+                        Icon(
+                            imageVector = if (isWebLoading) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+                            contentDescription = "Play/Pause",
+                            tint = Color.White.copy(alpha = 0.9f)
+                        )
+                    }
+
+                    IconButton(
+                        onClick = {
+                            showChannelPanel = channelList != null && !showChannelPanel
+                            panelSelectedIndex = currentIndex.coerceAtLeast(0)
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.AutoAwesomeMotion,
+                            contentDescription = "Channels",
+                            tint = Color.White.copy(alpha = 0.9f)
+                        )
+                    }
+                }
             }
         }
 
