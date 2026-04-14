@@ -55,10 +55,6 @@ class ExoPlayJet : ComponentActivity() {
         applyIntent(intent)
         maybeLoadChannelListAsync(intent)
 
-        if (maybeRouteToWebDrmPlayer()) {
-            return
-        }
-
         applyImmersive(this)
 
         setContent {
@@ -129,8 +125,6 @@ class ExoPlayJet : ComponentActivity() {
             applyIntent(intent)
             maybeLoadChannelListAsync(intent)
         }
-
-        maybeRouteToWebDrmPlayer()
     }
 
     private fun maybeRouteToWebDrmPlayer(): Boolean {

@@ -12,6 +12,11 @@ import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.ConsoleMessage
+import android.webkit.PermissionRequest
+import android.webkit.WebChromeClient
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.Toast
@@ -170,6 +175,23 @@ fun ExoPlayJetScreen(
     val scope = rememberCoroutineScope()
     var numericJob: Job? by remember { mutableStateOf(null) }
     var isControllerVisible by remember { mutableStateOf(false) }
+    var zoneWebView: WebView? by remember { mutableStateOf(null) }
+    var isWebLoading by remember { mutableStateOf(false) }
+
+    val activeUrlRaw = overrideVideoUrl ?: channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
+    val normalizedActiveUrl = remember(activeUrlRaw, currentIndex, channelList, videoUrl) {
+        normalizePlaybackUrl(context, activeUrlRaw)
+    }
+    val useZoneDrmWebPlayer = remember(normalizedActiveUrl) {
+        isLikelyDrmRoute(normalizedActiveUrl)
+    }
+    val zoneDrmStartupUrl = remember(normalizedActiveUrl, localPORT, preferenceManager.myPrefs.filterQX) {
+        toZoneDrmUrl(
+            inputUrl = normalizedActiveUrl,
+            localPort = localPORT,
+            quality = preferenceManager.myPrefs.filterQX
+        )
+    }
 
 
     // Keep local state in sync when a new intent provides a different index.
@@ -258,9 +280,21 @@ fun ExoPlayJetScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_RESUME -> exoPlayer.playWhenReady = true
-                Lifecycle.Event.ON_PAUSE -> if (!PlayerCommandBus.isInPipMode && !PlayerCommandBus.isEnteringPip) exoPlayer.playWhenReady =
-                    false
+                Lifecycle.Event.ON_RESUME -> {
+                    if (useZoneDrmWebPlayer) {
+                        zoneWebView?.onResume()
+                    } else {
+                        exoPlayer.playWhenReady = true
+                    }
+                }
+
+                Lifecycle.Event.ON_PAUSE -> if (!PlayerCommandBus.isInPipMode && !PlayerCommandBus.isEnteringPip) {
+                    if (useZoneDrmWebPlayer) {
+                        zoneWebView?.onPause()
+                    } else {
+                        exoPlayer.playWhenReady = false
+                    }
+                }
 
                 Lifecycle.Event.ON_DESTROY -> {
                     // Do not release here — onDispose always runs and is the
@@ -279,6 +313,10 @@ fun ExoPlayJetScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            try {
+                zoneWebView?.destroy()
+            } catch (_: Exception) {
+            }
             cleanupPlaybackLogic(exoPlayer)  // remove listener ref before release → no leak
             exoPlayer.release()
         }
@@ -351,6 +389,23 @@ fun ExoPlayJetScreen(
                 return@LaunchedEffect
             }
 
+            if (isLikelyDrmRoute(currentUrl)) {
+                // DRM channels are rendered in embedded Shaka WebView to keep Zone UI shell.
+                try {
+                    exoPlayer.stop()
+                    exoPlayer.clearMediaItems()
+                    exoPlayer.playWhenReady = false
+                } catch (_: Exception) {
+                }
+
+                if (!PlayerCommandBus.isInPipMode) {
+                    showChannelOverlay = true
+                    delay(overlayDisplayTimeMs.toLong())
+                    showChannelOverlay = false
+                }
+                return@LaunchedEffect
+            }
+
             val mediaItem = buildMediaItemForPlaybackUrl(currentUrl)
             exoPlayer.setMediaItem(mediaItem)
             exoPlayer.prepare()
@@ -380,7 +435,20 @@ fun ExoPlayJetScreen(
         PlayerCommandBus.setHandlers(
             playPause = {
                 try {
-                    exoPlayer.playWhenReady = !exoPlayer.playWhenReady
+                    if (useZoneDrmWebPlayer) {
+                        zoneWebView?.evaluateJavascript(
+                            """
+                            (function() {
+                              var v = document.querySelector('video');
+                              if (!v) return;
+                              if (v.paused) { v.play(); } else { v.pause(); }
+                            })();
+                            """.trimIndent(),
+                            null
+                        )
+                    } else {
+                        exoPlayer.playWhenReady = !exoPlayer.playWhenReady
+                    }
                 } finally {
                     PlayerCommandBus.notifyStateChanged()
                     // Some launchers refresh PiP actions a tick later; send a follow-up update
@@ -411,13 +479,17 @@ fun ExoPlayJetScreen(
                 }
             },
             // Use ExoPlayer.isPlaying so PiP icon matches actual playback (pause shows Play icon, play shows Pause icon)
-            isPlaying = { exoPlayer.isPlaying }
+            isPlaying = { if (useZoneDrmWebPlayer) true else exoPlayer.isPlaying }
         )
         PlayerCommandBus.setOnStopPlayback {
             try {
-                exoPlayer.stop()
-                exoPlayer.clearMediaItems()
-                exoPlayer.playWhenReady = false
+                if (useZoneDrmWebPlayer) {
+                    zoneWebView?.onPause()
+                } else {
+                    exoPlayer.stop()
+                    exoPlayer.clearMediaItems()
+                    exoPlayer.playWhenReady = false
+                }
             } catch (_: Exception) {
             }
         }
@@ -587,6 +659,9 @@ fun ExoPlayJetScreen(
                     if (isControllerVisible) {
                         return@onPreviewKeyEvent false
                     } else {
+                        if (useZoneDrmWebPlayer) {
+                            return@onPreviewKeyEvent false
+                        }
                         val androidKeyEvent = android.view.KeyEvent(
                             android.view.KeyEvent.ACTION_UP,
                             android.view.KeyEvent.KEYCODE_DPAD_CENTER
@@ -643,7 +718,134 @@ fun ExoPlayJetScreen(
             else -> videoAspect
         }
 
-        AndroidView(
+        if (useZoneDrmWebPlayer) {
+            AndroidView(
+                factory = {
+                    WebView(it).apply {
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.mediaPlaybackRequiresUserGesture = false
+                        settings.loadWithOverviewMode = true
+                        settings.useWideViewPort = true
+                        settings.defaultTextEncodingName = "utf-8"
+                        settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                        setLayerType(View.LAYER_TYPE_HARDWARE, null)
+                        isLongClickable = false
+                        isHapticFeedbackEnabled = false
+                        setOnLongClickListener { true }
+                        // Keep interaction model consistent: Zone overlays/keys drive controls.
+                        setOnTouchListener { _, _ -> true }
+
+                        webChromeClient = object : WebChromeClient() {
+                            override fun onPermissionRequest(request: PermissionRequest?) {
+                                if (request == null) return
+                                (context as? Activity)?.runOnUiThread {
+                                    try {
+                                        request.grant(request.resources)
+                                    } catch (_: Exception) {
+                                        request.deny()
+                                    }
+                                }
+                            }
+
+                            override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
+                                if (consoleMessage.messageLevel() == ConsoleMessage.MessageLevel.ERROR ||
+                                    consoleMessage.message().contains("drm", ignoreCase = true) ||
+                                    consoleMessage.message().contains("widevine", ignoreCase = true)
+                                ) {
+                                    Log.e(
+                                        TAG,
+                                        "ZoneWeb ${consoleMessage.messageLevel()}: ${consoleMessage.message()} @${consoleMessage.sourceId()}:${consoleMessage.lineNumber()}"
+                                    )
+                                }
+                                return super.onConsoleMessage(consoleMessage)
+                            }
+                        }
+
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
+                                isWebLoading = true
+                            }
+
+                            override fun onPageFinished(view: WebView, url: String) {
+                                isWebLoading = false
+                                                                // Hard-hide page/chrome/shaka controls to keep a Zone-like shell UI.
+                                view.evaluateJavascript(
+                                    """
+                                    (function() {
+                                      try {
+                                                                                var cssId = 'zone-shell-hide-ui';
+                                                                                var css = `
+                                                                                    header, nav, .navbar, .sticky, .top-0, .bottom-0,
+                                                                                    .shaka-controls-container, .shaka-overflow-menu,
+                                                                                    .shaka-settings-menu, .shaka-context-menu,
+                                                                                    [class*="controls"], [class*="player-controls"],
+                                                                                    [class*="header"], [class*="footer"] {
+                                                                                        display: none !important;
+                                                                                        opacity: 0 !important;
+                                                                                        visibility: hidden !important;
+                                                                                        pointer-events: none !important;
+                                                                                    }
+                                                                                    body, html { background: black !important; overflow: hidden !important; }
+                                                                                    video { width: 100vw !important; height: 100vh !important; object-fit: contain !important; }
+                                                                                `;
+
+                                                                                var style = document.getElementById(cssId);
+                                                                                if (!style) {
+                                                                                    style = document.createElement('style');
+                                                                                    style.id = cssId;
+                                                                                    document.head.appendChild(style);
+                                                                                }
+                                                                                style.textContent = css;
+
+                                                                                var v = document.querySelector('video');
+                                                                                if (v) {
+                                                                                    v.controls = false;
+                                                                                    var p = v.play();
+                                                                                    if (p && p.catch) p.catch(function(){});
+                                                                                }
+
+                                                                                if (!window.__zoneShellUiObserverInstalled) {
+                                                                                    window.__zoneShellUiObserverInstalled = true;
+                                                                                    var applyHide = function() {
+                                                                                        var vv = document.querySelector('video');
+                                                                                        if (vv) {
+                                                                                            vv.controls = false;
+                                                                                            vv.style.width = '100vw';
+                                                                                            vv.style.height = '100vh';
+                                                                                            vv.style.objectFit = 'contain';
+                                                                                        }
+                                                                                    };
+                                                                                    var obs = new MutationObserver(applyHide);
+                                                                                    obs.observe(document.documentElement || document.body, { childList: true, subtree: true, attributes: true });
+                                                                                    setInterval(applyHide, 1200);
+                                                                                }
+                                      } catch(e) {}
+                                    })();
+                                    """.trimIndent(),
+                                    null
+                                )
+                            }
+                        }
+
+                        zoneWebView = this
+                        if (zoneDrmStartupUrl.isNotBlank()) {
+                            loadUrl(zoneDrmStartupUrl)
+                        }
+                    }
+                },
+                update = { webView ->
+                    zoneWebView = webView
+                    val current = webView.url.orEmpty()
+                    if (zoneDrmStartupUrl.isNotBlank() && current != zoneDrmStartupUrl) {
+                        webView.loadUrl(zoneDrmStartupUrl)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .align(Alignment.Center)
+            )
+        } else AndroidView(
             factory = {
                 PlayerView(it).apply {
                     useController = true
@@ -846,7 +1048,7 @@ fun ExoPlayJetScreen(
             }
         )
 
-        if (isBuffering) {
+        if ((isBuffering && !useZoneDrmWebPlayer) || (isWebLoading && useZoneDrmWebPlayer)) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -921,7 +1123,7 @@ fun ExoPlayJetScreen(
             }
         }
 
-        if (!PlayerCommandBus.isInPipMode && isControllerVisible) {
+        if (!PlayerCommandBus.isInPipMode && isControllerVisible && !useZoneDrmWebPlayer) {
             IconButton(
                 onClick = {
                     panelSelectedIndex = currentIndex
@@ -1038,6 +1240,7 @@ fun ExoPlayJetScreen(
             val rawUrl = channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
             val url = normalizePlaybackUrl(context, rawUrl)
             if (url.isBlank()) return@LaunchedEffect
+            if (isLikelyDrmRoute(url)) return@LaunchedEffect
             val mediaItem = buildMediaItemForPlaybackUrl(url)
             exoPlayer.setMediaItem(mediaItem)
             exoPlayer.prepare()
@@ -1251,6 +1454,31 @@ private fun inferPlaybackMimeType(url: String): String? {
         cleaned.contains("localhost") && !cleaned.substringAfterLast("/").contains(".") -> MimeTypes.APPLICATION_M3U8
         else -> null
     }
+}
+
+private fun isLikelyDrmRoute(url: String): Boolean {
+    val u = url.lowercase()
+    return u.contains("/play/") ||
+            u.contains("/mpd/") ||
+            u.contains(".mpd") ||
+            u.contains("widevine") ||
+            u.contains("render.dash")
+}
+
+private fun toZoneDrmUrl(inputUrl: String, localPort: Int, quality: String?): String {
+    val cleaned = inputUrl.trim()
+    if (cleaned.isBlank()) return cleaned
+    if (cleaned.contains("/mpd/", ignoreCase = true) || cleaned.contains(".mpd", ignoreCase = true)) {
+        return cleaned
+    }
+
+    val playRegex = Regex(".*/play/(\\d+)(?:[/?].*)?$")
+    val match = playRegex.find(cleaned) ?: return cleaned
+    val id = match.groupValues.getOrNull(1).orEmpty()
+    if (id.isBlank()) return cleaned
+
+    val q = quality?.takeIf { it.isNotBlank() } ?: "high"
+    return "http://localhost:$localPort/mpd/$id?q=$q&pm=hd"
 }
 
 @UnstableApi
