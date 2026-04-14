@@ -479,11 +479,66 @@ class WebPlayerActivity : ComponentActivity() {
             if (isPlayerLikeUrl) {
                 Log.d(TAG, "Playing: $url")
                 setupFullScreenMode()
+                centerPlayerInWebUi(view)
             } else {
                 moveSearchInput(view)
                 extractChannelNumbers()
                 loadRecentChannels()
             }
+        }
+
+        fun centerPlayerInWebUi(view: WebView) {
+            view.evaluateJavascript(
+                """
+                (function() {
+                    try {
+                        var cssId = 'webui-shaka-center';
+                        var css = `
+                            html, body {
+                                width: 100% !important;
+                                height: 100% !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                                background: black !important;
+                                overflow: hidden !important;
+                                display: flex !important;
+                                align-items: center !important;
+                                justify-content: center !important;
+                            }
+                            .shaka-video-container,
+                            .shaka-player-container,
+                            .player,
+                            .video-container,
+                            iframe {
+                                width: 100% !important;
+                                height: 100% !important;
+                                max-width: 100% !important;
+                                max-height: 100% !important;
+                                margin: 0 auto !important;
+                            }
+                            video {
+                                width: 100% !important;
+                                height: 100% !important;
+                                max-width: 100% !important;
+                                max-height: 100% !important;
+                                object-fit: contain !important;
+                                display: block !important;
+                                margin: auto !important;
+                            }
+                        `;
+
+                        var style = document.getElementById(cssId);
+                        if (!style) {
+                            style = document.createElement('style');
+                            style.id = cssId;
+                            document.head.appendChild(style);
+                        }
+                        style.textContent = css;
+                    } catch (e) {}
+                })();
+                """.trimIndent(),
+                null
+            )
         }
 
         fun extractChannelNumbers() {

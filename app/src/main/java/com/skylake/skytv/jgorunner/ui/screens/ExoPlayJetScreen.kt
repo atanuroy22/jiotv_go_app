@@ -49,8 +49,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesomeMotion
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularWavyProgressIndicator
@@ -772,31 +770,43 @@ fun ExoPlayJetScreen(
 
                             override fun onPageFinished(view: WebView, url: String) {
                                 isWebLoading = false
-                                                                // Hide Shaka UI but keep video layer visible
+                                                                // Keep Shaka controls and force centered video layout.
                                 view.evaluateJavascript(
                                     """
                                     (function() {
                                       try {
                                                                                 var cssId = 'zone-shaka-hide-ui';
                                                                                 var css = `
-                                                                                    body, html { 
+                                                                                    body, html {
                                                                                         background: black !important; 
                                                                                         overflow: hidden !important; 
+                                                                                        width: 100% !important;
+                                                                                        height: 100% !important;
+                                                                                        margin: 0 !important;
+                                                                                        padding: 0 !important;
+                                                                                        display: flex !important;
+                                                                                        align-items: center !important;
+                                                                                        justify-content: center !important;
                                                                                     }
-                                                                                    .shaka-controls-container, 
-                                                                                    .shaka-overflow-menu,
-                                                                                    .shaka-settings-menu, 
-                                                                                    .shaka-context-menu,
-                                                                                    [class*="shaka-"][class*="menu"],
-                                                                                    [class*="shaka-"][class*="control"] {
-                                                                                        display: none !important;
-                                                                                        opacity: 0 !important;
-                                                                                        visibility: hidden !important;
+                                                                                    .shaka-video-container,
+                                                                                    .shaka-player-container,
+                                                                                    .player,
+                                                                                    .video-container,
+                                                                                    iframe {
+                                                                                        width: 100% !important;
+                                                                                        height: 100% !important;
+                                                                                        max-width: 100% !important;
+                                                                                        max-height: 100% !important;
+                                                                                        margin: 0 auto !important;
                                                                                     }
                                                                                     video { 
                                                                                         width: 100% !important; 
                                                                                         height: 100% !important; 
+                                                                                        max-width: 100% !important;
+                                                                                        max-height: 100% !important;
                                                                                         object-fit: contain !important;
+                                                                                        display: block !important;
+                                                                                        margin: auto !important;
                                                                                     }
                                                                                 `;
 
@@ -812,7 +822,11 @@ fun ExoPlayJetScreen(
                                                                                     var videos = document.querySelectorAll('video');
                                                                                     for (var i = 0; i < videos.length; i++) {
                                                                                         var v = videos[i];
-                                                                                        v.controls = false;
+                                                                                        v.style.width = '100%';
+                                                                                        v.style.height = '100%';
+                                                                                        v.style.maxWidth = '100%';
+                                                                                        v.style.maxHeight = '100%';
+                                                                                        v.style.objectFit = 'contain';
                                                                                         v.style.opacity = '1';
                                                                                         v.style.visibility = 'visible';
                                                                                         v.style.display = 'block';
@@ -826,6 +840,9 @@ fun ExoPlayJetScreen(
                                                                                     for (var j = 0; j < iframes.length; j++) {
                                                                                         iframes[j].style.width = '100%';
                                                                                         iframes[j].style.height = '100%';
+                                                                                        iframes[j].style.maxWidth = '100%';
+                                                                                        iframes[j].style.maxHeight = '100%';
+                                                                                        iframes[j].style.margin = '0 auto';
                                                                                     }
                                                                                 };
                                                                                 tryShowVideo();
@@ -1094,27 +1111,6 @@ fun ExoPlayJetScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(
-                        onClick = {
-                            zoneWebView?.evaluateJavascript(
-                                """
-                                (function() {
-                                  var v = document.querySelector('video');
-                                  if (!v) return;
-                                  if (v.paused) { v.play(); } else { v.pause(); }
-                                })();
-                                """.trimIndent(),
-                                null
-                            )
-                        }
-                    ) {
-                        Icon(
-                            imageVector = if (isWebLoading) Icons.Filled.PlayArrow else Icons.Filled.Pause,
-                            contentDescription = "Play/Pause",
-                            tint = Color.White.copy(alpha = 0.9f)
-                        )
-                    }
-
                     IconButton(
                         onClick = {
                             showChannelPanel = channelList != null && !showChannelPanel
