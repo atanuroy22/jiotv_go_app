@@ -194,6 +194,7 @@ fun ExoPlayJetScreen(
     var zoneWebRetryCount by remember { mutableIntStateOf(0) }
     var zoneWebRetryJob: Job? by remember { mutableStateOf(null) }
     var isZoneShakaControllerVisible by remember { mutableStateOf(false) }
+    var suppressNextZoneCenterKeyUp by remember { mutableStateOf(false) }
 
     val activeUrlRaw = overrideVideoUrl ?: channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
     val normalizedActiveUrl = remember(activeUrlRaw, currentIndex, channelList, videoUrl) {
@@ -329,40 +330,119 @@ fun ExoPlayJetScreen(
             webView.isFocusableInTouchMode = true
             webView.requestFocus(View.FOCUS_DOWN)
             webView.dispatchKeyEvent(android.view.KeyEvent(action, keyCode))
-            if (action == android.view.KeyEvent.ACTION_DOWN &&
-                keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER
-            ) {
-                // Fallback: reveal and focus Shaka controls so OK always has a visible target.
-                webView.evaluateJavascript(
-                    """
-                    (function() {
-                      try {
-                        var root = document.querySelector('.shaka-controls-container');
-                        if (root) {
-                          root.classList.remove('shaka-hidden');
-                          root.style.opacity = '1';
-                        }
-                        var candidate = document.querySelector(
-                          '.shaka-controls-container button:not([disabled]), .shaka-play-button-container button:not([disabled]), button.shaka-play-button:not([disabled])'
-                        );
-                        if (candidate) {
-                          candidate.focus();
-                        }
-                        if (window.__zoneNotifyShakaController) {
-                          window.__zoneNotifyShakaController();
-                        }
-                      } catch (e) {}
-                    })();
-                    """.trimIndent(),
-                    null
-                )
-            }
             // Consume DPAD events once routed to web to avoid fall-through into non-web handlers.
             true
         } catch (_: Exception) {
             false
         }
     }
+
+        fun showAndFocusZoneShakaController() {
+                val webView = zoneWebView ?: return
+                webView.evaluateJavascript(
+                        """
+                        (function() {
+                            try {
+                                var root = document.querySelector('.shaka-controls-container');
+                                if (root) {
+                                    root.classList.remove('shaka-hidden');
+                                    root.style.opacity = '1';
+                                }
+
+                                function isVisible(el) {
+                                    if (!el) return false;
+                                    var style = window.getComputedStyle(el);
+                                    if (!style) return false;
+                                    if (style.display === 'none' || style.visibility === 'hidden') return false;
+                                    if (parseFloat(style.opacity || '1') === 0) return false;
+                                    var rect = el.getBoundingClientRect();
+                                    return rect && rect.width > 0 && rect.height > 0;
+                                }
+
+                                function isExitLike(el) {
+                                    var cls = String(el.className || '').toLowerCase();
+                                    var label = String(el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent || '').toLowerCase();
+                                    return cls.indexOf('exit') >= 0 || cls.indexOf('close') >= 0 || label.indexOf('exit') >= 0 || label.indexOf('close') >= 0;
+                                }
+
+                                var active = document.activeElement;
+                                if (active && active.tagName === 'BUTTON' && !active.disabled && isVisible(active) && !isExitLike(active)) {
+                                    if (window.__zoneNotifyShakaController) window.__zoneNotifyShakaController();
+                                    return true;
+                                }
+
+                                var candidates = [];
+                                if (root) {
+                                    candidates = Array.prototype.slice.call(root.querySelectorAll('button:not([disabled])'));
+                                }
+
+                                var preferred = null;
+                                for (var i = 0; i < candidates.length; i++) {
+                                    var el = candidates[i];
+                                    var cls = String(el.className || '').toLowerCase();
+                                    if (!isVisible(el) || isExitLike(el)) continue;
+                                    if (cls.indexOf('play') >= 0 || cls.indexOf('overflow') >= 0 || cls.indexOf('menu') >= 0 || cls.indexOf('mute') >= 0 || cls.indexOf('volume') >= 0) {
+                                        preferred = el;
+                                        break;
+                                    }
+                                }
+
+                                if (!preferred) {
+                                    for (var j = 0; j < candidates.length; j++) {
+                                        if (isVisible(candidates[j]) && !isExitLike(candidates[j])) {
+                                            preferred = candidates[j];
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if (preferred) {
+                                    preferred.focus();
+                                }
+
+                                if (window.__zoneNotifyShakaController) {
+                                    window.__zoneNotifyShakaController();
+                                }
+                                return !!preferred;
+                            } catch (e) {
+                                return false;
+                            }
+                        })();
+                        """.trimIndent(),
+                        null
+                )
+                isZoneShakaControllerVisible = true
+        }
+
+        fun clickFocusedZoneShakaControllerItem() {
+                val webView = zoneWebView ?: return
+                webView.evaluateJavascript(
+                        """
+                        (function() {
+                            try {
+                                function isExitLike(el) {
+                                    var cls = String(el.className || '').toLowerCase();
+                                    var label = String(el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent || '').toLowerCase();
+                                    return cls.indexOf('exit') >= 0 || cls.indexOf('close') >= 0 || label.indexOf('exit') >= 0 || label.indexOf('close') >= 0;
+                                }
+
+                                var active = document.activeElement;
+                                if (active && active.tagName === 'BUTTON' && !active.disabled && !isExitLike(active)) {
+                                    active.click();
+                                    if (window.__zoneNotifyShakaController) window.__zoneNotifyShakaController();
+                                    return true;
+                                }
+
+                                if (window.__zoneNotifyShakaController) window.__zoneNotifyShakaController();
+                                return false;
+                            } catch (e) {
+                                return false;
+                            }
+                        })();
+                        """.trimIndent(),
+                        null
+                )
+        }
 
     fun refreshShakaVisibilityAndOpenChannelPanelIfHidden() {
         val webView = zoneWebView ?: return
@@ -377,7 +457,22 @@ fun ExoPlayJetScreen(
                 if (root.classList.contains('shaka-hidden')) return false;
                 if (style.display === 'none' || style.visibility === 'hidden') return false;
                 if (parseFloat(style.opacity || '1') === 0) return false;
-                return true;
+
+                                function isVisible(el) {
+                                    if (!el) return false;
+                                    var s = window.getComputedStyle(el);
+                                    if (!s) return false;
+                                    if (s.display === 'none' || s.visibility === 'hidden') return false;
+                                    if (parseFloat(s.opacity || '1') === 0) return false;
+                                    var r = el.getBoundingClientRect();
+                                    return r && r.width > 0 && r.height > 0;
+                                }
+
+                                var buttons = Array.prototype.slice.call(root.querySelectorAll('button:not([disabled])'));
+                                for (var i = 0; i < buttons.length; i++) {
+                                    if (isVisible(buttons[i])) return true;
+                                }
+                                return false;
               } catch (e) {
                 return false;
               }
@@ -842,6 +937,25 @@ fun ExoPlayJetScreen(
                 }
 
                 if (useZoneDrmWebPlayer && !showChannelPanel) {
+                    if (isOkKey && event.type == KeyEventType.KeyDown) {
+                        if (!isZoneShakaControllerVisible) {
+                            showAndFocusZoneShakaController()
+                            suppressNextZoneCenterKeyUp = true
+                            return@onPreviewKeyEvent true
+                        }
+                        showAndFocusZoneShakaController()
+                        return@onPreviewKeyEvent true
+                    }
+
+                    if (isOkKey && event.type == KeyEventType.KeyUp) {
+                        if (suppressNextZoneCenterKeyUp) {
+                            suppressNextZoneCenterKeyUp = false
+                            return@onPreviewKeyEvent true
+                        }
+                        clickFocusedZoneShakaControllerItem()
+                        return@onPreviewKeyEvent true
+                    }
+
                     if (event.key == Key.DirectionLeft && event.type == KeyEventType.KeyDown) {
                         if (!isZoneShakaControllerVisible) {
                             panelSelectedIndex = currentIndex
@@ -858,10 +972,7 @@ fun ExoPlayJetScreen(
                         Key.DirectionLeft,
                         Key.DirectionRight,
                         Key.DirectionUp,
-                        Key.DirectionDown,
-                        Key.DirectionCenter,
-                        Key.Enter,
-                        Key.NumPadEnter -> true
+                        Key.DirectionDown -> true
                         else -> false
                     }
                     if (isDpadForWeb && (event.type == KeyEventType.KeyDown || event.type == KeyEventType.KeyUp)) {
