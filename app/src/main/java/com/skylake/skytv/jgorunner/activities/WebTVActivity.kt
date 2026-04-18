@@ -19,6 +19,7 @@ import android.webkit.WebViewClient
 import android.widget.ProgressBar
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.core.view.WindowCompat
 import com.skylake.skytv.jgorunner.R
 import com.skylake.skytv.jgorunner.core.data.JTVConfigurationManager
 import com.skylake.skytv.jgorunner.data.SkySharedPref
@@ -150,13 +151,87 @@ class WebPlayerActivity : ComponentActivity() {
 
     private fun setupFullScreenMode() {
 //        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+                WindowCompat.setDecorFitsSystemWindows(window, false)
         updateSystemUiVisibility()
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         updateSystemUiVisibility() // This maintains full-screen mode in both orientations
+                refreshShakaViewportLayout()
     }
+
+        private fun refreshShakaViewportLayout() {
+                val currentUrl = webView?.url.orEmpty()
+                val isPlayerLikeUrl = currentUrl.contains("/player/") ||
+                                currentUrl.contains("/mpd/", ignoreCase = true) ||
+                                currentUrl.contains(".mpd", ignoreCase = true)
+                if (!isPlayerLikeUrl) return
+
+                webView?.evaluateJavascript(
+                        """
+                        (function() {
+                            try {
+                                var cssId = 'webui-shaka-center';
+                                var css = `
+                                    html, body {
+                                        width: 100% !important;
+                                        height: 100% !important;
+                                        min-height: 100vh !important;
+                                        min-height: 100dvh !important;
+                                        margin: 0 !important;
+                                        padding: 0 !important;
+                                        background: black !important;
+                                        overflow: hidden !important;
+                                    }
+                                    .shaka-video-container,
+                                    .shaka-player-container,
+                                    .player,
+                                    .video-container,
+                                    iframe {
+                                        width: 100% !important;
+                                        height: 100% !important;
+                                        min-height: 100vh !important;
+                                        min-height: 100dvh !important;
+                                        max-width: 100% !important;
+                                        max-height: 100% !important;
+                                        margin: 0 !important;
+                                        padding: 0 !important;
+                                        overflow: hidden !important;
+                                    }
+                                    video {
+                                        width: 100% !important;
+                                        height: 100% !important;
+                                        max-width: 100% !important;
+                                        max-height: 100% !important;
+                                        object-fit: contain !important;
+                                        object-position: center center !important;
+                                        display: block !important;
+                                        margin: 0 auto !important;
+                                        opacity: 1 !important;
+                                        visibility: visible !important;
+                                        background: black !important;
+                                    }
+                                `;
+
+                                var style = document.getElementById(cssId);
+                                if (!style) {
+                                    style = document.createElement('style');
+                                    style.id = cssId;
+                                    document.head.appendChild(style);
+                                }
+                                style.textContent = css;
+
+                                window.dispatchEvent(new Event('resize'));
+                                setTimeout(function() {
+                                    window.dispatchEvent(new Event('resize'));
+                                }, 120);
+                            } catch (e) {}
+                        })();
+                        """.trimIndent(),
+                        null
+                )
+        }
 
 
     private fun updateSystemUiVisibility() {
@@ -501,6 +576,8 @@ class WebPlayerActivity : ComponentActivity() {
                             html, body {
                                 width: 100% !important;
                                 height: 100% !important;
+                                min-height: 100vh !important;
+                                min-height: 100dvh !important;
                                 margin: 0 !important;
                                 padding: 0 !important;
                                 background: black !important;
@@ -513,10 +590,13 @@ class WebPlayerActivity : ComponentActivity() {
                             iframe {
                                 width: 100% !important;
                                 height: 100% !important;
+                                min-height: 100vh !important;
+                                min-height: 100dvh !important;
                                 max-width: 100% !important;
                                 max-height: 100% !important;
                                 margin: 0 !important;
                                 padding: 0 !important;
+                                overflow: hidden !important;
                             }
                             video {
                                 width: 100% !important;
@@ -524,6 +604,7 @@ class WebPlayerActivity : ComponentActivity() {
                                 max-width: 100% !important;
                                 max-height: 100% !important;
                                 object-fit: contain !important;
+                                object-position: center center !important;
                                 display: block !important;
                                 margin: 0 auto !important;
                                 opacity: 1 !important;
@@ -539,6 +620,8 @@ class WebPlayerActivity : ComponentActivity() {
                             document.head.appendChild(style);
                         }
                         style.textContent = css;
+                        window.dispatchEvent(new Event('resize'));
+                        setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 120);
                     } catch (e) {}
                 })();
                 """.trimIndent(),
