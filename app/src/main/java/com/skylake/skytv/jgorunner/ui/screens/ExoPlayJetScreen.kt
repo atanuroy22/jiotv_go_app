@@ -355,21 +355,6 @@ fun ExoPlayJetScreen(
         isZoneShakaControllerVisible = false
     }
 
-        fun scheduleZoneShakaAutoHide() {
-                zoneWebView?.evaluateJavascript(
-                        """
-                        (function() {
-                            try {
-                                if (window.__zoneScheduleShakaAutoHide) {
-                                    window.__zoneScheduleShakaAutoHide();
-                                }
-                            } catch (e) {}
-                        })();
-                        """.trimIndent(),
-                        null
-                )
-        }
-
     fun dispatchDpadToZoneWeb(event: KeyEvent): Boolean {
         val keyCode = when (event.key) {
             Key.DirectionLeft -> android.view.KeyEvent.KEYCODE_DPAD_LEFT
@@ -386,11 +371,7 @@ fun ExoPlayJetScreen(
             else -> return false
         }
 
-        val handled = dispatchAndroidKeyToZoneWeb(action, keyCode)
-        if (handled && event.type == KeyEventType.KeyUp) {
-            scheduleZoneShakaAutoHide()
-        }
-        return handled
+        return dispatchAndroidKeyToZoneWeb(action, keyCode)
     }
 
     val exoPlayer = remember {
@@ -1119,7 +1100,6 @@ fun ExoPlayJetScreen(
                                                                         """
                                                                         (function() {
                                                                             try {
-                                                                                var AUTO_HIDE_MS = 3000;
                                                                                 function controlsVisible() {
                                                                                     var root = document.querySelector('.shaka-controls-container');
                                                                                     if (!root) return false;
@@ -1131,45 +1111,15 @@ fun ExoPlayJetScreen(
                                                                                     return true;
                                                                                 }
 
-                                                                                function clearAutoHideTimer() {
-                                                                                    if (window.__zoneShakaHideTimer) {
-                                                                                        clearTimeout(window.__zoneShakaHideTimer);
-                                                                                        window.__zoneShakaHideTimer = null;
-                                                                                    }
-                                                                                }
-
-                                                                                function hideControllerNow() {
-                                                                                    try {
-                                                                                        var root = document.querySelector('.shaka-controls-container');
-                                                                                        if (root) {
-                                                                                            root.classList.add('shaka-hidden');
-                                                                                        }
-                                                                                    } catch (e) {}
-                                                                                    notify();
-                                                                                }
-
-                                                                                function scheduleAutoHide() {
-                                                                                    clearAutoHideTimer();
-                                                                                    if (!controlsVisible()) return;
-                                                                                    window.__zoneShakaHideTimer = setTimeout(function() {
-                                                                                        hideControllerNow();
-                                                                                    }, AUTO_HIDE_MS);
-                                                                                }
-
                                                                                 function notify() {
                                                                                     var visible = controlsVisible();
                                                                                     if (window.ZoneShakaBridge && window.ZoneShakaBridge.onControllerVisibilityChanged) {
                                                                                         window.ZoneShakaBridge.onControllerVisibilityChanged(visible);
                                                                                     }
-                                                                                    if (visible) {
-                                                                                        scheduleAutoHide();
-                                                                                    } else {
-                                                                                        clearAutoHideTimer();
-                                                                                    }
                                                                                 }
 
                                                                                 window.__zoneNotifyShakaController = notify;
-                                                                                window.__zoneScheduleShakaAutoHide = scheduleAutoHide;
+                                                                                window.__zoneScheduleShakaAutoHide = null;
 
                                                                                 if (!window.__zoneShakaControllerObserverInstalled) {
                                                                                     window.__zoneShakaControllerObserverInstalled = true;
@@ -1185,10 +1135,7 @@ fun ExoPlayJetScreen(
                                                                                     }
                                                                                     ['keydown','keyup','click','focusin','mousemove','touchstart'].forEach(function(evt) {
                                                                                         document.addEventListener(evt, function() {
-                                                                                            setTimeout(function() {
-                                                                                                notify();
-                                                                                                scheduleAutoHide();
-                                                                                            }, 0);
+                                                                                            setTimeout(notify, 0);
                                                                                         }, true);
                                                                                     });
                                                                                 }
@@ -1430,20 +1377,9 @@ fun ExoPlayJetScreen(
                     }
                 }
             },
-            modifier = when {
-                currentResizeMode == RESIZE_MODE_FILL -> Modifier
-                    .fillMaxSize()
-                    .align(Alignment.Center)
-
-                isDefaultMode -> Modifier
-                    .aspectRatio(16f / 9f)
-                    .align(Alignment.Center)
-
-                else -> Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(aspectForModifier)
-                    .align(Alignment.Center)
-            }
+            modifier = Modifier
+                .fillMaxSize()
+                .align(Alignment.Center)
         )
 
         if ((isBuffering && !useZoneDrmWebPlayer) || (isWebLoading && useZoneDrmWebPlayer)) {
