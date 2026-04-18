@@ -515,6 +515,12 @@ fun TvScreenMenu(
 
                 // --- Experimental/Debug Section ---
                 if (preferenceManager.myPrefs.customPlaylistSupport) {
+                    val customUrlFilename = preferenceManager.myPrefs.custURL
+                        ?.substringAfterLast('/')
+                        ?.takeIf { it.isNotBlank() } ?: "Custom Playlist"
+                    val currentPlaylistLabel = if (showPlaylist) "JioTV" else "IPTV"
+                    val switchPlaylistLabel = if (showPlaylist) "Switch to IPTV" else "Switch to JioTV"
+
                     if (!showPlaylist) {
                         Column {
                             Text("Add Channels", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
@@ -532,24 +538,27 @@ fun TvScreenMenu(
                         Spacer(modifier = Modifier.height(8.dp))
                     }
 
-                    // --- Playlist Selection Dropdown ---
-                    var playlistDropdownExpanded by remember { mutableStateOf(false) }
-                    val customUrlFilename = preferenceManager.myPrefs.custURL
-                        ?.substringAfterLast('/')
-                        ?.takeIf { it.isNotBlank() } ?: "Custom Playlist"
-                    val playlistOptions = listOf("JioTVGO", customUrlFilename)
-                    val selectedPlaylistLabel = if (showPlaylist) "JioTVGO" else customUrlFilename
-
-                    DropdownSelection2(
-                        title = "Select Playlist",
-                        options = playlistOptions,
-                        selectedOption = selectedPlaylistLabel,
-                        onOptionSelected = { label ->
-                            showPlaylist = (label == "JioTVGO")
-                        },
-                        expanded = playlistDropdownExpanded,
-                        onExpandChange = { playlistDropdownExpanded = it }
-                    )
+                    Column {
+                        Text("Current Playlist: $currentPlaylistLabel", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        if (!showPlaylist) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "IPTV Source: $customUrlFilename",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedButton(
+                                onClick = { showPlaylist = !showPlaylist },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = MaterialTheme.shapes.medium
+                            ) {
+                                Text(switchPlaylistLabel)
+                            }
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(8.dp))
                 }

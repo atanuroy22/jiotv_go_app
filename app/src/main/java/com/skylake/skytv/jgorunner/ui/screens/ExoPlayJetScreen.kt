@@ -159,6 +159,7 @@ fun ExoPlayJetScreen(
     currentChannelIndex: Int
 ) {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val overlayDisplayTimeMs = 3000
     val localPORT by remember { mutableIntStateOf(preferenceManager.myPrefs.jtvGoServerPort) }
@@ -209,6 +210,25 @@ fun ExoPlayJetScreen(
             quality = preferenceManager.myPrefs.filterQX
         )
     }
+
+        LaunchedEffect(configuration.orientation, useZoneDrmWebPlayer) {
+                if (!useZoneDrmWebPlayer) return@LaunchedEffect
+                delay(140)
+                zoneWebView?.evaluateJavascript(
+                        """
+                        (function() {
+                            try {
+                                if (window.__zoneApplyViewportFix) {
+                                    window.__zoneApplyViewportFix();
+                                }
+                                window.dispatchEvent(new Event('resize'));
+                                setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 140);
+                            } catch (e) {}
+                        })();
+                        """.trimIndent(),
+                        null
+                )
+        }
 
     fun scheduleZoneWebRetry(view: WebView?, failedUrl: String?, reason: String?) {
         val targetUrl = failedUrl?.takeIf { it.isNotBlank() }
@@ -1005,6 +1025,95 @@ fun ExoPlayJetScreen(
                                     """.trimIndent(),
                                     null
                                 )
+
+                                                                view.evaluateJavascript(
+                                                                        """
+                                                                        (function() {
+                                                                            try {
+                                                                                function viewportHeightPx() {
+                                                                                    if (window.visualViewport && window.visualViewport.height) {
+                                                                                        return Math.round(window.visualViewport.height);
+                                                                                    }
+                                                                                    return Math.round(window.innerHeight || document.documentElement.clientHeight || 0);
+                                                                                }
+
+                                                                                function applyViewportFix() {
+                                                                                    var vh = viewportHeightPx();
+                                                                                    if (!vh) return;
+                                                                                    var px = vh + 'px';
+
+                                                                                    var html = document.documentElement;
+                                                                                    var body = document.body;
+                                                                                    if (!html || !body) return;
+
+                                                                                    html.style.height = px;
+                                                                                    html.style.minHeight = px;
+                                                                                    html.style.maxHeight = px;
+                                                                                    html.style.overflow = 'hidden';
+
+                                                                                    body.style.height = px;
+                                                                                    body.style.minHeight = px;
+                                                                                    body.style.maxHeight = px;
+                                                                                    body.style.margin = '0';
+                                                                                    body.style.padding = '0';
+                                                                                    body.style.overflow = 'hidden';
+                                                                                    body.style.background = 'black';
+
+                                                                                    var selectors = [
+                                                                                        '.shaka-video-container',
+                                                                                        '.shaka-player-container',
+                                                                                        '.player',
+                                                                                        '.video-container',
+                                                                                        '#player',
+                                                                                        'main',
+                                                                                        'iframe'
+                                                                                    ];
+                                                                                    selectors.forEach(function(sel) {
+                                                                                        document.querySelectorAll(sel).forEach(function(el) {
+                                                                                            el.style.height = px;
+                                                                                            el.style.minHeight = px;
+                                                                                            el.style.maxHeight = px;
+                                                                                            el.style.width = '100%';
+                                                                                            el.style.maxWidth = '100%';
+                                                                                            el.style.overflow = 'hidden';
+                                                                                        });
+                                                                                    });
+
+                                                                                    var v = document.querySelector('video');
+                                                                                    if (v) {
+                                                                                        v.style.width = '100%';
+                                                                                        v.style.height = '100%';
+                                                                                        v.style.objectFit = 'contain';
+                                                                                        v.style.objectPosition = 'center center';
+                                                                                        v.style.display = 'block';
+                                                                                        v.style.margin = '0 auto';
+                                                                                        v.style.background = 'black';
+                                                                                    }
+                                                                                }
+
+                                                                                window.__zoneApplyViewportFix = applyViewportFix;
+
+                                                                                if (!window.__zoneViewportFixInstalled) {
+                                                                                    window.__zoneViewportFixInstalled = true;
+                                                                                    window.addEventListener('resize', applyViewportFix, true);
+                                                                                    window.addEventListener('orientationchange', function() {
+                                                                                        setTimeout(applyViewportFix, 60);
+                                                                                        setTimeout(applyViewportFix, 220);
+                                                                                    }, true);
+                                                                                    if (window.visualViewport) {
+                                                                                        window.visualViewport.addEventListener('resize', applyViewportFix, true);
+                                                                                        window.visualViewport.addEventListener('scroll', applyViewportFix, true);
+                                                                                    }
+                                                                                }
+
+                                                                                setTimeout(applyViewportFix, 0);
+                                                                                setTimeout(applyViewportFix, 120);
+                                                                                setTimeout(applyViewportFix, 320);
+                                                                            } catch (e) {}
+                                                                        })();
+                                                                        """.trimIndent(),
+                                                                        null
+                                                                )
 
                                                                 view.evaluateJavascript(
                                                                         """

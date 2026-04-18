@@ -222,6 +222,63 @@ class WebPlayerActivity : ComponentActivity() {
                                 }
                                 style.textContent = css;
 
+                                function viewportHeightPx() {
+                                    if (window.visualViewport && window.visualViewport.height) {
+                                        return Math.round(window.visualViewport.height);
+                                    }
+                                    return Math.round(window.innerHeight || document.documentElement.clientHeight || 0);
+                                }
+
+                                function applyViewportFix() {
+                                    try {
+                                        var vh = viewportHeightPx();
+                                        if (!vh) return;
+                                        var px = vh + 'px';
+                                        var html = document.documentElement;
+                                        var body = document.body;
+                                        if (!html || !body) return;
+
+                                        html.style.height = px;
+                                        html.style.minHeight = px;
+                                        html.style.maxHeight = px;
+                                        html.style.overflow = 'hidden';
+
+                                        body.style.height = px;
+                                        body.style.minHeight = px;
+                                        body.style.maxHeight = px;
+                                        body.style.overflow = 'hidden';
+
+                                        var selectors = ['.shaka-video-container','.shaka-player-container','.player','.video-container','#player','iframe'];
+                                        selectors.forEach(function(sel) {
+                                            document.querySelectorAll(sel).forEach(function(el) {
+                                                el.style.height = px;
+                                                el.style.minHeight = px;
+                                                el.style.maxHeight = px;
+                                                el.style.width = '100%';
+                                                el.style.maxWidth = '100%';
+                                            });
+                                        });
+                                    } catch (e) {}
+                                }
+
+                                window.__webUiApplyViewportFix = applyViewportFix;
+                                if (!window.__webUiViewportFixInstalled) {
+                                    window.__webUiViewportFixInstalled = true;
+                                    window.addEventListener('resize', applyViewportFix, true);
+                                    window.addEventListener('orientationchange', function() {
+                                        setTimeout(applyViewportFix, 60);
+                                        setTimeout(applyViewportFix, 220);
+                                    }, true);
+                                    if (window.visualViewport) {
+                                        window.visualViewport.addEventListener('resize', applyViewportFix, true);
+                                        window.visualViewport.addEventListener('scroll', applyViewportFix, true);
+                                    }
+                                }
+
+                                setTimeout(applyViewportFix, 0);
+                                setTimeout(applyViewportFix, 120);
+                                setTimeout(applyViewportFix, 320);
+
                                 window.dispatchEvent(new Event('resize'));
                                 setTimeout(function() {
                                     window.dispatchEvent(new Event('resize'));
@@ -676,6 +733,63 @@ class WebPlayerActivity : ComponentActivity() {
                             document.head.appendChild(style);
                         }
                         style.textContent = css;
+
+                        function viewportHeightPx() {
+                            if (window.visualViewport && window.visualViewport.height) {
+                                return Math.round(window.visualViewport.height);
+                            }
+                            return Math.round(window.innerHeight || document.documentElement.clientHeight || 0);
+                        }
+
+                        function applyViewportFix() {
+                            try {
+                                var vh = viewportHeightPx();
+                                if (!vh) return;
+                                var px = vh + 'px';
+                                var html = document.documentElement;
+                                var body = document.body;
+                                if (!html || !body) return;
+
+                                html.style.height = px;
+                                html.style.minHeight = px;
+                                html.style.maxHeight = px;
+                                html.style.overflow = 'hidden';
+
+                                body.style.height = px;
+                                body.style.minHeight = px;
+                                body.style.maxHeight = px;
+                                body.style.overflow = 'hidden';
+
+                                var selectors = ['.shaka-video-container','.shaka-player-container','.player','.video-container','#player','iframe'];
+                                selectors.forEach(function(sel) {
+                                    document.querySelectorAll(sel).forEach(function(el) {
+                                        el.style.height = px;
+                                        el.style.minHeight = px;
+                                        el.style.maxHeight = px;
+                                        el.style.width = '100%';
+                                        el.style.maxWidth = '100%';
+                                    });
+                                });
+                            } catch (e) {}
+                        }
+
+                        window.__webUiApplyViewportFix = applyViewportFix;
+                        if (!window.__webUiViewportFixInstalled) {
+                            window.__webUiViewportFixInstalled = true;
+                            window.addEventListener('resize', applyViewportFix, true);
+                            window.addEventListener('orientationchange', function() {
+                                setTimeout(applyViewportFix, 60);
+                                setTimeout(applyViewportFix, 220);
+                            }, true);
+                            if (window.visualViewport) {
+                                window.visualViewport.addEventListener('resize', applyViewportFix, true);
+                                window.visualViewport.addEventListener('scroll', applyViewportFix, true);
+                            }
+                        }
+
+                        setTimeout(applyViewportFix, 0);
+                        setTimeout(applyViewportFix, 120);
+                        setTimeout(applyViewportFix, 320);
                         window.dispatchEvent(new Event('resize'));
                         setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 120);
                     } catch (e) {}
