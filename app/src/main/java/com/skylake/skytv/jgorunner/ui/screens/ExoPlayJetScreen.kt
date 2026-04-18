@@ -364,6 +364,35 @@ fun ExoPlayJetScreen(
         }
     }
 
+        fun refreshShakaVisibilityAndOpenChannelPanelIfHidden() {
+                val webView = zoneWebView ?: return
+                webView.evaluateJavascript(
+                        """
+                        (function() {
+                            try {
+                                var root = document.querySelector('.shaka-controls-container');
+                                if (!root) return false;
+                                var style = window.getComputedStyle(root);
+                                if (!style) return false;
+                                if (root.classList.contains('shaka-hidden')) return false;
+                                if (style.display === 'none' || style.visibility === 'hidden') return false;
+                                if (parseFloat(style.opacity || '1') === 0) return false;
+                                return true;
+                            } catch (e) {
+                                return false;
+                            }
+                        })();
+                        """.trimIndent()
+                ) { result ->
+                        val visible = result?.contains("true", ignoreCase = true) == true
+                        isZoneShakaControllerVisible = visible
+                        if (!visible && !showChannelPanel) {
+                                panelSelectedIndex = currentIndex
+                                showChannelPanel = channelList != null
+                        }
+                }
+        }
+
     fun hideZoneShakaController() {
         zoneWebView?.evaluateJavascript(
             """
@@ -819,6 +848,15 @@ fun ExoPlayJetScreen(
                             showChannelPanel = channelList != null
                         }
                         return@onPreviewKeyEvent true
+                    }
+
+                    if (
+                        event.key == Key.DirectionLeft &&
+                        isZoneShakaControllerVisible &&
+                        event.type == KeyEventType.KeyDown
+                    ) {
+                        // Visibility bridge can be briefly stale; verify before deciding Left behavior.
+                        refreshShakaVisibilityAndOpenChannelPanelIfHidden()
                     }
 
                     val isDpadForWeb = when (event.key) {
