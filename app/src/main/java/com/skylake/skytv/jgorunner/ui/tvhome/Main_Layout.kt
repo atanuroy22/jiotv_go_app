@@ -116,12 +116,12 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
     fun hindiAddonLabel(categoryId: Int): String {
         val originalName = categoryMap.entries.firstOrNull { it.value == categoryId }?.key?.trim().orEmpty()
         if (originalName.isBlank()) {
-            return "Hindi Category $categoryId"
+            return "Hindi-Category-$categoryId"
         }
         return if (originalName.startsWith("Hindi", ignoreCase = true)) {
             originalName
         } else {
-            "Hindi $originalName"
+            "Hindi-$originalName"
         }
     }
     var selectedHindiAddonCategoryIds by rememberSaveable { mutableStateOf(emptySet<Int>()) }
