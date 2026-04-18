@@ -365,8 +365,22 @@ fun ExoPlayJetScreen(
                                     return cls.indexOf('exit') >= 0 || cls.indexOf('close') >= 0 || label.indexOf('exit') >= 0 || label.indexOf('close') >= 0;
                                 }
 
+                                function isMuteLike(el) {
+                                    var cls = String(el.className || '').toLowerCase();
+                                    var label = String(el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent || '').toLowerCase();
+                                    return cls.indexOf('mute') >= 0 || cls.indexOf('volume') >= 0 || label.indexOf('mute') >= 0 || label.indexOf('volume') >= 0;
+                                }
+
+                                function isMoreLike(el) {
+                                    var cls = String(el.className || '').toLowerCase();
+                                    var label = String(el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent || '').toLowerCase();
+                                    return cls.indexOf('overflow') >= 0 || cls.indexOf('menu') >= 0 || cls.indexOf('more') >= 0 || cls.indexOf('setting') >= 0 ||
+                                        label.indexOf('overflow') >= 0 || label.indexOf('menu') >= 0 || label.indexOf('more') >= 0 || label.indexOf('setting') >= 0 ||
+                                        label.indexOf('option') >= 0;
+                                }
+
                                 var active = document.activeElement;
-                                if (active && active.tagName === 'BUTTON' && !active.disabled && isVisible(active) && !isExitLike(active)) {
+                                if (active && active.tagName === 'BUTTON' && !active.disabled && isVisible(active) && !isExitLike(active) && !isMuteLike(active) && isMoreLike(active)) {
                                     if (window.__zoneNotifyShakaController) window.__zoneNotifyShakaController();
                                     return true;
                                 }
@@ -379,17 +393,28 @@ fun ExoPlayJetScreen(
                                 var preferred = null;
                                 for (var i = 0; i < candidates.length; i++) {
                                     var el = candidates[i];
-                                    var cls = String(el.className || '').toLowerCase();
-                                    if (!isVisible(el) || isExitLike(el)) continue;
-                                    if (cls.indexOf('play') >= 0 || cls.indexOf('overflow') >= 0 || cls.indexOf('menu') >= 0 || cls.indexOf('mute') >= 0 || cls.indexOf('volume') >= 0) {
+                                    if (!isVisible(el) || isExitLike(el) || isMuteLike(el)) continue;
+                                    if (isMoreLike(el)) {
                                         preferred = el;
                                         break;
                                     }
                                 }
 
                                 if (!preferred) {
+                                    for (var k = 0; k < candidates.length; k++) {
+                                        var fallback = candidates[k];
+                                        var fallbackCls = String(fallback.className || '').toLowerCase();
+                                        if (!isVisible(fallback) || isExitLike(fallback) || isMuteLike(fallback)) continue;
+                                        if (fallbackCls.indexOf('play') >= 0) {
+                                            preferred = fallback;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if (!preferred) {
                                     for (var j = 0; j < candidates.length; j++) {
-                                        if (isVisible(candidates[j]) && !isExitLike(candidates[j])) {
+                                        if (isVisible(candidates[j]) && !isExitLike(candidates[j]) && !isMuteLike(candidates[j])) {
                                             preferred = candidates[j];
                                             break;
                                         }
@@ -943,7 +968,7 @@ fun ExoPlayJetScreen(
                             suppressNextZoneCenterKeyUp = true
                             return@onPreviewKeyEvent true
                         }
-                        showAndFocusZoneShakaController()
+                        // Controller already visible: keep current focus and wait for KeyUp selection.
                         return@onPreviewKeyEvent true
                     }
 
@@ -956,20 +981,15 @@ fun ExoPlayJetScreen(
                         return@onPreviewKeyEvent true
                     }
 
-                    if (event.key == Key.DirectionLeft && event.type == KeyEventType.KeyDown) {
-                        if (!isZoneShakaControllerVisible) {
+                    if (event.key == Key.DirectionLeft) {
+                        if (event.type == KeyEventType.KeyDown) {
                             panelSelectedIndex = currentIndex
                             showChannelPanel = channelList != null
-                            return@onPreviewKeyEvent true
                         }
-                        dispatchDpadToZoneWeb(event)
-                        // Visibility bridge can be briefly stale; verify after routing Left.
-                        refreshShakaVisibilityAndOpenChannelPanelIfHidden()
                         return@onPreviewKeyEvent true
                     }
 
                     val isDpadForWeb = when (event.key) {
-                        Key.DirectionLeft,
                         Key.DirectionRight,
                         Key.DirectionUp,
                         Key.DirectionDown -> true
