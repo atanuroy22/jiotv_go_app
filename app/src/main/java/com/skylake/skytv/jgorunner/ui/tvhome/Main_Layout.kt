@@ -112,24 +112,43 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
         ?.split(",")?.mapNotNull { it.toIntOrNull() }?.toMutableSet() ?: mutableSetOf()
 //    var selectedCategoryIds by remember { mutableStateOf(savedCategoryIds) }
     var selectedCategoryIds by rememberSaveable { mutableStateOf(savedCategoryIds.toSet()) }
-    val hindiAddonCategoryIds = categoryMap.values.filterNotNull()
-    fun hindiAddonLabel(categoryId: Int): String {
+    val languageNameById = mapOf(
+        1 to "Hindi",
+        2 to "Marathi",
+        3 to "Punjabi",
+        4 to "Urdu",
+        5 to "Bengali",
+        6 to "English",
+        7 to "Malayalam",
+        8 to "Tamil",
+        9 to "Gujarati",
+        10 to "Odia",
+        11 to "Telugu",
+        12 to "Bhojpuri",
+        13 to "Kannada",
+        14 to "Assamese",
+        15 to "Nepali",
+        16 to "French",
+        18 to "Other"
+    )
+    val secondLanguageIdForUi = preferenceManager.myPrefs.filterLI2
+        ?.trim()
+        ?.toIntOrNull()
+    val secondLanguageNameForUi = secondLanguageIdForUi?.let { languageNameById[it] } ?: "Language"
+    val secondLanguageAddonCategoryIds = categoryMap.values.filterNotNull()
+    fun secondLanguageAddonLabel(categoryId: Int): String {
         val originalName = categoryMap.entries.firstOrNull { it.value == categoryId }?.key?.trim().orEmpty()
         if (originalName.isBlank()) {
-            return "Hindi-Category-$categoryId"
+            return "$secondLanguageNameForUi-Category-$categoryId"
         }
-        return if (originalName.startsWith("Hindi", ignoreCase = true)) {
-            originalName
+        return if (originalName.startsWith(secondLanguageNameForUi, ignoreCase = true)) {
+            originalName.replace(" ", "-")
         } else {
-            "Hindi-$originalName"
+            "$secondLanguageNameForUi-${originalName.replace(" ", "-")}"
         }
     }
-    var selectedHindiAddonCategoryIds by rememberSaveable { mutableStateOf(emptySet<Int>()) }
-    val languageIdsForUi = preferenceManager.myPrefs.filterLI
-        ?.split(",")
-        ?.mapNotNull { it.trim().toIntOrNull() }
-        ?.takeIf { it.isNotEmpty() }
-    val showHindiAddonSelector = languageIdsForUi?.contains(5) == true // Bengali language id
+    var selectedSecondLanguageAddonCategoryIds by rememberSaveable { mutableStateOf(emptySet<Int>()) }
+    val showSecondLanguageAddonSelector = secondLanguageIdForUi != null
 
     val sortedCategories = remember(selectedCategoryIds) {
         val allCategoryName = "All"
@@ -158,17 +177,17 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
             languageIds = languageIds
         )
 
-        if (selectedHindiAddonCategoryIds.isEmpty()) {
+        if (secondLanguageIdForUi == null || selectedSecondLanguageAddonCategoryIds.isEmpty()) {
             return baseFiltered
         }
 
-        val hindiAddonFiltered = ChannelUtils.filterChannels(
+        val secondLanguageAddonFiltered = ChannelUtils.filterChannels(
             response,
-            categoryIds = selectedHindiAddonCategoryIds.toList(),
-            languageIds = listOf(1) // Hindi language id
+            categoryIds = selectedSecondLanguageAddonCategoryIds.toList(),
+            languageIds = listOf(secondLanguageIdForUi)
         )
 
-        return (baseFiltered + hindiAddonFiltered)
+        return (baseFiltered + secondLanguageAddonFiltered)
             .distinctBy { "${it.channel_id}|${it.channel_url}" }
     }
 
@@ -198,10 +217,17 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                 if (channelsToUse.isNotEmpty()) {
                     try {
                         val firstChannel = channelsToUse.first()
+                        val (channelWindow, relativeIndex) = buildChannelInfoWindow(
+                            context = context,
+                            channels = channelsToUse,
+                            basefinURL = basefinURL,
+                            centerIndex = 0
+                        )
                         val intent = Intent(context, ExoPlayJet::class.java).apply {
                             putExtra("zone", "TV")
                             if (firstChannel.channel_id.all { it.isDigit() }) putExtra("channel_list_kind", "jio")
-                            putExtra("current_channel_index", -1)
+                            putExtra("current_channel_index", relativeIndex)
+                            putParcelableArrayListExtra("channel_list_data", channelWindow)
                             putExtra("video_url", firstChannel.channel_url)
                             putExtra(
                                 "logo_url",
@@ -285,10 +311,17 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
 
             if (!AppStartTracker.shouldPlayChannel && channelsForAutoplay.isNotEmpty()) {
                 val firstChannel = channelsForAutoplay.first()
+                val (channelWindow, relativeIndex) = buildChannelInfoWindow(
+                    context = context,
+                    channels = channelsForAutoplay,
+                    basefinURL = basefinURL,
+                    centerIndex = 0
+                )
                 val intent = Intent(context, ExoPlayJet::class.java).apply {
                     putExtra("zone", "TV")
                     if (firstChannel.channel_id.all { it.isDigit() }) putExtra("channel_list_kind", "jio")
-                    putExtra("current_channel_index", -1)
+                    putExtra("current_channel_index", relativeIndex)
+                    putParcelableArrayListExtra("channel_list_data", channelWindow)
                     putExtra("video_url", firstChannel.channel_url)
                     putExtra(
                         "logo_url",
@@ -336,14 +369,14 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
 
     }
 
-    LaunchedEffect(showHindiAddonSelector) {
-        if (!showHindiAddonSelector && selectedHindiAddonCategoryIds.isNotEmpty()) {
-            selectedHindiAddonCategoryIds = emptySet()
+    LaunchedEffect(showSecondLanguageAddonSelector, secondLanguageIdForUi) {
+        if (!showSecondLanguageAddonSelector && selectedSecondLanguageAddonCategoryIds.isNotEmpty()) {
+            selectedSecondLanguageAddonCategoryIds = emptySet()
         }
     }
 
-    // Re-filter channels when category or Hindi addon selection changes
-    LaunchedEffect(selectedCategoryIds, selectedHindiAddonCategoryIds) {
+    // Re-filter channels when category or second-language addon selection changes
+    LaunchedEffect(selectedCategoryIds, selectedSecondLanguageAddonCategoryIds, secondLanguageIdForUi) {
         channelsResponse.value?.let { response ->
             val filtered = applyMainFilters(response)
             filteredChannels.value = filtered
@@ -548,23 +581,23 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
             }
         }
 
-        if (showHindiAddonSelector) {
+        if (showSecondLanguageAddonSelector) {
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 4.dp),
+                    .padding(start = 4.dp, end = 4.dp, top = 0.dp, bottom = 1.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                items(hindiAddonCategoryIds) { categoryId ->
-                    val label = hindiAddonLabel(categoryId)
-                    val isSelected = selectedHindiAddonCategoryIds.contains(categoryId)
+                items(secondLanguageAddonCategoryIds) { categoryId ->
+                    val label = secondLanguageAddonLabel(categoryId)
+                    val isSelected = selectedSecondLanguageAddonCategoryIds.contains(categoryId)
 
                     FilterChip(
                         onClick = {
-                            selectedHindiAddonCategoryIds = if (isSelected) {
-                                selectedHindiAddonCategoryIds - categoryId
+                            selectedSecondLanguageAddonCategoryIds = if (isSelected) {
+                                selectedSecondLanguageAddonCategoryIds - categoryId
                             } else {
-                                selectedHindiAddonCategoryIds + categoryId
+                                selectedSecondLanguageAddonCategoryIds + categoryId
                             }
                         },
                         label = { Text(label) },

@@ -394,6 +394,17 @@ fun TvScreenMenu(
                         }.toMutableList()
                     )
                 }
+                val secondLanguageOptions = languageMap
+                    .filterKeys { it != "All Languages" }
+                    .keys
+                    .toList()
+                var selectedSecondLanguageId by remember {
+                    mutableStateOf(preferenceManager.myPrefs.filterLI2?.trim()?.toIntOrNull())
+                }
+                var secondLanguageDropdownExpanded by remember { mutableStateOf(false) }
+                val selectedSecondLanguageLabel = selectedSecondLanguageId?.let { id ->
+                    languageMap.entries.firstOrNull { it.value == id }?.key
+                } ?: "None"
                 var showLanguageCheckboxes by remember { mutableStateOf(false) }
 
                 if (showPlaylist) {
@@ -444,6 +455,41 @@ fun TvScreenMenu(
                                 }
                             }
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    DropdownSelection2(
+                        title = "Second Language Filter",
+                        options = listOf("None") + secondLanguageOptions,
+                        selectedOption = selectedSecondLanguageLabel,
+                        onOptionSelected = { label ->
+                            selectedSecondLanguageId = if (label == "None") {
+                                null
+                            } else {
+                                languageMap[label]
+                            }
+                        },
+                        expanded = secondLanguageDropdownExpanded,
+                        onExpandChange = { secondLanguageDropdownExpanded = it }
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Checkbox(
+                            checked = selectedSecondLanguageId == null,
+                            onCheckedChange = { checked ->
+                                if (checked) {
+                                    selectedSecondLanguageId = null
+                                }
+                            }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "Clear second language filter")
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -690,6 +736,7 @@ fun TvScreenMenu(
                                 myPrefs.filterQX = "auto"
                                 myPrefs.filterCI = ""
                                 myPrefs.filterLI = ""
+                                myPrefs.filterLI2 = ""
                                 myPrefs.selectedRemoteNavTV = "0"
                                 myPrefs.showPLAYLIST = false
                                 myPrefs.showRecentTab = false
@@ -720,6 +767,7 @@ fun TvScreenMenu(
                                 myPrefs.filterQX = selectedQuality
                                 myPrefs.filterCI = selectedCategoryInts.value.joinToString(",")
                                 myPrefs.filterLI = selectedLanguageInts.value.joinToString(",")
+                                myPrefs.filterLI2 = selectedSecondLanguageId?.toString().orEmpty()
                                 if (myPrefs.customPlaylistSupport) {
                                     myPrefs.showPLAYLIST = showPlaylist
                                 }

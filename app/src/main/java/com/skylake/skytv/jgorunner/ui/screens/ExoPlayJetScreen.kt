@@ -965,22 +965,22 @@ fun ExoPlayJetScreen(
                                 zoneWebRetryCount = 0
                                 zoneWebRetryJob?.cancel()
                                 zoneWebRetryJob = null
-                                                                view.requestFocus(View.FOCUS_DOWN)
-                                                                view.evaluateJavascript(
-                                                                        """
-                                                                        (function() {
-                                                                            try {
-                                                                                if (document && document.body) {
-                                                                                    if (document.body.tabIndex < 0) {
-                                                                                        document.body.tabIndex = 0;
-                                                                                    }
-                                                                                    document.body.focus();
-                                                                                }
-                                                                            } catch (e) {}
-                                                                        })();
-                                                                        """.trimIndent(),
-                                                                        null
-                                                                )
+                                view.requestFocus(View.FOCUS_DOWN)
+                                view.evaluateJavascript(
+                                    """
+                                    (function() {
+                                        try {
+                                            if (document && document.body) {
+                                                if (document.body.tabIndex < 0) {
+                                                    document.body.tabIndex = 0;
+                                                }
+                                                document.body.focus();
+                                            }
+                                        } catch (e) {}
+                                    })();
+                                    """.trimIndent(),
+                                    null
+                                )
                                 // Do not force DOM/CSS in Shaka pages; aggressive overrides can hide video while audio continues.
                                 view.evaluateJavascript(
                                     """
