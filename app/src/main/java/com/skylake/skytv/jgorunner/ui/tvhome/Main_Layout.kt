@@ -112,6 +112,24 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
         ?.split(",")?.mapNotNull { it.toIntOrNull() }?.toMutableSet() ?: mutableSetOf()
 //    var selectedCategoryIds by remember { mutableStateOf(savedCategoryIds) }
     var selectedCategoryIds by rememberSaveable { mutableStateOf(savedCategoryIds.toSet()) }
+    val hindiAddonCategoryIds = categoryMap.values.filterNotNull()
+    fun hindiAddonLabel(categoryId: Int): String {
+        val originalName = categoryMap.entries.firstOrNull { it.value == categoryId }?.key?.trim().orEmpty()
+        if (originalName.isBlank()) {
+            return "Hindi Category $categoryId"
+        }
+        return if (originalName.startsWith("Hindi", ignoreCase = true)) {
+            originalName
+        } else {
+            "Hindi $originalName"
+        }
+    }
+    var selectedHindiAddonCategoryIds by rememberSaveable { mutableStateOf(emptySet<Int>()) }
+    val languageIdsForUi = preferenceManager.myPrefs.filterLI
+        ?.split(",")
+        ?.mapNotNull { it.trim().toIntOrNull() }
+        ?.takeIf { it.isNotEmpty() }
+    val showHindiAddonSelector = languageIdsForUi?.contains(5) == true // Bengali language id
 
     val sortedCategories = remember(selectedCategoryIds) {
         val allCategoryName = "All"
@@ -124,6 +142,36 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
         listOf(allCategoryName) + selectedOtherCategories + unselectedOtherCategories
     }
 
+    fun currentLanguageIdsFromPrefs(): List<Int>? {
+        return preferenceManager.myPrefs.filterLI
+            ?.split(",")
+            ?.mapNotNull { it.trim().toIntOrNull() }
+            ?.takeIf { it.isNotEmpty() }
+    }
+
+    fun applyMainFilters(response: ChannelResponse): List<Channel> {
+        val languageIds = currentLanguageIdsFromPrefs()
+
+        val baseFiltered = ChannelUtils.filterChannels(
+            response,
+            categoryIds = selectedCategoryIds.takeIf { it.isNotEmpty() }?.toList(),
+            languageIds = languageIds
+        )
+
+        if (selectedHindiAddonCategoryIds.isEmpty()) {
+            return baseFiltered
+        }
+
+        val hindiAddonFiltered = ChannelUtils.filterChannels(
+            response,
+            categoryIds = selectedHindiAddonCategoryIds.toList(),
+            languageIds = listOf(1) // Hindi language id
+        )
+
+        return (baseFiltered + hindiAddonFiltered)
+            .distinctBy { "${it.channel_id}|${it.channel_url}" }
+    }
+
 
     // Helper functions for enhanced autoplay
     suspend fun fetchFromBackend(): List<Channel> {
@@ -134,36 +182,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                     putString("channels_json", Gson().toJson(response))
                     apply()
                 }
-                val categories = preferenceManager.myPrefs.filterCI
-                    ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
-                val languages = preferenceManager.myPrefs.filterLI
-                    ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
-
-                val filtered = when {
-                    categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                        response
-                    )
-
-                    categories.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                        response,
-                        languageIds = languages?.mapNotNull { it.toIntOrNull() }
-                            ?.takeIf { it.isNotEmpty() }
-                    )
-
-                    languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                        response,
-                        categoryIds = categories.mapNotNull { it.toIntOrNull() }
-                            .takeIf { it.isNotEmpty() }
-                    )
-
-                    else -> ChannelUtils.filterChannels(
-                        response,
-                        categoryIds = categories.mapNotNull { it.toIntOrNull() }
-                            .takeIf { it.isNotEmpty() },
-                        languageIds = languages.mapNotNull { it.toIntOrNull() }
-                            .takeIf { it.isNotEmpty() }
-                    )
-                }
+                val filtered = applyMainFilters(response)
                 filteredChannels.value = filtered
                 filtered
             } ?: emptyList()
@@ -228,36 +247,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
         }
 
         if (useCache && cachedChannels != null) {
-            val categories = preferenceManager.myPrefs.filterCI
-                ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
-            val languages = preferenceManager.myPrefs.filterLI
-                ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
-
-            val filtered = when {
-                categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                    cachedChannels
-                )
-
-                categories.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                    cachedChannels,
-                    languageIds = languages?.mapNotNull { it.toIntOrNull() }
-                        ?.takeIf { it.isNotEmpty() }
-                )
-
-                languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                    cachedChannels,
-                    categoryIds = categories.mapNotNull { it.toIntOrNull() }
-                        .takeIf { it.isNotEmpty() }
-                )
-
-                else -> ChannelUtils.filterChannels(
-                    cachedChannels,
-                    categoryIds = categories.mapNotNull { it.toIntOrNull() }
-                        .takeIf { it.isNotEmpty() },
-                    languageIds = languages.mapNotNull { it.toIntOrNull() }
-                        .takeIf { it.isNotEmpty() }
-                )
-            }
+            val filtered = applyMainFilters(cachedChannels)
             filteredChannels.value = filtered
             fetched = true
         } else {
@@ -273,36 +263,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                         sharedPref.edit {
                             putString("channels_json", responseJsonString)
                         }
-                        val categories = preferenceManager.myPrefs.filterCI
-                            ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
-                        val languages = preferenceManager.myPrefs.filterLI
-                            ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
-
-                        val filtered = when {
-                            categories.isNullOrEmpty() && languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                                response
-                            )
-
-                            categories.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                                response,
-                                languageIds = languages?.mapNotNull { it.toIntOrNull() }
-                                    ?.takeIf { it.isNotEmpty() }
-                            )
-
-                            languages.isNullOrEmpty() -> ChannelUtils.filterChannels(
-                                response,
-                                categoryIds = categories.mapNotNull { it.toIntOrNull() }
-                                    .takeIf { it.isNotEmpty() }
-                            )
-
-                            else -> ChannelUtils.filterChannels(
-                                response,
-                                categoryIds = categories.mapNotNull { it.toIntOrNull() }
-                                    .takeIf { it.isNotEmpty() },
-                                languageIds = languages.mapNotNull { it.toIntOrNull() }
-                                    .takeIf { it.isNotEmpty() }
-                            )
-                        }
+                        val filtered = applyMainFilters(response)
                         filteredChannels.value = filtered
                         success = true
                     }
@@ -375,17 +336,16 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
 
     }
 
-    // Re-filter channels when category changes
-    LaunchedEffect(selectedCategoryIds) {
-        channelsResponse.value?.let { response ->
-            val languages = preferenceManager.myPrefs.filterLI
-                ?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.isNotEmpty() }
+    LaunchedEffect(showHindiAddonSelector) {
+        if (!showHindiAddonSelector && selectedHindiAddonCategoryIds.isNotEmpty()) {
+            selectedHindiAddonCategoryIds = emptySet()
+        }
+    }
 
-            val filtered = ChannelUtils.filterChannels(
-                response,
-                categoryIds = selectedCategoryIds.takeIf { it.isNotEmpty() }?.toList(),
-                languageIds = languages
-            )
+    // Re-filter channels when category or Hindi addon selection changes
+    LaunchedEffect(selectedCategoryIds, selectedHindiAddonCategoryIds) {
+        channelsResponse.value?.let { response ->
+            val filtered = applyMainFilters(response)
             filteredChannels.value = filtered
         }
     }
@@ -585,6 +545,43 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                         else -> null
                     }
                 )
+            }
+        }
+
+        if (showHindiAddonSelector) {
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                items(hindiAddonCategoryIds) { categoryId ->
+                    val label = hindiAddonLabel(categoryId)
+                    val isSelected = selectedHindiAddonCategoryIds.contains(categoryId)
+
+                    FilterChip(
+                        onClick = {
+                            selectedHindiAddonCategoryIds = if (isSelected) {
+                                selectedHindiAddonCategoryIds - categoryId
+                            } else {
+                                selectedHindiAddonCategoryIds + categoryId
+                            }
+                        },
+                        label = { Text(label) },
+                        selected = isSelected,
+                        leadingIcon = if (isSelected) {
+                            {
+                                Icon(
+                                    imageVector = Icons.Filled.Done,
+                                    contentDescription = "Done icon",
+                                    modifier = Modifier.size(FilterChipDefaults.IconSize)
+                                )
+                            }
+                        } else {
+                            null
+                        }
+                    )
+                }
             }
         }
 
