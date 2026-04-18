@@ -612,7 +612,7 @@ fun ExoPlayJetScreen(
             .onPreviewKeyEvent { event ->
                 val isOkKey =
                     event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter
-                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft) {
+                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft && tvNAV != "2") {
                     if (isControllerVisible) {
                         return@onPreviewKeyEvent false
                     } else {
@@ -1467,7 +1467,11 @@ private fun toZoneDrmUrl(inputUrl: String, localPort: Int, quality: String?): St
     val id = match.groupValues.getOrNull(1).orEmpty()
     if (id.isBlank()) return cleaned
 
-    val q = quality?.takeIf { it.isNotBlank() } ?: "high"
+    val normalizedQuality = quality?.trim()?.lowercase()
+    val q = when (normalizedQuality) {
+        "auto", "low", "medium", "high" -> normalizedQuality
+        else -> "auto"
+    }
     return "http://localhost:$localPort/mpd/$id?q=$q&pm=hd"
 }
 
@@ -1634,21 +1638,31 @@ fun handleTVRemoteKey(
     onChannelChange: (Int) -> Unit
 ): Boolean {
     if (event.type != KeyEventType.KeyUp) return false
+    val total = channelList?.size ?: 0
+    if (total <= 0) return false
 
     val currentIndex = currentIndexState()
     val newIndex = when (tvNAV) {
         "0" -> when (event.key) {
-            Key.ChannelUp -> (currentIndex + 1) % (channelList?.size ?: return false)
-            Key.ChannelDown -> if (currentIndex - 1 < 0) (channelList?.size
-                ?: 1) - 1 else currentIndex - 1
+            // Some TV remotes do not emit ChannelUp/ChannelDown and only send DPAD Up/Down.
+            Key.ChannelUp -> (currentIndex + 1) % total
+            Key.DirectionUp -> (currentIndex + 1) % total
+            Key.ChannelDown -> if (currentIndex - 1 < 0) total - 1 else currentIndex - 1
+            Key.DirectionDown -> if (currentIndex - 1 < 0) total - 1 else currentIndex - 1
 
             else -> return false
         }
 
         "1" -> when (event.key) {
-            Key.DirectionUp -> (currentIndex + 1) % (channelList?.size ?: return false)
-            Key.DirectionDown -> if (currentIndex - 1 < 0) (channelList?.size
-                ?: 1) - 1 else currentIndex - 1
+            Key.DirectionUp -> (currentIndex + 1) % total
+            Key.DirectionDown -> if (currentIndex - 1 < 0) total - 1 else currentIndex - 1
+
+            else -> return false
+        }
+
+        "2" -> when (event.key) {
+            Key.DirectionRight -> (currentIndex + 1) % total
+            Key.DirectionLeft -> if (currentIndex - 1 < 0) total - 1 else currentIndex - 1
 
             else -> return false
         }

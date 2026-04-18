@@ -281,7 +281,11 @@ class WebPlayerActivity : ComponentActivity() {
         val playId = match.groupValues.getOrNull(1).orEmpty()
         if (playId.isBlank()) return input
 
-        val quality = prefManager.myPrefs.filterQX?.takeIf { it.isNotBlank() } ?: "high"
+        val normalizedQuality = prefManager.myPrefs.filterQX?.trim()?.lowercase()
+        val quality = when (normalizedQuality) {
+            "auto", "low", "medium", "high" -> normalizedQuality
+            else -> "auto"
+        }
         val localPort = prefManager.myPrefs.jtvGoServerPort
         val base = String.format(Locale.getDefault(), DEFAULT_URL_TEMPLATE, localPort)
         val rewritten = "$base/mpd/$playId?q=$quality&pm=hd"
