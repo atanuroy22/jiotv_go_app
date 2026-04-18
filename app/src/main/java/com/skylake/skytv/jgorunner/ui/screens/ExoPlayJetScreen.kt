@@ -328,70 +328,70 @@ fun ExoPlayJetScreen(
             webView.isFocusable = true
             webView.isFocusableInTouchMode = true
             webView.requestFocus(View.FOCUS_DOWN)
-                        val handled = webView.dispatchKeyEvent(android.view.KeyEvent(action, keyCode))
-                        if (action == android.view.KeyEvent.ACTION_DOWN &&
-                                keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER
-                        ) {
-                                // Fallback: reveal and focus Shaka controls so OK always has a visible target.
-                                webView.evaluateJavascript(
-                                        """
-                                        (function() {
-                                            try {
-                                                var root = document.querySelector('.shaka-controls-container');
-                                                if (root) {
-                                                    root.classList.remove('shaka-hidden');
-                                                    root.style.opacity = '1';
-                                                }
-                                                var candidate = document.querySelector(
-                                                    '.shaka-controls-container button:not([disabled]), .shaka-play-button-container button:not([disabled]), button.shaka-play-button:not([disabled])'
-                                                );
-                                                if (candidate) {
-                                                    candidate.focus();
-                                                }
-                                                if (window.__zoneNotifyShakaController) {
-                                                    window.__zoneNotifyShakaController();
-                                                }
-                                            } catch (e) {}
-                                        })();
-                                        """.trimIndent(),
-                                        null
-                                )
+            webView.dispatchKeyEvent(android.view.KeyEvent(action, keyCode))
+            if (action == android.view.KeyEvent.ACTION_DOWN &&
+                keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER
+            ) {
+                // Fallback: reveal and focus Shaka controls so OK always has a visible target.
+                webView.evaluateJavascript(
+                    """
+                    (function() {
+                      try {
+                        var root = document.querySelector('.shaka-controls-container');
+                        if (root) {
+                          root.classList.remove('shaka-hidden');
+                          root.style.opacity = '1';
                         }
-                        handled || (action == android.view.KeyEvent.ACTION_DOWN &&
-                                keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER)
+                        var candidate = document.querySelector(
+                          '.shaka-controls-container button:not([disabled]), .shaka-play-button-container button:not([disabled]), button.shaka-play-button:not([disabled])'
+                        );
+                        if (candidate) {
+                          candidate.focus();
+                        }
+                        if (window.__zoneNotifyShakaController) {
+                          window.__zoneNotifyShakaController();
+                        }
+                      } catch (e) {}
+                    })();
+                    """.trimIndent(),
+                    null
+                )
+            }
+            // Consume DPAD events once routed to web to avoid fall-through into non-web handlers.
+            true
         } catch (_: Exception) {
             false
         }
     }
 
-        fun refreshShakaVisibilityAndOpenChannelPanelIfHidden() {
-                val webView = zoneWebView ?: return
-                webView.evaluateJavascript(
-                        """
-                        (function() {
-                            try {
-                                var root = document.querySelector('.shaka-controls-container');
-                                if (!root) return false;
-                                var style = window.getComputedStyle(root);
-                                if (!style) return false;
-                                if (root.classList.contains('shaka-hidden')) return false;
-                                if (style.display === 'none' || style.visibility === 'hidden') return false;
-                                if (parseFloat(style.opacity || '1') === 0) return false;
-                                return true;
-                            } catch (e) {
-                                return false;
-                            }
-                        })();
-                        """.trimIndent()
-                ) { result ->
-                        val visible = result?.contains("true", ignoreCase = true) == true
-                        isZoneShakaControllerVisible = visible
-                        if (!visible && !showChannelPanel) {
-                                panelSelectedIndex = currentIndex
-                                showChannelPanel = channelList != null
-                        }
-                }
+    fun refreshShakaVisibilityAndOpenChannelPanelIfHidden() {
+        val webView = zoneWebView ?: return
+        webView.evaluateJavascript(
+            """
+            (function() {
+              try {
+                var root = document.querySelector('.shaka-controls-container');
+                if (!root) return false;
+                var style = window.getComputedStyle(root);
+                if (!style) return false;
+                if (root.classList.contains('shaka-hidden')) return false;
+                if (style.display === 'none' || style.visibility === 'hidden') return false;
+                if (parseFloat(style.opacity || '1') === 0) return false;
+                return true;
+              } catch (e) {
+                return false;
+              }
+            })();
+            """.trimIndent()
+        ) { result ->
+            val visible = result?.contains("true", ignoreCase = true) == true
+            isZoneShakaControllerVisible = visible
+            if (!visible && !showChannelPanel) {
+                panelSelectedIndex = currentIndex
+                showChannelPanel = channelList != null
+            }
         }
+    }
 
     fun hideZoneShakaController() {
         zoneWebView?.evaluateJavascript(
@@ -842,21 +842,16 @@ fun ExoPlayJetScreen(
                 }
 
                 if (useZoneDrmWebPlayer && !showChannelPanel) {
-                    if (event.key == Key.DirectionLeft && !isZoneShakaControllerVisible) {
-                        if (event.type == KeyEventType.KeyDown) {
+                    if (event.key == Key.DirectionLeft && event.type == KeyEventType.KeyDown) {
+                        if (!isZoneShakaControllerVisible) {
                             panelSelectedIndex = currentIndex
                             showChannelPanel = channelList != null
+                            return@onPreviewKeyEvent true
                         }
-                        return@onPreviewKeyEvent true
-                    }
-
-                    if (
-                        event.key == Key.DirectionLeft &&
-                        isZoneShakaControllerVisible &&
-                        event.type == KeyEventType.KeyDown
-                    ) {
-                        // Visibility bridge can be briefly stale; verify before deciding Left behavior.
+                        dispatchDpadToZoneWeb(event)
+                        // Visibility bridge can be briefly stale; verify after routing Left.
                         refreshShakaVisibilityAndOpenChannelPanelIfHidden()
+                        return@onPreviewKeyEvent true
                     }
 
                     val isDpadForWeb = when (event.key) {
@@ -870,7 +865,8 @@ fun ExoPlayJetScreen(
                         else -> false
                     }
                     if (isDpadForWeb && (event.type == KeyEventType.KeyDown || event.type == KeyEventType.KeyUp)) {
-                        return@onPreviewKeyEvent dispatchDpadToZoneWeb(event)
+                        dispatchDpadToZoneWeb(event)
+                        return@onPreviewKeyEvent true
                     }
                 }
 
