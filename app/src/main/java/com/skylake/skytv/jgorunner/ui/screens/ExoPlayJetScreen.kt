@@ -14,6 +14,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.webkit.ConsoleMessage
 import android.webkit.PermissionRequest
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -178,6 +180,8 @@ fun ExoPlayJetScreen(
     var zoneWebView: WebView? by remember { mutableStateOf(null) }
     var isWebLoading by remember { mutableStateOf(false) }
     var lastLoadedZoneDrmUrl by remember { mutableStateOf<String?>(null) }
+    var zoneWebRetryCount by remember { mutableIntStateOf(0) }
+    var zoneWebRetryJob: Job? by remember { mutableStateOf(null) }
 
     val activeUrlRaw = overrideVideoUrl ?: channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
     val normalizedActiveUrl = remember(activeUrlRaw, currentIndex, channelList, videoUrl) {
@@ -193,6 +197,38 @@ fun ExoPlayJetScreen(
             localPort = localPORT,
             quality = preferenceManager.myPrefs.filterQX
         )
+    }
+
+    fun scheduleZoneWebRetry(view: WebView?, failedUrl: String?, reason: String?) {
+        val targetUrl = failedUrl?.takeIf { it.isNotBlank() }
+            ?: lastLoadedZoneDrmUrl?.takeIf { it.isNotBlank() }
+            ?: zoneDrmStartupUrl.takeIf { it.isNotBlank() }
+            ?: return
+        if (view == null) return
+
+        if (zoneWebRetryCount >= 8) {
+            Log.e(TAG, "ZoneWeb retries exhausted. reason=$reason url=$targetUrl")
+            isWebLoading = false
+            return
+        }
+
+        zoneWebRetryCount += 1
+        val retryDelayMs = (zoneWebRetryCount * 1200L).coerceAtMost(5_000L)
+        Log.w(TAG, "ZoneWeb retry #$zoneWebRetryCount in ${retryDelayMs}ms. reason=$reason url=$targetUrl")
+        zoneWebRetryJob?.cancel()
+        zoneWebRetryJob = scope.launch {
+            delay(retryDelayMs)
+            try {
+                view.stopLoading()
+            } catch (_: Exception) {
+            }
+            try {
+                isWebLoading = true
+                view.loadUrl(targetUrl)
+                lastLoadedZoneDrmUrl = targetUrl
+            } catch (_: Exception) {
+            }
+        }
     }
 
 
@@ -315,6 +351,7 @@ fun ExoPlayJetScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            zoneWebRetryJob?.cancel()
             try {
                 zoneWebView?.destroy()
             } catch (_: Exception) {
@@ -768,8 +805,41 @@ fun ExoPlayJetScreen(
                                 isWebLoading = true
                             }
 
+                            override fun onReceivedError(
+                                view: WebView,
+                                request: WebResourceRequest,
+                                error: android.webkit.WebResourceError
+                            ) {
+                                if (!request.isForMainFrame) return
+                                isWebLoading = true
+                                scheduleZoneWebRetry(
+                                    view = view,
+                                    failedUrl = request.url?.toString(),
+                                    reason = error.description?.toString()
+                                )
+                            }
+
+                            override fun onReceivedHttpError(
+                                view: WebView,
+                                request: WebResourceRequest,
+                                errorResponse: WebResourceResponse
+                            ) {
+                                if (!request.isForMainFrame) return
+                                if (errorResponse.statusCode >= 500) {
+                                    isWebLoading = true
+                                    scheduleZoneWebRetry(
+                                        view = view,
+                                        failedUrl = request.url?.toString(),
+                                        reason = "HTTP ${errorResponse.statusCode}"
+                                    )
+                                }
+                            }
+
                             override fun onPageFinished(view: WebView, url: String) {
                                 isWebLoading = false
+                                zoneWebRetryCount = 0
+                                zoneWebRetryJob?.cancel()
+                                zoneWebRetryJob = null
                                 // Do not force DOM/CSS in Shaka pages; aggressive overrides can hide video while audio continues.
                                 view.evaluateJavascript(
                                     """
@@ -787,6 +857,26 @@ fun ExoPlayJetScreen(
                                     """.trimIndent(),
                                     null
                                 )
+
+                                // Some backend failures are rendered as plain text pages. Detect and auto-retry.
+                                view.evaluateJavascript(
+                                    """
+                                    (function() {
+                                      try {
+                                        return (document && document.body && document.body.innerText) ? document.body.innerText : '';
+                                      } catch (e) { return ''; }
+                                    })();
+                                    """.trimIndent()
+                                ) { pageText ->
+                                    val text = pageText.orEmpty().lowercase()
+                                    if (text.contains("network is unreachable") || text.contains("dial tcp")) {
+                                        scheduleZoneWebRetry(
+                                            view = view,
+                                            failedUrl = url,
+                                            reason = "upstream network unreachable"
+                                        )
+                                    }
+                                }
                             }
                         }
                         zoneWebView = this
@@ -1564,17 +1654,11 @@ fun initializePlayer(
         override fun onPlayerError(error: PlaybackException) {
             val attempt = retryCountRef.value + 1
             retryCountRef.value = attempt
-            if (attempt > 12) {
-                try {
-                    player.stop()
-                    player.clearMediaItems()
-                    player.playWhenReady = false
-                } catch (_: Exception) {
-                }
-                return
+            if (attempt % 10 == 0) {
+                Log.w(TAG, "Playback still failing after $attempt attempts: ${error.errorCodeName}")
             }
             val currentUrl = getCurrentVideoUrl()
-            val retryDelayMs = (attempt * 150L).coerceAtMost(900L)
+            val retryDelayMs = (attempt.coerceAtMost(20) * 250L).coerceAtMost(3_000L)
             retryHandler.removeCallbacksAndMessages(null)
             retryHandler.postDelayed(
                 {
@@ -1607,6 +1691,7 @@ fun initializePlayer(
                 Player.STATE_READY -> {
                     isBufferingLong = false
                     stallRecoveries = 0
+                    retryCountRef.value = 0
                     stallHandler.removeCallbacks(bufferingStallRunnable)
                 }
 
