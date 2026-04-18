@@ -14,6 +14,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.webkit.ConsoleMessage
 import android.webkit.PermissionRequest
+import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebChromeClient
@@ -135,6 +136,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 
+private class ZoneShakaBridge(
+    private val onVisibilityChanged: (Boolean) -> Unit
+) {
+    @JavascriptInterface
+    fun onControllerVisibilityChanged(visible: Boolean) {
+        onVisibilityChanged(visible)
+    }
+}
+
 const val TAG = "ExoJetScreen"
 
 @RequiresApi(Build.VERSION_CODES.O)
@@ -184,12 +194,9 @@ fun ExoPlayJetScreen(
     var zoneWebRetryJob: Job? by remember { mutableStateOf(null) }
     var isZoneShakaControllerVisible by remember { mutableStateOf(false) }
     val zoneShakaBridge = remember {
-        object {
-            @android.webkit.JavascriptInterface
-            fun onControllerVisibilityChanged(visible: Boolean) {
-                Handler(Looper.getMainLooper()).post {
-                    isZoneShakaControllerVisible = visible
-                }
+        ZoneShakaBridge { visible ->
+            Handler(Looper.getMainLooper()).post {
+                isZoneShakaControllerVisible = visible
             }
         }
     }
