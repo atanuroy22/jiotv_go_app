@@ -297,6 +297,9 @@ class WebPlayerActivity : ComponentActivity() {
 
         // Ensure hardware accelerated rendering path is used for video/DRM playback.
         webView!!.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        webView!!.isFocusable = true
+        webView!!.isFocusableInTouchMode = true
+        webView!!.requestFocus(View.FOCUS_DOWN)
     }
 
     private fun loadUrl() {
@@ -322,6 +325,7 @@ class WebPlayerActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         webView!!.onResume()
+        webView!!.requestFocus(View.FOCUS_DOWN)
 //        webView!!.loadUrl(url!!)
     }
 
@@ -368,21 +372,57 @@ class WebPlayerActivity : ComponentActivity() {
         return rewritten
     }
 
+    private fun isPlayerLikeUrl(currentUrl: String?): Boolean {
+        if (currentUrl.isNullOrBlank()) return false
+        return currentUrl.contains("/player/") ||
+                currentUrl.contains("/mpd/", ignoreCase = true) ||
+                currentUrl.contains(".mpd", ignoreCase = true)
+    }
+
+    private fun forwardDpadToWebView(event: KeyEvent): Boolean {
+        val target = webView ?: return false
+        val dpadCodes = setOf(
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_NUMPAD_ENTER
+        )
+        if (!dpadCodes.contains(event.keyCode)) return false
+
+        return try {
+            target.isFocusable = true
+            target.isFocusableInTouchMode = true
+            target.requestFocus(View.FOCUS_DOWN)
+            target.dispatchKeyEvent(event)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
 
     @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_DOWN && webView!!.url != null && webView!!.url!!
-                .contains("/player/")
-        ) {
-            when (event.keyCode) {
-                KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    navigateToNextChannel()
-                    return true
-                }
+        val currentUrl = webView?.url
+        if (isPlayerLikeUrl(currentUrl)) {
+            if (forwardDpadToWebView(event)) {
+                return true
+            }
 
-                KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    navigateToPreviousChannel()
-                    return true
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                when (event.keyCode) {
+                    KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_PAGE_UP -> {
+                        navigateToNextChannel()
+                        return true
+                    }
+
+                    KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_PAGE_DOWN -> {
+                        navigateToPreviousChannel()
+                        return true
+                    }
                 }
             }
         }
@@ -559,6 +599,22 @@ class WebPlayerActivity : ComponentActivity() {
                 Log.d(TAG, "Playing: $url")
                 setupFullScreenMode()
                 centerPlayerInWebUi(view)
+                view.requestFocus(View.FOCUS_DOWN)
+                view.evaluateJavascript(
+                    """
+                    (function() {
+                        try {
+                            if (document && document.body) {
+                                if (document.body.tabIndex < 0) {
+                                    document.body.tabIndex = 0;
+                                }
+                                document.body.focus();
+                            }
+                        } catch (e) {}
+                    })();
+                    """.trimIndent(),
+                    null
+                )
             } else {
                 moveSearchInput(view)
                 extractChannelNumbers()

@@ -182,6 +182,17 @@ fun ExoPlayJetScreen(
     var lastLoadedZoneDrmUrl by remember { mutableStateOf<String?>(null) }
     var zoneWebRetryCount by remember { mutableIntStateOf(0) }
     var zoneWebRetryJob: Job? by remember { mutableStateOf(null) }
+    var isZoneShakaControllerVisible by remember { mutableStateOf(false) }
+    val zoneShakaBridge = remember {
+        object {
+            @android.webkit.JavascriptInterface
+            fun onControllerVisibilityChanged(visible: Boolean) {
+                Handler(Looper.getMainLooper()).post {
+                    isZoneShakaControllerVisible = visible
+                }
+            }
+        }
+    }
 
     val activeUrlRaw = overrideVideoUrl ?: channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
     val normalizedActiveUrl = remember(activeUrlRaw, currentIndex, channelList, videoUrl) {
@@ -289,6 +300,77 @@ fun ExoPlayJetScreen(
         }
         numericBuffer = ""
         showNumericOverlay = false
+    }
+
+    fun dispatchAndroidKeyToZoneWeb(action: Int, keyCode: Int): Boolean {
+        val webView = zoneWebView ?: return false
+        return try {
+            webView.isFocusable = true
+            webView.isFocusableInTouchMode = true
+            webView.requestFocus(View.FOCUS_DOWN)
+            webView.dispatchKeyEvent(android.view.KeyEvent(action, keyCode))
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun hideZoneShakaController() {
+        zoneWebView?.evaluateJavascript(
+            """
+            (function() {
+              try {
+                var root = document.querySelector('.shaka-controls-container');
+                if (root) {
+                  root.classList.add('shaka-hidden');
+                }
+                if (window.__zoneNotifyShakaController) {
+                  window.__zoneNotifyShakaController();
+                }
+              } catch (e) {}
+            })();
+            """.trimIndent(),
+            null
+        )
+        isZoneShakaControllerVisible = false
+    }
+
+        fun scheduleZoneShakaAutoHide() {
+                zoneWebView?.evaluateJavascript(
+                        """
+                        (function() {
+                            try {
+                                if (window.__zoneScheduleShakaAutoHide) {
+                                    window.__zoneScheduleShakaAutoHide();
+                                }
+                            } catch (e) {}
+                        })();
+                        """.trimIndent(),
+                        null
+                )
+        }
+
+    fun dispatchDpadToZoneWeb(event: KeyEvent): Boolean {
+        val keyCode = when (event.key) {
+            Key.DirectionLeft -> android.view.KeyEvent.KEYCODE_DPAD_LEFT
+            Key.DirectionRight -> android.view.KeyEvent.KEYCODE_DPAD_RIGHT
+            Key.DirectionUp -> android.view.KeyEvent.KEYCODE_DPAD_UP
+            Key.DirectionDown -> android.view.KeyEvent.KEYCODE_DPAD_DOWN
+            Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> android.view.KeyEvent.KEYCODE_DPAD_CENTER
+            else -> return false
+        }
+
+        val action = when (event.type) {
+            KeyEventType.KeyDown -> android.view.KeyEvent.ACTION_DOWN
+            KeyEventType.KeyUp -> android.view.KeyEvent.ACTION_UP
+            else -> return false
+        }
+
+        val handled = dispatchAndroidKeyToZoneWeb(action, keyCode)
+        if (handled && event.type == KeyEventType.KeyUp) {
+            scheduleZoneShakaAutoHide()
+        }
+        return handled
     }
 
     val exoPlayer = remember {
@@ -610,6 +692,10 @@ fun ExoPlayJetScreen(
                 showChannelPanel = false
             }
 
+            useZoneDrmWebPlayer && isZoneShakaControllerVisible -> {
+                hideZoneShakaController()
+            }
+
             isControllerVisible -> {
 
                 exoPlayerView?.hideController()
@@ -649,7 +735,16 @@ fun ExoPlayJetScreen(
             .onPreviewKeyEvent { event ->
                 val isOkKey =
                     event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter
-                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft && tvNAV != "2") {
+                if (useZoneDrmWebPlayer && !showChannelPanel &&
+                    (event.key == Key.Back || event.key == Key.Escape) &&
+                    (event.type == KeyEventType.KeyDown || event.type == KeyEventType.KeyUp) &&
+                    isZoneShakaControllerVisible
+                ) {
+                    hideZoneShakaController()
+                    return@onPreviewKeyEvent true
+                }
+
+                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft && tvNAV != "2" && !useZoneDrmWebPlayer) {
                     if (isControllerVisible) {
                         return@onPreviewKeyEvent false
                     } else {
@@ -684,6 +779,30 @@ fun ExoPlayJetScreen(
                             }
                         }
                         return@onPreviewKeyEvent true
+                    }
+                }
+
+                if (useZoneDrmWebPlayer && !showChannelPanel) {
+                    if (event.key == Key.DirectionLeft && !isZoneShakaControllerVisible) {
+                        if (event.type == KeyEventType.KeyDown) {
+                            panelSelectedIndex = currentIndex
+                            showChannelPanel = channelList != null
+                        }
+                        return@onPreviewKeyEvent true
+                    }
+
+                    val isDpadForWeb = when (event.key) {
+                        Key.DirectionLeft,
+                        Key.DirectionRight,
+                        Key.DirectionUp,
+                        Key.DirectionDown,
+                        Key.DirectionCenter,
+                        Key.Enter,
+                        Key.NumPadEnter -> true
+                        else -> false
+                    }
+                    if (isDpadForWeb && (event.type == KeyEventType.KeyDown || event.type == KeyEventType.KeyUp)) {
+                        return@onPreviewKeyEvent dispatchDpadToZoneWeb(event)
                     }
                 }
 
@@ -770,6 +889,9 @@ fun ExoPlayJetScreen(
                         settings.defaultTextEncodingName = "utf-8"
                         settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                         setLayerType(View.LAYER_TYPE_HARDWARE, null)
+                        isFocusable = true
+                        isFocusableInTouchMode = true
+                        requestFocus(View.FOCUS_DOWN)
                         isLongClickable = false
                         isHapticFeedbackEnabled = false
                         setOnLongClickListener { true }
@@ -800,9 +922,12 @@ fun ExoPlayJetScreen(
                             }
                         }
 
+                        addJavascriptInterface(zoneShakaBridge, "ZoneShakaBridge")
+
                         webViewClient = object : WebViewClient() {
                             override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
                                 isWebLoading = true
+                                isZoneShakaControllerVisible = false
                             }
 
                             override fun onReceivedError(
@@ -840,6 +965,22 @@ fun ExoPlayJetScreen(
                                 zoneWebRetryCount = 0
                                 zoneWebRetryJob?.cancel()
                                 zoneWebRetryJob = null
+                                                                view.requestFocus(View.FOCUS_DOWN)
+                                                                view.evaluateJavascript(
+                                                                        """
+                                                                        (function() {
+                                                                            try {
+                                                                                if (document && document.body) {
+                                                                                    if (document.body.tabIndex < 0) {
+                                                                                        document.body.tabIndex = 0;
+                                                                                    }
+                                                                                    document.body.focus();
+                                                                                }
+                                                                            } catch (e) {}
+                                                                        })();
+                                                                        """.trimIndent(),
+                                                                        null
+                                                                )
                                 // Do not force DOM/CSS in Shaka pages; aggressive overrides can hide video while audio continues.
                                 view.evaluateJavascript(
                                     """
@@ -857,6 +998,92 @@ fun ExoPlayJetScreen(
                                     """.trimIndent(),
                                     null
                                 )
+
+                                                                view.evaluateJavascript(
+                                                                        """
+                                                                        (function() {
+                                                                            try {
+                                                                                var AUTO_HIDE_MS = 3000;
+                                                                                function controlsVisible() {
+                                                                                    var root = document.querySelector('.shaka-controls-container');
+                                                                                    if (!root) return false;
+                                                                                    var style = window.getComputedStyle(root);
+                                                                                    if (!style) return false;
+                                                                                    if (root.classList.contains('shaka-hidden')) return false;
+                                                                                    if (style.display === 'none' || style.visibility === 'hidden') return false;
+                                                                                    if (parseFloat(style.opacity || '1') === 0) return false;
+                                                                                    return true;
+                                                                                }
+
+                                                                                function clearAutoHideTimer() {
+                                                                                    if (window.__zoneShakaHideTimer) {
+                                                                                        clearTimeout(window.__zoneShakaHideTimer);
+                                                                                        window.__zoneShakaHideTimer = null;
+                                                                                    }
+                                                                                }
+
+                                                                                function hideControllerNow() {
+                                                                                    try {
+                                                                                        var root = document.querySelector('.shaka-controls-container');
+                                                                                        if (root) {
+                                                                                            root.classList.add('shaka-hidden');
+                                                                                        }
+                                                                                    } catch (e) {}
+                                                                                    notify();
+                                                                                }
+
+                                                                                function scheduleAutoHide() {
+                                                                                    clearAutoHideTimer();
+                                                                                    if (!controlsVisible()) return;
+                                                                                    window.__zoneShakaHideTimer = setTimeout(function() {
+                                                                                        hideControllerNow();
+                                                                                    }, AUTO_HIDE_MS);
+                                                                                }
+
+                                                                                function notify() {
+                                                                                    var visible = controlsVisible();
+                                                                                    if (window.ZoneShakaBridge && window.ZoneShakaBridge.onControllerVisibilityChanged) {
+                                                                                        window.ZoneShakaBridge.onControllerVisibilityChanged(visible);
+                                                                                    }
+                                                                                    if (visible) {
+                                                                                        scheduleAutoHide();
+                                                                                    } else {
+                                                                                        clearAutoHideTimer();
+                                                                                    }
+                                                                                }
+
+                                                                                window.__zoneNotifyShakaController = notify;
+                                                                                window.__zoneScheduleShakaAutoHide = scheduleAutoHide;
+
+                                                                                if (!window.__zoneShakaControllerObserverInstalled) {
+                                                                                    window.__zoneShakaControllerObserverInstalled = true;
+                                                                                    var target = document.querySelector('.shaka-controls-container') || document.body;
+                                                                                    if (target) {
+                                                                                        var observer = new MutationObserver(function() { notify(); });
+                                                                                        observer.observe(target, {
+                                                                                            attributes: true,
+                                                                                            childList: true,
+                                                                                            subtree: true,
+                                                                                            attributeFilter: ['class', 'style']
+                                                                                        });
+                                                                                    }
+                                                                                    ['keydown','keyup','click','focusin','mousemove','touchstart'].forEach(function(evt) {
+                                                                                        document.addEventListener(evt, function() {
+                                                                                            setTimeout(function() {
+                                                                                                notify();
+                                                                                                scheduleAutoHide();
+                                                                                            }, 0);
+                                                                                        }, true);
+                                                                                    });
+                                                                                }
+
+                                                                                setTimeout(notify, 100);
+                                                                                setTimeout(notify, 400);
+                                                                            } catch (e) {}
+                                                                        })();
+                                                                        """.trimIndent(),
+                                                                        null
+                                                                )
 
                                 // Some backend failures are rendered as plain text pages. Detect and auto-retry.
                                 view.evaluateJavascript(
@@ -888,6 +1115,9 @@ fun ExoPlayJetScreen(
                 },
                 update = { webView ->
                     zoneWebView = webView
+                    webView.isFocusable = true
+                    webView.isFocusableInTouchMode = true
+                    webView.requestFocus(View.FOCUS_DOWN)
                     if (zoneDrmStartupUrl.isNotBlank() && zoneDrmStartupUrl != lastLoadedZoneDrmUrl) {
                         webView.loadUrl(zoneDrmStartupUrl)
                         lastLoadedZoneDrmUrl = zoneDrmStartupUrl
