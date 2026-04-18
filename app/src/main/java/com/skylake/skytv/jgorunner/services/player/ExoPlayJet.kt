@@ -20,6 +20,8 @@ import androidx.lifecycle.lifecycleScope
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
+import com.skylake.skytv.jgorunner.activities.WebPlayerActivity
+import com.skylake.skytv.jgorunner.core.data.JTVConfigurationManager
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.ui.screens.ExoPlayJetScreen
 import com.skylake.skytv.jgorunner.ui.theme.JGOTheme
@@ -123,6 +125,48 @@ class ExoPlayJet : ComponentActivity() {
             applyIntent(intent)
             maybeLoadChannelListAsync(intent)
         }
+    }
+
+    private fun maybeRouteToWebDrmPlayer(): Boolean {
+        val currentUrl = videoUrlState
+        if (currentUrl.isBlank()) return false
+
+        val isLikelyDrmRoute = isLikelyDrmRoute(currentUrl)
+        if (!isLikelyDrmRoute) return false
+
+        val drmEnabled = try {
+            JTVConfigurationManager.getInstance(this).jtvConfiguration.drm
+        } catch (_: Exception) {
+            false
+        }
+        if (!drmEnabled) return false
+
+        val startupUrl = toAbsoluteLocalUrl(currentUrl)
+        val webIntent = Intent(this, WebPlayerActivity::class.java).apply {
+            putExtra("startup_url", startupUrl)
+            addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+        startActivity(webIntent)
+        finish()
+        return true
+    }
+
+    private fun isLikelyDrmRoute(url: String): Boolean {
+        val u = url.lowercase()
+        return u.contains("/play/") ||
+                u.contains("/mpd/") ||
+                u.contains(".mpd") ||
+                u.contains("widevine") ||
+                u.contains("render.dash")
+    }
+
+    private fun toAbsoluteLocalUrl(input: String): String {
+        val trimmed = input.trim()
+        if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
+            return trimmed
+        }
+        val base = "http://localhost:${prefManager.myPrefs.jtvGoServerPort}"
+        return if (trimmed.startsWith("/")) "$base$trimmed" else "$base/$trimmed"
     }
 
     private fun applyIntent(intent: Intent?) {

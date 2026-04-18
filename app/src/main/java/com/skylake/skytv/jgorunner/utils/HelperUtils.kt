@@ -129,9 +129,12 @@ fun normalizePlaybackUrl(context: Context, inputUrl: String): String {
     }
 
     val parsed = runCatching { Uri.parse(url) }.getOrNull()
-    val qFromUrl = parsed?.getQueryParameter("q")?.lowercase()
-    val qFromPref = skyPref.filterQX?.lowercase()
-    val effectiveQuality = qFromPref ?: qFromUrl
+    val qFromPref = skyPref.filterQX?.trim()?.lowercase()
+    val effectiveQuality = when (qFromPref) {
+        "low", "medium", "high" -> qFromPref
+        // Auto (and null/blank) should not force a fixed tier from URL query params.
+        else -> null
+    }
 
     if (parsed != null && parsed.query?.isNotEmpty() == true) {
         val builder = parsed.buildUpon().clearQuery()

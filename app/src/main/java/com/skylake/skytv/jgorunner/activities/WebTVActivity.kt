@@ -9,6 +9,8 @@ import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
+import android.webkit.ConsoleMessage
+import android.webkit.PermissionRequest
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.webkit.WebChromeClient
@@ -17,7 +19,9 @@ import android.webkit.WebViewClient
 import android.widget.ProgressBar
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.core.view.WindowCompat
 import com.skylake.skytv.jgorunner.R
+import com.skylake.skytv.jgorunner.core.data.JTVConfigurationManager
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import org.json.JSONArray
 import org.json.JSONException
@@ -44,6 +48,7 @@ class WebPlayerActivity : ComponentActivity() {
     private val recentChannels: MutableList<Channel> = ArrayList()
 
     private val prefManager = SkySharedPref.getInstance(this)
+    private val jtvConfigManager by lazy { JTVConfigurationManager.getInstance(this) }
 
     private class Channel(var playId: String?, var logoUrl: String?, var channelName: String?)
 
@@ -73,11 +78,28 @@ class WebPlayerActivity : ComponentActivity() {
             }
         }
 
-        url = String.format(
+        val defaultUrl = String.format(
             Locale.getDefault(),
             DEFAULT_URL_TEMPLATE,
             savedPortNumber
         ) + extraFilterUrl
+
+        val startupUrl = intent?.getStringExtra("startup_url")?.trim().orEmpty()
+        val resolvedStartupUrl = if (startupUrl.isNotEmpty()) {
+            if (startupUrl.startsWith("http://", ignoreCase = true) || startupUrl.startsWith("https://", ignoreCase = true)) {
+                startupUrl
+            } else {
+                if (startupUrl.startsWith("/")) {
+                    String.format(Locale.getDefault(), DEFAULT_URL_TEMPLATE, savedPortNumber) + startupUrl
+                } else {
+                    String.format(Locale.getDefault(), DEFAULT_URL_TEMPLATE, savedPortNumber) + "/$startupUrl"
+                }
+            }
+        } else {
+            defaultUrl
+        }
+
+        url = rewriteDrmPlayUrlToMpdIfNeeded(resolvedStartupUrl)
 
         Log.d("DIX", url!!)
 
@@ -129,13 +151,144 @@ class WebPlayerActivity : ComponentActivity() {
 
     private fun setupFullScreenMode() {
 //        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+                WindowCompat.setDecorFitsSystemWindows(window, false)
         updateSystemUiVisibility()
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         updateSystemUiVisibility() // This maintains full-screen mode in both orientations
+                refreshShakaViewportLayout()
     }
+
+        private fun refreshShakaViewportLayout() {
+                val currentUrl = webView?.url.orEmpty()
+                val isPlayerLikeUrl = currentUrl.contains("/player/") ||
+                                currentUrl.contains("/mpd/", ignoreCase = true) ||
+                                currentUrl.contains(".mpd", ignoreCase = true)
+                if (!isPlayerLikeUrl) return
+
+                webView?.evaluateJavascript(
+                        """
+                        (function() {
+                            try {
+                                var cssId = 'webui-shaka-center';
+                                var css = `
+                                    html, body {
+                                        width: 100% !important;
+                                        height: 100% !important;
+                                        min-height: 100vh !important;
+                                        min-height: 100dvh !important;
+                                        margin: 0 !important;
+                                        padding: 0 !important;
+                                        background: black !important;
+                                        overflow: hidden !important;
+                                    }
+                                    .shaka-video-container,
+                                    .shaka-player-container,
+                                    .player,
+                                    .video-container,
+                                    iframe {
+                                        width: 100% !important;
+                                        height: 100% !important;
+                                        min-height: 100vh !important;
+                                        min-height: 100dvh !important;
+                                        max-width: 100% !important;
+                                        max-height: 100% !important;
+                                        margin: 0 !important;
+                                        padding: 0 !important;
+                                        overflow: hidden !important;
+                                    }
+                                    video {
+                                        width: 100% !important;
+                                        height: 100% !important;
+                                        max-width: 100% !important;
+                                        max-height: 100% !important;
+                                        object-fit: contain !important;
+                                        object-position: center center !important;
+                                        display: block !important;
+                                        margin: 0 auto !important;
+                                        opacity: 1 !important;
+                                        visibility: visible !important;
+                                        background: black !important;
+                                    }
+                                `;
+
+                                var style = document.getElementById(cssId);
+                                if (!style) {
+                                    style = document.createElement('style');
+                                    style.id = cssId;
+                                    document.head.appendChild(style);
+                                }
+                                style.textContent = css;
+
+                                function viewportHeightPx() {
+                                    if (window.visualViewport && window.visualViewport.height) {
+                                        return Math.round(window.visualViewport.height);
+                                    }
+                                    return Math.round(window.innerHeight || document.documentElement.clientHeight || 0);
+                                }
+
+                                function applyViewportFix() {
+                                    try {
+                                        var vh = viewportHeightPx();
+                                        if (!vh) return;
+                                        var px = vh + 'px';
+                                        var html = document.documentElement;
+                                        var body = document.body;
+                                        if (!html || !body) return;
+
+                                        html.style.height = px;
+                                        html.style.minHeight = px;
+                                        html.style.maxHeight = px;
+                                        html.style.overflow = 'hidden';
+
+                                        body.style.height = px;
+                                        body.style.minHeight = px;
+                                        body.style.maxHeight = px;
+                                        body.style.overflow = 'hidden';
+
+                                        var selectors = ['.shaka-video-container','.shaka-player-container','.player','.video-container','#player','iframe'];
+                                        selectors.forEach(function(sel) {
+                                            document.querySelectorAll(sel).forEach(function(el) {
+                                                el.style.height = px;
+                                                el.style.minHeight = px;
+                                                el.style.maxHeight = px;
+                                                el.style.width = '100%';
+                                                el.style.maxWidth = '100%';
+                                            });
+                                        });
+                                    } catch (e) {}
+                                }
+
+                                window.__webUiApplyViewportFix = applyViewportFix;
+                                if (!window.__webUiViewportFixInstalled) {
+                                    window.__webUiViewportFixInstalled = true;
+                                    window.addEventListener('resize', applyViewportFix, true);
+                                    window.addEventListener('orientationchange', function() {
+                                        setTimeout(applyViewportFix, 60);
+                                        setTimeout(applyViewportFix, 220);
+                                    }, true);
+                                    if (window.visualViewport) {
+                                        window.visualViewport.addEventListener('resize', applyViewportFix, true);
+                                        window.visualViewport.addEventListener('scroll', applyViewportFix, true);
+                                    }
+                                }
+
+                                setTimeout(applyViewportFix, 0);
+                                setTimeout(applyViewportFix, 120);
+                                setTimeout(applyViewportFix, 320);
+
+                                window.dispatchEvent(new Event('resize'));
+                                setTimeout(function() {
+                                    window.dispatchEvent(new Event('resize'));
+                                }, 120);
+                            } catch (e) {}
+                        })();
+                        """.trimIndent(),
+                        null
+                )
+        }
 
 
     private fun updateSystemUiVisibility() {
@@ -159,7 +312,36 @@ class WebPlayerActivity : ComponentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
         webView!!.webViewClient = CustomWebViewClient()
-        webView!!.webChromeClient = WebChromeClient()
+        webView!!.webChromeClient = object : WebChromeClient() {
+            override fun onPermissionRequest(request: PermissionRequest?) {
+                // Shaka/Widevine in WebView may request protected media. Granting on the UI
+                // thread prevents silent DRM-denied fallback to non-DRM playback paths.
+                if (request == null) return
+                runOnUiThread {
+                    try {
+                        request.grant(request.resources)
+                        Log.d(TAG, "Granted WebView permission request: ${request.resources.joinToString()}")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to grant WebView permission request", e)
+                        request.deny()
+                    }
+                }
+            }
+
+            override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
+                if (consoleMessage.messageLevel() == ConsoleMessage.MessageLevel.ERROR ||
+                    consoleMessage.message().contains("drm", ignoreCase = true) ||
+                    consoleMessage.message().contains("widevine", ignoreCase = true) ||
+                    consoleMessage.message().contains("eme", ignoreCase = true)
+                ) {
+                    Log.e(
+                        TAG,
+                        "WebConsole ${consoleMessage.messageLevel()}: ${consoleMessage.message()} @${consoleMessage.sourceId()}:${consoleMessage.lineNumber()}"
+                    )
+                }
+                return super.onConsoleMessage(consoleMessage)
+            }
+        }
 
         val webSettings = webView!!.settings
         webSettings.javaScriptEnabled = true
@@ -169,6 +351,12 @@ class WebPlayerActivity : ComponentActivity() {
         webSettings.defaultTextEncodingName = "utf-8"
         webSettings.mixedContentMode = 0
         webSettings.mediaPlaybackRequiresUserGesture = false // Allow autoplay
+
+        // Ensure hardware accelerated rendering path is used for video/DRM playback.
+        webView!!.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        webView!!.isFocusable = true
+        webView!!.isFocusableInTouchMode = true
+        webView!!.requestFocus(View.FOCUS_DOWN)
     }
 
     private fun loadUrl() {
@@ -194,24 +382,104 @@ class WebPlayerActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         webView!!.onResume()
+        webView!!.requestFocus(View.FOCUS_DOWN)
 //        webView!!.loadUrl(url!!)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val startupUrl = intent.getStringExtra("startup_url")?.trim().orEmpty()
+        if (startupUrl.isNotEmpty()) {
+            val localPort = prefManager.myPrefs.jtvGoServerPort
+            val resolved = if (startupUrl.startsWith("http://", ignoreCase = true) || startupUrl.startsWith("https://", ignoreCase = true)) {
+                startupUrl
+            } else {
+                val base = String.format(Locale.getDefault(), DEFAULT_URL_TEMPLATE, localPort)
+                if (startupUrl.startsWith("/")) "$base$startupUrl" else "$base/$startupUrl"
+            }
+            val rewritten = rewriteDrmPlayUrlToMpdIfNeeded(resolved)
+            url = rewritten
+            webView?.loadUrl(rewritten)
+        }
+    }
+
+    private fun rewriteDrmPlayUrlToMpdIfNeeded(input: String): String {
+        val drmEnabled = try {
+            jtvConfigManager.jtvConfiguration.drm
+        } catch (_: Exception) {
+            false
+        }
+        if (!drmEnabled) return input
+
+        val playRegex = Regex(".*/play/(\\d+)(?:[/?].*)?$")
+        val match = playRegex.find(input) ?: return input
+        val playId = match.groupValues.getOrNull(1).orEmpty()
+        if (playId.isBlank()) return input
+
+        val normalizedQuality = prefManager.myPrefs.filterQX?.trim()?.lowercase()
+        val quality = when (normalizedQuality) {
+            "auto", "low", "medium", "high" -> normalizedQuality
+            else -> "auto"
+        }
+        val localPort = prefManager.myPrefs.jtvGoServerPort
+        val base = String.format(Locale.getDefault(), DEFAULT_URL_TEMPLATE, localPort)
+        val rewritten = "$base/mpd/$playId?q=$quality&pm=hd"
+        Log.d(TAG, "Rewriting DRM /play/ URL to direct MPD URL: $rewritten")
+        return rewritten
+    }
+
+    private fun isPlayerLikeUrl(currentUrl: String?): Boolean {
+        if (currentUrl.isNullOrBlank()) return false
+        return currentUrl.contains("/player/") ||
+                currentUrl.contains("/mpd/", ignoreCase = true) ||
+                currentUrl.contains(".mpd", ignoreCase = true)
+    }
+
+    private fun forwardDpadToWebView(event: KeyEvent): Boolean {
+        val target = webView ?: return false
+        val dpadCodes = setOf(
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_NUMPAD_ENTER
+        )
+        if (!dpadCodes.contains(event.keyCode)) return false
+
+        return try {
+            target.isFocusable = true
+            target.isFocusableInTouchMode = true
+            target.requestFocus(View.FOCUS_DOWN)
+            target.dispatchKeyEvent(event)
+            true
+        } catch (_: Exception) {
+            false
+        }
     }
 
 
     @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_DOWN && webView!!.url != null && webView!!.url!!
-                .contains("/player/")
-        ) {
-            when (event.keyCode) {
-                KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    navigateToNextChannel()
-                    return true
-                }
+        val currentUrl = webView?.url
+        if (isPlayerLikeUrl(currentUrl)) {
+            if (forwardDpadToWebView(event)) {
+                return true
+            }
 
-                KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    navigateToPreviousChannel()
-                    return true
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                when (event.keyCode) {
+                    KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_PAGE_UP -> {
+                        navigateToNextChannel()
+                        return true
+                    }
+
+                    KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_PAGE_DOWN -> {
+                        navigateToPreviousChannel()
+                        return true
+                    }
                 }
             }
         }
@@ -264,6 +532,33 @@ class WebPlayerActivity : ComponentActivity() {
     private inner class CustomWebViewClient : WebViewClient() {
         @Deprecated("Deprecated in Java")
         override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
+            val isDrmLikeUrl = url.contains("/play/", ignoreCase = true) ||
+                    url.contains("/mpd/", ignoreCase = true) ||
+                    url.contains(".mpd", ignoreCase = true) ||
+                    url.contains("render.dash", ignoreCase = true) ||
+                    url.contains("widevine", ignoreCase = true)
+
+            if (isDrmLikeUrl) {
+                val drmEnabled = try {
+                    jtvConfigManager.jtvConfiguration.drm
+                } catch (_: Exception) {
+                    false
+                }
+
+                if (drmEnabled) {
+                    val rewrittenUrl = rewriteDrmPlayUrlToMpdIfNeeded(url)
+                    if (rewrittenUrl != url) {
+                        Log.d(TAG, "DRM enabled, forcing direct MPD route: $rewrittenUrl")
+                        view.loadUrl(rewrittenUrl)
+                        return true
+                    }
+                    // Keep DRM routes in WebView so the server-side Shaka player handles playback.
+                    Log.d(TAG, "DRM enabled, keeping URL in WebView: $url")
+                    return false
+                }
+            }
+
+            // Only redirect /play/ URLs to ExoPlayer if DRM is disabled.
             if (url.contains("/play/")) {
                 initURL = webView!!.url
                 Log.d(TAG, "Saving initURL: $initURL")
@@ -324,14 +619,12 @@ class WebPlayerActivity : ComponentActivity() {
                     }
                 }
 
-                // Construct the new URL
+                // Construct the HLS URL only for non-DRM route.
                 var modifiedUrl = url.replace("/play/", "/live/") + ".m3u8"
-
                 modifiedUrl = modifiedUrl.replace("//.m3u8", ".m3u8")
 
                 Log.d("DIX", "Modified URL for intent: $modifiedUrl")
 
-                // Send the intent to ExoplayerActivity
                 val intent = Intent(this@WebPlayerActivity, ExoplayerActivity::class.java).apply {
                     putExtra("video_url", modifiedUrl)
                     putExtra("current_play_id", playId?.substringBefore("?") ?: playId)
@@ -356,15 +649,154 @@ class WebPlayerActivity : ComponentActivity() {
 
         override fun onPageFinished(view: WebView, url: String) {
             loadingSpinner!!.visibility = View.GONE
-            if (url.contains("/player/")) {
+            val isPlayerLikeUrl = url.contains("/player/") ||
+                    url.contains("/mpd/", ignoreCase = true) ||
+                    url.contains(".mpd", ignoreCase = true)
+            if (isPlayerLikeUrl) {
                 Log.d(TAG, "Playing: $url")
                 setupFullScreenMode()
-                playVideoInFullScreen(view)
+                centerPlayerInWebUi(view)
+                view.requestFocus(View.FOCUS_DOWN)
+                view.evaluateJavascript(
+                    """
+                    (function() {
+                        try {
+                            if (document && document.body) {
+                                if (document.body.tabIndex < 0) {
+                                    document.body.tabIndex = 0;
+                                }
+                                document.body.focus();
+                            }
+                        } catch (e) {}
+                    })();
+                    """.trimIndent(),
+                    null
+                )
             } else {
                 moveSearchInput(view)
                 extractChannelNumbers()
                 loadRecentChannels()
             }
+        }
+
+        fun centerPlayerInWebUi(view: WebView) {
+            view.evaluateJavascript(
+                """
+                (function() {
+                    try {
+                        var cssId = 'webui-shaka-center';
+                        var css = `
+                            html, body {
+                                width: 100% !important;
+                                height: 100% !important;
+                                min-height: 100vh !important;
+                                min-height: 100dvh !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                                background: black !important;
+                                overflow: hidden !important;
+                            }
+                            .shaka-video-container,
+                            .shaka-player-container,
+                            .player,
+                            .video-container,
+                            iframe {
+                                width: 100% !important;
+                                height: 100% !important;
+                                min-height: 100vh !important;
+                                min-height: 100dvh !important;
+                                max-width: 100% !important;
+                                max-height: 100% !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                                overflow: hidden !important;
+                            }
+                            video {
+                                width: 100% !important;
+                                height: 100% !important;
+                                max-width: 100% !important;
+                                max-height: 100% !important;
+                                object-fit: contain !important;
+                                object-position: center center !important;
+                                display: block !important;
+                                margin: 0 auto !important;
+                                opacity: 1 !important;
+                                visibility: visible !important;
+                                background: black !important;
+                            }
+                        `;
+
+                        var style = document.getElementById(cssId);
+                        if (!style) {
+                            style = document.createElement('style');
+                            style.id = cssId;
+                            document.head.appendChild(style);
+                        }
+                        style.textContent = css;
+
+                        function viewportHeightPx() {
+                            if (window.visualViewport && window.visualViewport.height) {
+                                return Math.round(window.visualViewport.height);
+                            }
+                            return Math.round(window.innerHeight || document.documentElement.clientHeight || 0);
+                        }
+
+                        function applyViewportFix() {
+                            try {
+                                var vh = viewportHeightPx();
+                                if (!vh) return;
+                                var px = vh + 'px';
+                                var html = document.documentElement;
+                                var body = document.body;
+                                if (!html || !body) return;
+
+                                html.style.height = px;
+                                html.style.minHeight = px;
+                                html.style.maxHeight = px;
+                                html.style.overflow = 'hidden';
+
+                                body.style.height = px;
+                                body.style.minHeight = px;
+                                body.style.maxHeight = px;
+                                body.style.overflow = 'hidden';
+
+                                var selectors = ['.shaka-video-container','.shaka-player-container','.player','.video-container','#player','iframe'];
+                                selectors.forEach(function(sel) {
+                                    document.querySelectorAll(sel).forEach(function(el) {
+                                        el.style.height = px;
+                                        el.style.minHeight = px;
+                                        el.style.maxHeight = px;
+                                        el.style.width = '100%';
+                                        el.style.maxWidth = '100%';
+                                    });
+                                });
+                            } catch (e) {}
+                        }
+
+                        window.__webUiApplyViewportFix = applyViewportFix;
+                        if (!window.__webUiViewportFixInstalled) {
+                            window.__webUiViewportFixInstalled = true;
+                            window.addEventListener('resize', applyViewportFix, true);
+                            window.addEventListener('orientationchange', function() {
+                                setTimeout(applyViewportFix, 60);
+                                setTimeout(applyViewportFix, 220);
+                            }, true);
+                            if (window.visualViewport) {
+                                window.visualViewport.addEventListener('resize', applyViewportFix, true);
+                                window.visualViewport.addEventListener('scroll', applyViewportFix, true);
+                            }
+                        }
+
+                        setTimeout(applyViewportFix, 0);
+                        setTimeout(applyViewportFix, 120);
+                        setTimeout(applyViewportFix, 320);
+                        window.dispatchEvent(new Event('resize'));
+                        setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 120);
+                    } catch (e) {}
+                })();
+                """.trimIndent(),
+                null
+            )
         }
 
         fun extractChannelNumbers() {
@@ -384,33 +816,6 @@ class WebPlayerActivity : ComponentActivity() {
                 }
             }
         }
-
-        fun playVideoInFullScreen(view: WebView) {
-            val width = "100vw"
-            val height = "auto"
-            val objectFit = "contain"
-
-            val script = """
-        javascript:(function() {
-            try {
-                var video = document.getElementsByTagName('video')[0];
-                if (video) {
-                    video.style.width = '$width';
-                    video.style.height = '$height';
-                    video.style.objectFit = '$objectFit';
-                    video.play();
-                } else {
-                    console.error('No video element found');
-                }
-            } catch (e) {
-                console.error('Error in full-screen script:', e);
-            }
-        })()
-    """.trimIndent()
-
-            view.evaluateJavascript(script, null)
-        }
-
 
         fun moveSearchInput(view: WebView) {
             view.loadUrl(
