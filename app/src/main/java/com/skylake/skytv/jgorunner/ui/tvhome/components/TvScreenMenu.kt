@@ -765,6 +765,7 @@ fun TvScreenMenu(
                                 myPrefs.selectedZoneTabTV = 0
                                 myPrefs.filterQX = "auto"
                                 myPrefs.filterCI = ""
+                                myPrefs.filterCI2 = ""
                                 myPrefs.filterLI = ""
                                 myPrefs.filterLI2 = ""
                                 myPrefs.selectedRemoteNavTV = "0"

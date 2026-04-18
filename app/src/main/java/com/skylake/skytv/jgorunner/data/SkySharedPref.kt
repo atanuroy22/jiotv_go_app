@@ -172,6 +172,7 @@ class SkySharedPref(context: Context) {
         @SharedPrefKey("filterLI") var filterLI: String? = "",
         @SharedPrefKey("filterLI2") var filterLI2: String? = "",
         @SharedPrefKey("filterCI") var filterCI: String? = "",
+        @SharedPrefKey("filterCI2") var filterCI2: String? = "",
         @SharedPrefKey("login_chk") var loginChk: Boolean = true,
         @SharedPrefKey("cast_channel_name") var castChannelName: String? = "",
         @SharedPrefKey("cast_channel_logo") var castChannelLogo: String? = "",

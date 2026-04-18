@@ -136,6 +136,11 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
         ?.toIntOrNull()
     val secondLanguageNameForUi = secondLanguageIdForUi?.let { languageNameById[it] } ?: "Language"
     val secondLanguageAddonCategoryIds = categoryMap.values.filterNotNull()
+    val savedSecondLanguageAddonCategoryIds = preferenceManager.myPrefs.filterCI2
+        ?.split(",")
+        ?.mapNotNull { it.trim().toIntOrNull() }
+        ?.toSet()
+        ?: emptySet()
     fun secondLanguageAddonLabel(categoryId: Int): String {
         val originalName = categoryMap.entries.firstOrNull { it.value == categoryId }?.key?.trim().orEmpty()
         if (originalName.isBlank()) {
@@ -147,7 +152,9 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
             "$secondLanguageNameForUi-${originalName.replace(" ", "-")}"
         }
     }
-    var selectedSecondLanguageAddonCategoryIds by rememberSaveable { mutableStateOf(emptySet<Int>()) }
+    var selectedSecondLanguageAddonCategoryIds by rememberSaveable {
+        mutableStateOf(savedSecondLanguageAddonCategoryIds)
+    }
     val showSecondLanguageAddonSelector = secondLanguageIdForUi != null
 
     val sortedCategories = remember(selectedCategoryIds) {
@@ -372,6 +379,8 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
     LaunchedEffect(showSecondLanguageAddonSelector, secondLanguageIdForUi) {
         if (!showSecondLanguageAddonSelector && selectedSecondLanguageAddonCategoryIds.isNotEmpty()) {
             selectedSecondLanguageAddonCategoryIds = emptySet()
+            preferenceManager.myPrefs.filterCI2 = ""
+            preferenceManager.savePreferences()
         }
     }
 
@@ -599,6 +608,9 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                             } else {
                                 selectedSecondLanguageAddonCategoryIds + categoryId
                             }
+                            preferenceManager.myPrefs.filterCI2 =
+                                selectedSecondLanguageAddonCategoryIds.joinToString(",")
+                            preferenceManager.savePreferences()
                         },
                         label = { Text(label) },
                         selected = isSelected,

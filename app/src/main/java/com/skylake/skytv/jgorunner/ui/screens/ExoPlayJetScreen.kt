@@ -328,8 +328,37 @@ fun ExoPlayJetScreen(
             webView.isFocusable = true
             webView.isFocusableInTouchMode = true
             webView.requestFocus(View.FOCUS_DOWN)
-            webView.dispatchKeyEvent(android.view.KeyEvent(action, keyCode))
-            true
+                        val handled = webView.dispatchKeyEvent(android.view.KeyEvent(action, keyCode))
+                        if (action == android.view.KeyEvent.ACTION_DOWN &&
+                                keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER
+                        ) {
+                                // Fallback: reveal and focus Shaka controls so OK always has a visible target.
+                                webView.evaluateJavascript(
+                                        """
+                                        (function() {
+                                            try {
+                                                var root = document.querySelector('.shaka-controls-container');
+                                                if (root) {
+                                                    root.classList.remove('shaka-hidden');
+                                                    root.style.opacity = '1';
+                                                }
+                                                var candidate = document.querySelector(
+                                                    '.shaka-controls-container button:not([disabled]), .shaka-play-button-container button:not([disabled]), button.shaka-play-button:not([disabled])'
+                                                );
+                                                if (candidate) {
+                                                    candidate.focus();
+                                                }
+                                                if (window.__zoneNotifyShakaController) {
+                                                    window.__zoneNotifyShakaController();
+                                                }
+                                            } catch (e) {}
+                                        })();
+                                        """.trimIndent(),
+                                        null
+                                )
+                        }
+                        handled || (action == android.view.KeyEvent.ACTION_DOWN &&
+                                keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER)
         } catch (_: Exception) {
             false
         }
@@ -892,7 +921,6 @@ fun ExoPlayJetScreen(
                         setLayerType(View.LAYER_TYPE_HARDWARE, null)
                         isFocusable = true
                         isFocusableInTouchMode = true
-                        requestFocus(View.FOCUS_DOWN)
                         isLongClickable = false
                         isHapticFeedbackEnabled = false
                         setOnLongClickListener { true }
@@ -973,7 +1001,6 @@ fun ExoPlayJetScreen(
                                 zoneWebRetryCount = 0
                                 zoneWebRetryJob?.cancel()
                                 zoneWebRetryJob = null
-                                view.requestFocus(View.FOCUS_DOWN)
                                 view.evaluateJavascript(
                                     """
                                     (function() {
@@ -1180,7 +1207,6 @@ fun ExoPlayJetScreen(
                     zoneWebView = webView
                     webView.isFocusable = true
                     webView.isFocusableInTouchMode = true
-                    webView.requestFocus(View.FOCUS_DOWN)
                     if (zoneDrmStartupUrl.isNotBlank() && zoneDrmStartupUrl != lastLoadedZoneDrmUrl) {
                         webView.loadUrl(zoneDrmStartupUrl)
                         lastLoadedZoneDrmUrl = zoneDrmStartupUrl
