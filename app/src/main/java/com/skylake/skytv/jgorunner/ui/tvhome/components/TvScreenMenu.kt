@@ -398,14 +398,18 @@ fun TvScreenMenu(
                     .filterKeys { it != "All Languages" }
                     .keys
                     .toList()
-                var selectedSecondLanguageId by remember {
-                    mutableStateOf(preferenceManager.myPrefs.filterLI2?.trim()?.toIntOrNull())
+                val secondLanguageSelectionOptions = listOf("None") + secondLanguageOptions
+                var selectedSecondLanguageOption by remember {
+                    mutableStateOf(
+                        preferenceManager.myPrefs.filterLI2
+                            ?.trim()
+                            ?.toIntOrNull()
+                            ?.let { id -> languageMap.entries.firstOrNull { it.value == id }?.key }
+                            ?: "None"
+                    )
                 }
-                var secondLanguageDropdownExpanded by remember { mutableStateOf(false) }
-                val selectedSecondLanguageLabel = selectedSecondLanguageId?.let { id ->
-                    languageMap.entries.firstOrNull { it.value == id }?.key
-                } ?: "None"
                 var showLanguageCheckboxes by remember { mutableStateOf(false) }
+                var showSecondLanguageCheckboxes by remember { mutableStateOf(false) }
 
                 if (showPlaylist) {
                     Column {
@@ -459,37 +463,51 @@ fun TvScreenMenu(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    DropdownSelection2(
-                        title = "Second Language Filter",
-                        options = listOf("None") + secondLanguageOptions,
-                        selectedOption = selectedSecondLanguageLabel,
-                        onOptionSelected = { label ->
-                            selectedSecondLanguageId = if (label == "None") {
-                                null
-                            } else {
-                                languageMap[label]
+                    Column {
+                        Text(
+                            text = "Second Language Filter",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedButton(
+                                onClick = { showSecondLanguageCheckboxes = true },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = MaterialTheme.shapes.medium
+                            ) {
+                                Text("Second Language")
                             }
-                        },
-                        expanded = secondLanguageDropdownExpanded,
-                        onExpandChange = { secondLanguageDropdownExpanded = it }
-                    )
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Checkbox(
-                            checked = selectedSecondLanguageId == null,
-                            onCheckedChange = { checked ->
-                                if (checked) {
-                                    selectedSecondLanguageId = null
+                        }
+                    }
+                    if (showSecondLanguageCheckboxes) {
+                        Dialog(onDismissRequest = { showSecondLanguageCheckboxes = false }) {
+                            Surface(
+                                shape = MaterialTheme.shapes.medium,
+                                color = MaterialTheme.colorScheme.surface
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .padding(16.dp)
+                                        .verticalScroll(rememberScrollState())
+                                ) {
+                                    SingleSelectDropdown(
+                                        title = "Second Language",
+                                        options = secondLanguageSelectionOptions,
+                                        selectedOption = selectedSecondLanguageOption,
+                                        onOptionSelected = { option ->
+                                            selectedSecondLanguageOption = option
+                                        }
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Button(
+                                        onClick = { showSecondLanguageCheckboxes = false },
+                                        modifier = Modifier.align(Alignment.End)
+                                    ) {
+                                        Text("Done")
+                                    }
                                 }
                             }
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = "Clear second language filter")
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -497,20 +515,22 @@ fun TvScreenMenu(
 
                 // --- Experimental/Debug Section ---
                 if (preferenceManager.myPrefs.customPlaylistSupport) {
-                    Column {
-                        Text("Add Channels", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                        Box(modifier = Modifier.fillMaxWidth()) {
-                            OutlinedButton(
-                                onClick = { showCustomUrlInputDialog = true },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = MaterialTheme.shapes.medium
-                            ) {
-                                Text("Add Custom Playlist URL")
+                    if (!showPlaylist) {
+                        Column {
+                            Text("Add Channels", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                OutlinedButton(
+                                    onClick = { showCustomUrlInputDialog = true },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = MaterialTheme.shapes.medium
+                                ) {
+                                    Text("Add Custom Playlist URL")
+                                }
                             }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
 
                     // --- Playlist Selection Dropdown ---
                     var playlistDropdownExpanded by remember { mutableStateOf(false) }
@@ -729,6 +749,7 @@ fun TvScreenMenu(
                             selectedCategoryInts.value.clear()
                             selectedLanguages.value.clear()
                             selectedLanguageInts.value.clear()
+                            selectedSecondLanguageOption = "None"
                             showPlaylist = false // Reset playlist selection
                             preferenceManager.apply {
                                 myPrefs.selectedScreenTV = "0"
@@ -767,7 +788,11 @@ fun TvScreenMenu(
                                 myPrefs.filterQX = selectedQuality
                                 myPrefs.filterCI = selectedCategoryInts.value.joinToString(",")
                                 myPrefs.filterLI = selectedLanguageInts.value.joinToString(",")
-                                myPrefs.filterLI2 = selectedSecondLanguageId?.toString().orEmpty()
+                                myPrefs.filterLI2 = if (selectedSecondLanguageOption == "None") {
+                                    ""
+                                } else {
+                                    languageMap[selectedSecondLanguageOption]?.toString().orEmpty()
+                                }
                                 if (myPrefs.customPlaylistSupport) {
                                     myPrefs.showPLAYLIST = showPlaylist
                                 }
@@ -891,6 +916,41 @@ fun MultiSelectDropdown2(
                         }
                     )
                     Text(text = categoryName, color = MaterialTheme.colorScheme.onSurface)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SingleSelectDropdown(
+    title: String,
+    options: List<String>,
+    selectedOption: String,
+    onOptionSelected: (String) -> Unit
+) {
+    Column {
+        Text(text = title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Column(modifier = Modifier.fillMaxWidth()) {
+            options.forEach { option ->
+                val isChecked = selectedOption == option
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = isChecked,
+                        onCheckedChange = { checked ->
+                            if (checked) {
+                                onOptionSelected(option)
+                            } else if (option != "None") {
+                                onOptionSelected("None")
+                            }
+                        }
+                    )
+                    Text(text = option, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
         }
