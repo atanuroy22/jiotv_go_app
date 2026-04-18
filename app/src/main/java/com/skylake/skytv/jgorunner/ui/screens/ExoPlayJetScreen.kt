@@ -193,13 +193,6 @@ fun ExoPlayJetScreen(
     var zoneWebRetryCount by remember { mutableIntStateOf(0) }
     var zoneWebRetryJob: Job? by remember { mutableStateOf(null) }
     var isZoneShakaControllerVisible by remember { mutableStateOf(false) }
-    val zoneShakaBridge = remember {
-        ZoneShakaBridge { visible ->
-            Handler(Looper.getMainLooper()).post {
-                isZoneShakaControllerVisible = visible
-            }
-        }
-    }
 
     val activeUrlRaw = overrideVideoUrl ?: channelList?.getOrNull(currentIndex)?.videoUrl ?: videoUrl
     val normalizedActiveUrl = remember(activeUrlRaw, currentIndex, channelList, videoUrl) {
@@ -929,7 +922,14 @@ fun ExoPlayJetScreen(
                             }
                         }
 
-                        addJavascriptInterface(zoneShakaBridge, "ZoneShakaBridge")
+                        addJavascriptInterface(
+                            ZoneShakaBridge { visible ->
+                                Handler(Looper.getMainLooper()).post {
+                                    isZoneShakaControllerVisible = visible
+                                }
+                            },
+                            "ZoneShakaBridge"
+                        )
 
                         webViewClient = object : WebViewClient() {
                             override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
