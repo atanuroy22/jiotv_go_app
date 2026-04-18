@@ -201,7 +201,7 @@ fun TvScreenMenu(
 
                 // --- TV Remote Navigation Configuration ---
                 val tvRemoteNavigationOptions = mapOf(
-                    "Channel Up / Down (DPAD Up/Down supported)" to 0,
+                    "Channel Up / Channel Down" to 0,
                     "Remote Up / Remote Down" to 1,
                     "Remote Left / Remote Right" to 2,
                     "Disable" to -1,

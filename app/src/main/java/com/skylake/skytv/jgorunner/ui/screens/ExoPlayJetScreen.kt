@@ -1729,11 +1729,8 @@ fun handleTVRemoteKey(
     val currentIndex = currentIndexState()
     val newIndex = when (tvNAV) {
         "0" -> when (event.key) {
-            // Some TV remotes do not emit ChannelUp/ChannelDown and only send DPAD Up/Down.
             Key.ChannelUp -> (currentIndex + 1) % total
-            Key.DirectionUp -> (currentIndex + 1) % total
             Key.ChannelDown -> if (currentIndex - 1 < 0) total - 1 else currentIndex - 1
-            Key.DirectionDown -> if (currentIndex - 1 < 0) total - 1 else currentIndex - 1
 
             else -> return false
         }
