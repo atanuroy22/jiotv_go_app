@@ -235,14 +235,6 @@ class MainActivity : ComponentActivity() {
         val isFlagSetForAutoStartServer = preferenceManager.myPrefs.autoStartServer
         if (isFlagSetForAutoStartServer && (!BinaryService.isRunning || isFirstAppOpen)) {
             Log.d(TAG, "Starting server automatically (forceStart=$isFirstAppOpen)")
-            if (isFirstAppOpen) {
-                // Clear channel cache so a fresh fetch is done after server starts
-                try {
-                    getSharedPreferences("channel_cache", MODE_PRIVATE).edit()
-                        .remove("channels_json")
-                        .apply()
-                } catch (_: Exception) {}
-            }
             val arguments = emptyArray<String>()
             runBinary(
                 activity = this,
@@ -386,19 +378,6 @@ class MainActivity : ComponentActivity() {
                 IntentFilter(BinaryService.ACTION_BINARY_STOPPED)
             )
         }
-
-
-        val sharedPref = getSharedPreferences("channel_cache", MODE_PRIVATE)
-        try {
-            with(sharedPref.edit()) {
-                remove("channels_json")
-                apply()
-                Log.d("DIXf", "Cleared channel cache")
-            }
-        } catch (e: Exception) {
-            Log.e("DIXf", "Error message", e)
-        }
-
 
         // Register the OnBackPressedCallback
         onBackPressedDispatcher.addCallback(this, backPressedCallback)

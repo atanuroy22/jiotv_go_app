@@ -234,6 +234,7 @@ class ExoPlayJet : ComponentActivity() {
                 getSharedPreferences("channel_cache", MODE_PRIVATE)
                     .edit()
                     .putString("channels_json", Gson().toJson(response))
+                    .putLong("channels_cache_updated_at_ms", System.currentTimeMillis())
                     .apply()
             } catch (_: Exception) {
             }

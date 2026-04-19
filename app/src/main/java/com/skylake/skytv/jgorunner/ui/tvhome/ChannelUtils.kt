@@ -31,6 +31,7 @@ object ChannelUtils {
                         val sharedPref = context?.getSharedPreferences("channel_cache", Context.MODE_PRIVATE)
                         sharedPref?.edit {
                             putString("channels_json", responseJsonString)
+                            putLong("channels_cache_updated_at_ms", System.currentTimeMillis())
                         }
                     }
 
