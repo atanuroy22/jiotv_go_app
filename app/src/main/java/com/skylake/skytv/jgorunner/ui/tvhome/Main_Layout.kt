@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,12 +59,18 @@ import com.bumptech.glide.integration.compose.GlideImage
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
+import com.skylake.skytv.jgorunner.core.ServerUtils.checkServerStatus
+import com.skylake.skytv.jgorunner.core.execution.runBinary
 import com.skylake.skytv.jgorunner.data.SkySharedPref
+import com.skylake.skytv.jgorunner.services.BinaryService
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 import com.skylake.skytv.jgorunner.utils.withQuality
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @SuppressLint("MutableCollectionMutableState")
 @OptIn(ExperimentalGlideComposeApi::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -224,6 +231,10 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
 
     suspend fun launchFirstChannel(channelsToUse: List<Channel>): Boolean {
         return try {
+            if (!ensureServerReady()) {
+                return false
+            }
+
             val firstChannel = channelsToUse.first()
             val (channelWindow, relativeIndex) = buildChannelInfoWindow(
                 context = context,
@@ -276,6 +287,38 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
         } catch (_: Exception) {
             false
         }
+    }
+
+    suspend fun ensureServerReady(): Boolean {
+        val port = preferenceManager.myPrefs.jtvGoServerPort
+
+        suspend fun waitForHttpServer(): Boolean {
+            val result = CompletableDeferred<Boolean>()
+            checkServerStatus(
+                port = port,
+                onLoginSuccess = { result.complete(true) },
+                onLoginFailure = { result.complete(false) },
+                onServerDown = { result.complete(false) }
+            )
+            return result.await()
+        }
+
+        if (BinaryService.isRunning && waitForHttpServer()) {
+            return true
+        }
+
+        val activity = context as? ComponentActivity ?: return false
+        withContext(Dispatchers.Main) {
+            runBinary(
+                activity = activity,
+                arguments = emptyArray(),
+                onRunSuccess = {},
+                onOutput = { },
+                forceStart = false
+            )
+        }
+
+        return waitForHttpServer()
     }
 
     suspend fun watchdogAutoplay(channels: List<Channel>): Boolean {
