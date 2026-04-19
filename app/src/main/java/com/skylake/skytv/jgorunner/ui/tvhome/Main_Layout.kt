@@ -70,6 +70,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 
 @SuppressLint("MutableCollectionMutableState")
@@ -232,24 +233,26 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
     suspend fun ensureServerReady(): Boolean {
         val port = preferenceManager.myPrefs.jtvGoServerPort
 
-        suspend fun waitForHttpServer(): Boolean {
-            val result = CompletableDeferred<Boolean>()
-            checkServerStatus(
-                port = port,
-                onLoginSuccess = { result.complete(true) },
-                onLoginFailure = { result.complete(false) },
-                onServerDown = { result.complete(false) }
-            )
-            return result.await()
+        suspend fun waitForHttpServer(maxWaitMs: Long): Boolean {
+            val response = withTimeoutOrNull(maxWaitMs) {
+                val result = CompletableDeferred<Boolean>()
+                checkServerStatus(
+                    port = port,
+                    onLoginSuccess = { result.complete(true) },
+                    onLoginFailure = { result.complete(false) },
+                    onServerDown = { result.complete(false) },
+                    baseDelay = 100L,
+                    maxDelay = 600L,
+                    maxAttempts = 5
+                )
+                result.await()
+            }
+            return response == true
         }
 
-        if (BinaryService.isRunning && waitForHttpServer()) {
-            return true
-        }
-
-        // If service process is already up, don't block autoplay on endpoint warm-up timing.
         if (BinaryService.isRunning) {
-            return true
+            // Keep this short so autoplay does not stall UI flow when endpoint warm-up is slow.
+            return waitForHttpServer(2500L) || true
         }
 
         val activity = context as? ComponentActivity ?: return false
@@ -263,7 +266,10 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
             )
         }
 
-        return waitForHttpServer() || BinaryService.isRunning
+        // Give binary a brief moment to bind sockets before probe.
+        delay(300)
+
+        return waitForHttpServer(9000L) || BinaryService.isRunning
     }
 
     suspend fun launchFirstChannel(channelsToUse: List<Channel>): Boolean {
@@ -551,8 +557,6 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(text = waitingDots, style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold))
                 Spacer(modifier = Modifier.height(10.dp))
-                Text(text = waitingDots, style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold))
-                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "Auto-retrying channel load in ${autoLoadCountdown}s...",
                     style = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Bold),

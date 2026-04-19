@@ -123,6 +123,15 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         runOnceAfterAppUpgrade()
         preferenceManager = SkySharedPref.getInstance(this)
+
+        // One-time default migration: if auto-start was never explicitly saved,
+        // enable it so server starts automatically on app open by default.
+        val rawPrefs = getSharedPreferences("SkySharedPref", MODE_PRIVATE)
+        if (!rawPrefs.contains("auto_start_server")) {
+            preferenceManager.myPrefs.autoStartServer = true
+            preferenceManager.savePreferences()
+        }
+
         BinaryUpdater.init(this)
 
 // DEL----------------------------------------------------------
@@ -194,6 +203,20 @@ class MainActivity : ComponentActivity() {
         jtvConfigManager.saveJTVConfiguration()
         isServerRunning = BinaryService.isRunning
 
+        if (preferenceManager.myPrefs.setupPending) {
+            val binaryName = preferenceManager.myPrefs.jtvGoBinaryName
+            val binaryFileReady = !binaryName.isNullOrBlank() && File(filesDir, binaryName).exists()
+            val configPath = preferenceManager.myPrefs.jtvConfigLocation
+            val configFileReady = !configPath.isNullOrBlank() && File(configPath).exists()
+            val canSkipSetup = (isServerRunning || binaryFileReady) && configFileReady
+
+            if (canSkipSetup) {
+                Log.d(TAG, "Skipping setup wizard: binary and config are already ready")
+                preferenceManager.myPrefs.setupPending = false
+                preferenceManager.savePreferences()
+            }
+        }
+
         if (!preferenceManager.myPrefs.enableCustomChannels && wasServerRunning && hadCustomChannelsConfigured) {
             stopBinary(context = this, onBinaryStopped = {
                 isServerRunning = false
@@ -219,7 +242,6 @@ class MainActivity : ComponentActivity() {
 
             countdownJob?.cancel()
             countdownJob = null
-            preferenceManager.myPrefs.autoStartServer = false
             preferenceManager.savePreferences()
             finish()
             return
@@ -231,9 +253,11 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Check if server should start automatically
-        val isFlagSetForAutoStartServer = preferenceManager.myPrefs.autoStartServer
-        if (isFlagSetForAutoStartServer && (!BinaryService.isRunning || isFirstAppOpen)) {
+        // Check if server should start automatically.
+        // Treat TV autoplay as an implicit server-autostart request to avoid flag drift.
+        val shouldAutoStartServer =
+            preferenceManager.myPrefs.autoStartServer || preferenceManager.myPrefs.startTvAutomatically
+        if (shouldAutoStartServer && (!BinaryService.isRunning || isFirstAppOpen)) {
             Log.d(TAG, "Starting server automatically (forceStart=$isFirstAppOpen)")
             val arguments = emptyArray<String>()
             runBinary(
