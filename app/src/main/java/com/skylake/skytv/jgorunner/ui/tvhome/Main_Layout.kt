@@ -247,6 +247,12 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
             return true
         }
 
+        // Be permissive for autoplay: if the service is already running,
+        // allow playback attempt even when the health probe endpoint is delayed.
+        if (BinaryService.isRunning) {
+            return true
+        }
+
         val activity = context as? ComponentActivity ?: return false
         withContext(Dispatchers.Main) {
             runBinary(
@@ -258,7 +264,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
             )
         }
 
-        return waitForHttpServer()
+        return waitForHttpServer() || BinaryService.isRunning
     }
 
     suspend fun launchFirstChannel(channelsToUse: List<Channel>): Boolean {
