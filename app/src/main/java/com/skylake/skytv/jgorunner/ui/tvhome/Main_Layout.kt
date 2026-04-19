@@ -247,6 +247,11 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
             return true
         }
 
+        // If service process is already up, don't block autoplay on endpoint warm-up timing.
+        if (BinaryService.isRunning) {
+            return true
+        }
+
         val activity = context as? ComponentActivity ?: return false
         withContext(Dispatchers.Main) {
             runBinary(
@@ -258,7 +263,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
             )
         }
 
-        return waitForHttpServer()
+        return waitForHttpServer() || BinaryService.isRunning
     }
 
     suspend fun launchFirstChannel(channelsToUse: List<Channel>): Boolean {
@@ -409,7 +414,10 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
             fetched = true
         }
 
-        if (preferenceManager.myPrefs.startTvAutomatically && !AppStartTracker.shouldPlayChannel) {
+        val canAutoplay = !AppStartTracker.shouldPlayChannel ||
+            preferenceManager.myPrefs.currChannelUrl.isNullOrEmpty()
+
+        if (preferenceManager.myPrefs.startTvAutomatically && canAutoplay) {
             var channelsForAutoplay = filteredChannels.value
             if (channelsForAutoplay.isEmpty()) {
                 channelsForAutoplay = fetchFromBackend()
@@ -426,10 +434,13 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
 
     // If channels arrive later (e.g., from retry loop), try autoplay again while sentinel is false.
     LaunchedEffect(filteredChannels.value) {
+        val canAutoplay = !AppStartTracker.shouldPlayChannel ||
+            preferenceManager.myPrefs.currChannelUrl.isNullOrEmpty()
+
         if (
             preferenceManager.myPrefs.startTvAutomatically &&
             filteredChannels.value.isNotEmpty() &&
-            !AppStartTracker.shouldPlayChannel
+            canAutoplay
         ) {
             launchFirstChannel(filteredChannels.value)
         }
