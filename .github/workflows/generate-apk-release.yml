@@ -63,22 +63,13 @@ jobs:
       - name: Change permissions for gradlew
         run: chmod +x ./gradlew
 
-      # Compile release Kotlin with verbose output so the exact compiler error is visible in logs
-      - name: Compile release Kotlin (verbose)
-        run: |
-          ./gradlew :${{ env.main_project_module }}:compileReleaseKotlin --stacktrace --info --warning-mode all \
-            | tee gradle-compile-release.log
-
-      - name: Upload compile log artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gradle-compile-release-log
-          path: gradle-compile-release.log
+      # Build all modules
+      - name: Build gradle project
+        run: ./gradlew build
 
       # Assemble release APK for main module
       - name: Build release APK
-        run: ./gradlew :${{ env.main_project_module }}:assembleRelease --stacktrace --warning-mode all
+        run: ./gradlew :${{ env.main_project_module }}:assembleRelease
 
       # Rename the signed APK
       - name: Rename APK with version and app name

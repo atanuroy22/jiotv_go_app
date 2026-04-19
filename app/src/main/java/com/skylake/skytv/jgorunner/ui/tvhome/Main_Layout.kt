@@ -59,7 +59,7 @@ import com.bumptech.glide.integration.compose.GlideImage
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
-import com.skylake.skytv.jgorunner.core.checkServerStatus
+import com.skylake.skytv.jgorunner.core.ServerUtils.checkServerStatus
 import com.skylake.skytv.jgorunner.core.execution.runBinary
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.BinaryService
@@ -229,44 +229,6 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
         }
     }
 
-    suspend fun ensureServerReady(): Boolean {
-        val port = preferenceManager.myPrefs.jtvGoServerPort
-
-        suspend fun waitForHttpServer(): Boolean {
-            val result = CompletableDeferred<Boolean>()
-            checkServerStatus(
-                port = port,
-                onLoginSuccess = { result.complete(true) },
-                onLoginFailure = { result.complete(false) },
-                onServerDown = { result.complete(false) }
-            )
-            return result.await()
-        }
-
-        if (BinaryService.isRunning && waitForHttpServer()) {
-            return true
-        }
-
-        // Be permissive for autoplay: if the service is already running,
-        // allow playback attempt even when the health probe endpoint is delayed.
-        if (BinaryService.isRunning) {
-            return true
-        }
-
-        val activity = context as? ComponentActivity ?: return false
-        withContext(Dispatchers.Main) {
-            runBinary(
-                activity = activity,
-                arguments = emptyArray(),
-                onRunSuccess = {},
-                onOutput = { },
-                forceStart = false
-            )
-        }
-
-        return waitForHttpServer() || BinaryService.isRunning
-    }
-
     suspend fun launchFirstChannel(channelsToUse: List<Channel>): Boolean {
         return try {
             if (!ensureServerReady()) {
@@ -325,6 +287,38 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
         } catch (_: Exception) {
             false
         }
+    }
+
+    suspend fun ensureServerReady(): Boolean {
+        val port = preferenceManager.myPrefs.jtvGoServerPort
+
+        suspend fun waitForHttpServer(): Boolean {
+            val result = CompletableDeferred<Boolean>()
+            checkServerStatus(
+                port = port,
+                onLoginSuccess = { result.complete(true) },
+                onLoginFailure = { result.complete(false) },
+                onServerDown = { result.complete(false) }
+            )
+            return result.await()
+        }
+
+        if (BinaryService.isRunning && waitForHttpServer()) {
+            return true
+        }
+
+        val activity = context as? ComponentActivity ?: return false
+        withContext(Dispatchers.Main) {
+            runBinary(
+                activity = activity,
+                arguments = emptyArray(),
+                onRunSuccess = {},
+                onOutput = { },
+                forceStart = false
+            )
+        }
+
+        return waitForHttpServer()
     }
 
     suspend fun watchdogAutoplay(channels: List<Channel>): Boolean {
