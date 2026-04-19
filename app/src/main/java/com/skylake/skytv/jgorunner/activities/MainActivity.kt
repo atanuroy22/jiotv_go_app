@@ -95,7 +95,7 @@ class MainActivity : ComponentActivity() {
 
     // SharedPreferences for saving binary selection
     private var outputText by mutableStateOf("ℹ️ Output logs")
-    private var currentScreen by mutableStateOf("Home") // Manage current screen
+    private var currentScreen by mutableStateOf("Zone") // Default to the new TV UI
 
     private val executor = Executors.newSingleThreadExecutor()
     private var showBinaryUpdatePopup by mutableStateOf(false)
@@ -144,11 +144,14 @@ class MainActivity : ComponentActivity() {
 
         val appPackageName = preferenceManager.myPrefs.iptvAppPackageName
 
-        if (!appPackageName.isNullOrEmpty()) {
-            if (appPackageName == "tvzone") {
-                preferenceManager.myPrefs.autoStartIPTV = false
-                currentScreen = "Zone"
-            }
+        val isTvZoneSelected = appPackageName.equals("tvzone", ignoreCase = true)
+        val shouldOpenZoneOnStart = isTvZoneSelected || preferenceManager.myPrefs.startTvAutomatically
+
+        if (isTvZoneSelected) {
+            preferenceManager.myPrefs.autoStartIPTV = false
+        }
+        if (shouldOpenZoneOnStart) {
+            currentScreen = "Zone"
         }
 
         if (preferenceManager.myPrefs.jtvGoBinaryVersion?.contains(
@@ -249,7 +252,7 @@ class MainActivity : ComponentActivity() {
 
         // Keep startup landing consistent for TVZone users.
         // If startup is still on Home after setup checks, route to Zone.
-        if (preferenceManager.myPrefs.iptvAppPackageName == "tvzone" && currentScreen == "Home") {
+        if (shouldOpenZoneOnStart && currentScreen == "Home") {
             currentScreen = "Zone"
         }
 
