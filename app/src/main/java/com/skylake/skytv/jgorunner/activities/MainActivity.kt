@@ -247,6 +247,12 @@ class MainActivity : ComponentActivity() {
             return
         }
 
+        // Keep startup landing consistent for TVZone users.
+        // If startup is still on Home after setup checks, route to Zone.
+        if (preferenceManager.myPrefs.iptvAppPackageName == "tvzone" && currentScreen == "Home") {
+            currentScreen = "Zone"
+        }
+
         if (isServerRunning) {
             BinaryService.instance?.binaryOutput?.observe(this) {
                 outputText = it
