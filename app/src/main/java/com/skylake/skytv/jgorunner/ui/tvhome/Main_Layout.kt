@@ -59,19 +59,86 @@ import com.bumptech.glide.integration.compose.GlideImage
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
-import com.skylake.skytv.jgorunner.core.checkServerStatus
 import com.skylake.skytv.jgorunner.core.execution.runBinary
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.BinaryService
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 import com.skylake.skytv.jgorunner.utils.withQuality
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
+import java.util.concurrent.TimeUnit
+
+private const val TV_STARTUP_TIMEOUT_MS = 8_000L
+private const val TV_STARTUP_POLL_DELAY_MS = 350L
+private const val TV_STARTUP_MAX_FALLBACK_CHANNELS = 4
+private const val TV_STREAM_CONNECT_TIMEOUT_MS = 1_250L
+private const val TV_STREAM_READ_TIMEOUT_MS = 1_250L
+private const val TV_STREAM_CALL_TIMEOUT_MS = 1_750L
+private const val TV_PREFLIGHT_CONNECT_TIMEOUT_MS = 650L
+private const val TV_PREFLIGHT_READ_TIMEOUT_MS = 650L
+private const val TV_PREFLIGHT_CALL_TIMEOUT_MS = 900L
+
+private data class TvStartupReadiness(
+    val ready: Boolean,
+    val reason: String? = null
+)
+
+private sealed class TvStartupOutcome {
+    data object Idle : TvStartupOutcome()
+    data object Checking : TvStartupOutcome()
+    data class Timeout(val reason: String) : TvStartupOutcome()
+    data class Failure(val reason: String) : TvStartupOutcome()
+}
+
+private suspend fun probeStreamEndpoint(
+    url: String,
+    connectTimeoutMs: Long = TV_STREAM_CONNECT_TIMEOUT_MS,
+    readTimeoutMs: Long = TV_STREAM_READ_TIMEOUT_MS,
+    callTimeoutMs: Long = TV_STREAM_CALL_TIMEOUT_MS
+): Boolean {
+    return withContext(Dispatchers.IO) {
+        val client = OkHttpClient.Builder()
+            .connectTimeout(connectTimeoutMs, TimeUnit.MILLISECONDS)
+            .readTimeout(readTimeoutMs, TimeUnit.MILLISECONDS)
+            .callTimeout(callTimeoutMs, TimeUnit.MILLISECONDS)
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .build()
+
+        fun execute(method: String): Int? {
+            val request = Request.Builder()
+                .url(url)
+                .method(method, null)
+                .build()
+
+            return client.newCall(request).execute().use { response ->
+                response.code
+            }
+        }
+
+        try {
+            val headCode = execute("HEAD")
+            if (headCode != null && headCode in 200..299) {
+                return@withContext true
+            }
+
+            if (headCode == 405 || headCode == 501) {
+                val getCode = execute("GET")
+                return@withContext getCode != null && getCode in 200..299
+            }
+
+            false
+        } catch (_: Exception) {
+            false
+        }
+    }
+}
 
 @SuppressLint("MutableCollectionMutableState")
 @OptIn(ExperimentalGlideComposeApi::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -100,6 +167,10 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
     var waitingDots by remember { mutableStateOf("") }
     var autoLoadCountdown by remember { mutableIntStateOf(5) }
     var autoRetryLoopRunning by remember { mutableStateOf(false) }
+    var startupOutcome by remember { mutableStateOf<TvStartupOutcome>(TvStartupOutcome.Idle) }
+    var startupRetryToken by rememberSaveable { mutableIntStateOf(0) }
+    var startupLaunchSessionKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var startupLaunchInProgress by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
     remember { FocusRequester() }
@@ -211,7 +282,6 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
     }
 
 
-    // Helper functions for enhanced autoplay
     suspend fun fetchFromBackend(): List<Channel> {
         return try {
             ChannelUtils.fetchChannels("$basefinURL/channels")?.let { response ->
@@ -230,120 +300,177 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
         }
     }
 
-    suspend fun ensureServerReady(): Boolean {
+    suspend fun ensureServerReady(): TvStartupReadiness {
         val port = preferenceManager.myPrefs.jtvGoServerPort
+        val url = "http://localhost:$port/live/143.m3u8"
 
-        suspend fun waitForHttpServer(maxWaitMs: Long): Boolean {
-            val response = withTimeoutOrNull(maxWaitMs) {
-                val result = CompletableDeferred<Boolean>()
-                checkServerStatus(
-                    port = port,
-                    onLoginSuccess = { result.complete(true) },
-                    onLoginFailure = { result.complete(false) },
-                    onServerDown = { result.complete(false) },
-                    baseDelay = 100L,
-                    maxDelay = 600L,
-                    maxAttempts = 5
+        val activity = context as? ComponentActivity
+            ?: return TvStartupReadiness(false, "TV autoplay requires an activity context")
+
+        if (!BinaryService.isRunning) {
+            Log.d("TVAutoplay", "Service start requested before readiness probe")
+            withContext(Dispatchers.Main) {
+                runBinary(
+                    activity = activity,
+                    arguments = emptyArray(),
+                    onRunSuccess = {
+                        Log.d("TVAutoplay", "Binary service start acknowledged")
+                    },
+                    onOutput = { },
+                    forceStart = false
                 )
-                result.await()
             }
-            return response == true
         }
 
-        if (BinaryService.isRunning) {
-            // Keep this short so autoplay does not stall UI flow when endpoint warm-up is slow.
-            return waitForHttpServer(2500L) || true
+        var lastProbeReason: String? = null
+        val readiness = withTimeoutOrNull(TV_STARTUP_TIMEOUT_MS) {
+            var attempt = 0
+            while (true) {
+                attempt++
+                Log.d("TVAutoplay", "HTTP ready probe attempt=$attempt url=$url")
+                if (probeStreamEndpoint(url)) {
+                    Log.d("TVAutoplay", "HTTP ready true after attempt=$attempt")
+                    return@withTimeoutOrNull TvStartupReadiness(ready = true)
+                }
+                lastProbeReason = "Attempt $attempt did not return a playable HTTP response"
+                delay(TV_STARTUP_POLL_DELAY_MS)
+            }
         }
 
-        val activity = context as? ComponentActivity ?: return false
-        withContext(Dispatchers.Main) {
-            runBinary(
-                activity = activity,
-                arguments = emptyArray(),
-                onRunSuccess = {},
-                onOutput = { },
-                forceStart = false
-            )
-        }
-
-        // Give binary a brief moment to bind sockets before probe.
-        delay(300)
-
-        return waitForHttpServer(9000L) || BinaryService.isRunning
+        return readiness ?: TvStartupReadiness(
+            ready = false,
+            reason = lastProbeReason ?: "Timed out after ${TV_STARTUP_TIMEOUT_MS / 1000}s waiting for $url"
+        )
     }
 
-    suspend fun launchFirstChannel(channelsToUse: List<Channel>): Boolean {
+    suspend fun launchFirstChannel(channelsToUse: List<Channel>, sessionKey: String): Boolean {
+        if (channelsToUse.isEmpty()) {
+            return false
+        }
+
+        if (startupLaunchInProgress || startupLaunchSessionKey == sessionKey) {
+            Log.d("TVAutoplay", "Skipping autoplay launch for session=$sessionKey")
+            return false
+        }
+
+        startupLaunchInProgress = true
+        startupLaunchSessionKey = sessionKey
         return try {
-            if (!ensureServerReady()) {
+            startupOutcome = TvStartupOutcome.Checking
+            showLoading = true
+
+            val readiness = ensureServerReady()
+            if (!readiness.ready) {
+                val reason = readiness.reason ?: "Server readiness timed out"
+                Log.w("TVAutoplay", reason)
+                startupOutcome = TvStartupOutcome.Timeout(reason)
+                showLoading = false
                 return false
             }
 
-            val firstChannel = channelsToUse.first()
-            val (channelWindow, relativeIndex) = buildChannelInfoWindow(
-                context = context,
-                channels = channelsToUse,
-                basefinURL = basefinURL,
-                centerIndex = 0
-            )
-            val intent = Intent(context, ExoPlayJet::class.java).apply {
-                putExtra("zone", "TV")
-                if (firstChannel.channel_id.all { it.isDigit() }) putExtra("channel_list_kind", "jio")
-                putExtra("current_channel_index", relativeIndex)
-                putParcelableArrayListExtra("channel_list_data", channelWindow)
-                putExtra("video_url", firstChannel.channel_url)
-                putExtra(
-                    "logo_url",
-                    if (firstChannel.logoUrl.startsWith("http")) firstChannel.logoUrl else "http://localhost:$localPORT/jtvimage/${firstChannel.logoUrl}"
+            val candidates = channelsToUse.take(TV_STARTUP_MAX_FALLBACK_CHANNELS)
+            for ((candidateIndex, candidate) in candidates.withIndex()) {
+                Log.d(
+                    "TVAutoplay",
+                    "Autoplay attempt index=${candidateIndex + 1}/${candidates.size} channel=${candidate.channel_name}"
                 )
-                putExtra("ch_name", firstChannel.channel_name)
-            }
-
-            delay(1000)
-            if (context !is Activity) {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(intent)
-
-            val recentChannelsJson = preferenceManager.myPrefs.recentChannels
-            val type = object : TypeToken<List<Channel>>() {}.type
-            val recentChannels: MutableList<Channel> =
-                Gson().fromJson(recentChannelsJson, type) ?: mutableListOf()
-
-            val existingIndex =
-                recentChannels.indexOfFirst { it.channel_id == firstChannel.channel_id }
-
-            if (existingIndex != -1) {
-                val existingChannel = recentChannels[existingIndex]
-                recentChannels.removeAt(existingIndex)
-                recentChannels.add(0, existingChannel)
-            } else {
-                recentChannels.add(0, firstChannel)
-                if (recentChannels.size > 25) {
-                    recentChannels.removeAt(recentChannels.size - 1)
+                if (!probeStreamEndpoint(
+                        url = candidate.channel_url,
+                        connectTimeoutMs = TV_PREFLIGHT_CONNECT_TIMEOUT_MS,
+                        readTimeoutMs = TV_PREFLIGHT_READ_TIMEOUT_MS,
+                        callTimeoutMs = TV_PREFLIGHT_CALL_TIMEOUT_MS
+                    )) {
+                    Log.w(
+                        "TVAutoplay",
+                        "Skipping candidate index=$candidateIndex due to preflight failure"
+                    )
+                    continue
                 }
-            }
-            preferenceManager.myPrefs.recentChannels = Gson().toJson(recentChannels)
-            preferenceManager.savePreferences()
+                val (channelWindow, relativeIndex) = buildChannelInfoWindow(
+                    context = context,
+                    channels = channelsToUse,
+                    basefinURL = basefinURL,
+                    centerIndex = candidateIndex
+                )
+                val intent = Intent(context, ExoPlayJet::class.java).apply {
+                    putExtra("zone", "TV")
+                    if (candidate.channel_id.all { it.isDigit() }) putExtra("channel_list_kind", "jio")
+                    putExtra("current_channel_index", relativeIndex)
+                    putParcelableArrayListExtra("channel_list_data", channelWindow)
+                    putExtra("video_url", candidate.channel_url)
+                    putExtra(
+                        "logo_url",
+                        if (candidate.logoUrl.startsWith("http")) candidate.logoUrl else "http://localhost:$localPORT/jtvimage/${candidate.logoUrl}"
+                    )
+                    putExtra("ch_name", candidate.channel_name)
+                }
 
-            AppStartTracker.shouldPlayChannel = true
-            true
-        } catch (_: Exception) {
+                if (context !is Activity) {
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+
+                withContext(Dispatchers.Main) {
+                    context.startActivity(intent)
+                }
+
+                val recentChannelsJson = preferenceManager.myPrefs.recentChannels
+                val type = object : TypeToken<List<Channel>>() {}.type
+                val recentChannels: MutableList<Channel> =
+                    Gson().fromJson(recentChannelsJson, type) ?: mutableListOf()
+
+                val existingIndex = recentChannels.indexOfFirst { it.channel_id == candidate.channel_id }
+
+                if (existingIndex != -1) {
+                    val existingChannel = recentChannels[existingIndex]
+                    recentChannels.removeAt(existingIndex)
+                    recentChannels.add(0, existingChannel)
+                } else {
+                    recentChannels.add(0, candidate)
+                    if (recentChannels.size > 25) {
+                        recentChannels.removeAt(recentChannels.size - 1)
+                    }
+                }
+                preferenceManager.myPrefs.recentChannels = Gson().toJson(recentChannels)
+                preferenceManager.savePreferences()
+
+                AppStartTracker.shouldPlayChannel = true
+                startupOutcome = TvStartupOutcome.Idle
+                showLoading = false
+                Log.d("TVAutoplay", "Autoplay launched channel index=$candidateIndex")
+                return true
+            }
+
+            val failureReason = "All ${candidates.size} autoplay candidates failed preflight"
+            Log.w("TVAutoplay", failureReason)
+            startupOutcome = TvStartupOutcome.Failure(failureReason)
+            showLoading = false
             false
+        } catch (_: Exception) {
+            val failureReason = "Autoplay launch failed unexpectedly"
+            startupOutcome = TvStartupOutcome.Failure(failureReason)
+            showLoading = false
+            false
+        } finally {
+            startupLaunchInProgress = false
         }
     }
 
-    suspend fun watchdogAutoplay(channels: List<Channel>): Boolean {
+    suspend fun watchdogAutoplay(channels: List<Channel>, sessionKey: String): Boolean {
         repeat(5) {
             if (preferenceManager.myPrefs.currChannelUrl.isNullOrEmpty()) {
                 val channelsToUse = channels.ifEmpty { fetchFromBackend() }
                 if (channelsToUse.isNotEmpty()) {
-                    if (launchFirstChannel(channelsToUse)) {
+                    if (launchFirstChannel(channelsToUse, sessionKey)) {
                         return true
                     }
                 }
             }
             delay(2000)
         }
+        if (startupOutcome is TvStartupOutcome.Checking) {
+            startupOutcome = TvStartupOutcome.Failure("No playable channels became available during startup")
+        }
+        showLoading = false
         return false
     }
 
@@ -356,8 +483,10 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
         return fetchedChannels
     }
 
-    // Fetch and filter channels (cache/network)
-    LaunchedEffect(reloadTrigger) {
+    // Fetch and filter channels (cache/network), then gate autoplay through one startup session.
+    LaunchedEffect(reloadTrigger, startupRetryToken) {
+        val sessionKey = "$reloadTrigger:$startupRetryToken"
+        showLoading = true
         val sharedPref = context.getSharedPreferences(channelCachePrefsName, Context.MODE_PRIVATE)
         var cachedChannels: ChannelResponse? = null
         var hasValidCachedChannels = false
@@ -430,26 +559,15 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
             }
 
             if (channelsForAutoplay.isNotEmpty()) {
-                launchFirstChannel(channelsForAutoplay)
+                launchFirstChannel(channelsForAutoplay, sessionKey)
             } else {
-                watchdogAutoplay(channelsForAutoplay)
+                watchdogAutoplay(channelsForAutoplay, sessionKey)
             }
+        } else {
+            showLoading = false
+            startupOutcome = TvStartupOutcome.Idle
         }
 
-    }
-
-    // If channels arrive later (e.g., from retry loop), try autoplay again while sentinel is false.
-    LaunchedEffect(filteredChannels.value) {
-        val canAutoplay = !AppStartTracker.shouldPlayChannel ||
-            preferenceManager.myPrefs.currChannelUrl.isNullOrEmpty()
-
-        if (
-            preferenceManager.myPrefs.startTvAutomatically &&
-            filteredChannels.value.isNotEmpty() &&
-            canAutoplay
-        ) {
-            launchFirstChannel(filteredChannels.value)
-        }
     }
 
     LaunchedEffect(showSecondLanguageAddonSelector, secondLanguageIdForUi) {
@@ -524,26 +642,95 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
         }
     }
 
-    LaunchedEffect(fetched) {
-        if (!fetched) {
-            delay(100)
-            if (!fetched) showLoading = true
+    // UI: Startup readiness, recovery and content.
+    val currentStartupOutcome = startupOutcome
+    if (currentStartupOutcome is TvStartupOutcome.Timeout || currentStartupOutcome is TvStartupOutcome.Failure) {
+        val reason = if (currentStartupOutcome is TvStartupOutcome.Timeout) {
+            currentStartupOutcome.reason
         } else {
-            showLoading = false
+            (currentStartupOutcome as TvStartupOutcome.Failure).reason
         }
-    }
-
-    // UI: Loading state
-    if (showLoading) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxSize()
         ) {
-            ContainedLoadingIndicator(modifier = Modifier.size(100.dp))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = if (currentStartupOutcome is TvStartupOutcome.Timeout) {
+                        "Startup timed out"
+                    } else {
+                        "Startup failed"
+                    },
+                    style = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold),
+                    color = Color.Red
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = reason,
+                    style = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Medium),
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                ElevatedCard(
+                    onClick = {
+                        startupOutcome = TvStartupOutcome.Checking
+                        showLoading = true
+                        startupRetryToken++
+                    }
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Refresh,
+                            contentDescription = "Retry startup"
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Retry startup")
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                ElevatedCard(
+                    onClick = {
+                        startupOutcome = TvStartupOutcome.Idle
+                        showLoading = !fetched
+                    }
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Done,
+                            contentDescription = "Open channel list"
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Open channel list")
+                    }
+                }
+            }
         }
-    }
-    // UI: Empty state
-    else if (fetched && filteredChannels.value.isEmpty()) {
+    } else if (showLoading || currentStartupOutcome is TvStartupOutcome.Checking) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                ContainedLoadingIndicator(modifier = Modifier.size(100.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = if (currentStartupOutcome is TvStartupOutcome.Checking) {
+                        "Waiting for server readiness..."
+                    } else {
+                        "Loading channels..."
+                    },
+                    style = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Medium),
+                    color = Color.White
+                )
+            }
+        }
+    } else if (fetched && filteredChannels.value.isEmpty()) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxSize()
@@ -600,9 +787,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                 }
             }
         }
-    }
-    // UI: Main content
-    else {
+    } else {
         // CATEGORY CHIPS
         LazyRow(
             modifier = Modifier
