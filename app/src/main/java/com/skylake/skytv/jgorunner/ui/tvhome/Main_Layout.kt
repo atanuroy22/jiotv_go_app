@@ -335,6 +335,10 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                 lastProbeReason = "Attempt $attempt did not return a playable HTTP response"
                 delay(TV_STARTUP_POLL_DELAY_MS)
             }
+            TvStartupReadiness(
+                ready = false,
+                reason = lastProbeReason ?: "Timed out after ${TV_STARTUP_TIMEOUT_MS / 1000}s waiting for $url"
+            )
         }
 
         return readiness ?: TvStartupReadiness(
