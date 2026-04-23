@@ -323,7 +323,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
         }
 
         var lastProbeReason: String? = null
-        val readiness = withTimeoutOrNull(TV_STARTUP_TIMEOUT_MS) {
+        val readiness: TvStartupReadiness? = withTimeoutOrNull(TV_STARTUP_TIMEOUT_MS) {
             var attempt = 0
             while (true) {
                 attempt++
