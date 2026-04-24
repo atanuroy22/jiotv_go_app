@@ -480,12 +480,10 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
 
     suspend fun watchdogAutoplay(channels: List<Channel>, sessionKey: String): Boolean {
         repeat(5) {
-            if (preferenceManager.myPrefs.currChannelUrl.isNullOrEmpty()) {
-                val channelsToUse = channels.ifEmpty { fetchFromBackend() }
-                if (channelsToUse.isNotEmpty()) {
-                    if (launchFirstChannel(channelsToUse, sessionKey)) {
-                        return true
-                    }
+            val channelsToUse = channels.ifEmpty { fetchFromBackend() }
+            if (channelsToUse.isNotEmpty()) {
+                if (launchFirstChannel(channelsToUse, sessionKey)) {
+                    return true
                 }
             }
             delay(2000)
@@ -572,8 +570,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
             fetched = true
         }
 
-        val canAutoplay = !AppStartTracker.shouldPlayChannel ||
-            preferenceManager.myPrefs.currChannelUrl.isNullOrEmpty()
+        val canAutoplay = !AppStartTracker.shouldPlayChannel
 
         if (preferenceManager.myPrefs.startTvAutomatically && canAutoplay) {
             var channelsForAutoplay = filteredChannels.value

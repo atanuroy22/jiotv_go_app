@@ -163,7 +163,6 @@ fun ExoPlayJetScreen(
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val overlayDisplayTimeMs = 3000
     val localPORT by remember { mutableIntStateOf(preferenceManager.myPrefs.jtvGoServerPort) }
     val basefinURL = "http://localhost:$localPORT"
     val tvNAV = preferenceManager.myPrefs.selectedRemoteNavTV ?: "0"
@@ -176,6 +175,7 @@ fun ExoPlayJetScreen(
             false
         }
     }
+    val overlayDisplayTimeMs = if (isTv) 1200 else 3000
     val focusRequester = remember { FocusRequester() }
     var currentIndex by remember { mutableStateOf(currentChannelIndex) }
     var overrideVideoUrl by remember { mutableStateOf<String?>(null) }
@@ -190,6 +190,7 @@ fun ExoPlayJetScreen(
     val scope = rememberCoroutineScope()
     var numericJob: Job? by remember { mutableStateOf(null) }
     var isControllerVisible by remember { mutableStateOf(false) }
+    var controllerAutoHideJob: Job? by remember { mutableStateOf(null) }
     var zoneWebView: WebView? by remember { mutableStateOf(null) }
     var isWebLoading by remember { mutableStateOf(false) }
     var lastLoadedZoneDrmUrl by remember { mutableStateOf<String?>(null) }
@@ -336,6 +337,19 @@ fun ExoPlayJetScreen(
             true
         } catch (_: Exception) {
             false
+        }
+    }
+
+    fun scheduleControllerAutoHide() {
+        if (!isTv || PlayerCommandBus.isInPipMode) return
+        controllerAutoHideJob?.cancel()
+        controllerAutoHideJob = scope.launch {
+            delay(1_800)
+            exoPlayerView?.hideController()
+            isControllerVisible = false
+            showChannelPanel = false
+            showResizeOverlay = false
+            showNumericOverlay = false
         }
     }
 
@@ -615,6 +629,7 @@ fun ExoPlayJetScreen(
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             zoneWebRetryJob?.cancel()
+            controllerAutoHideJob?.cancel()
             try {
                 zoneWebView?.destroy()
             } catch (_: Exception) {
@@ -1400,7 +1415,7 @@ fun ExoPlayJetScreen(
                     // retries, and player resets — this is the primary fix for black screens.
                     setKeepContentOnPlayerReset(true)
                     controllerAutoShow = false
-                    controllerShowTimeoutMs = 3000
+                    controllerShowTimeoutMs = if (isTv) 1_800 else 3_000
                     setResizeMode(resizeModes[resizeModeIndex].first)
                     player = exoPlayer
                     exoPlayerView = this
@@ -1408,6 +1423,11 @@ fun ExoPlayJetScreen(
                     setControllerVisibilityListener(
                         PlayerView.ControllerVisibilityListener { visibility ->
                             isControllerVisible = visibility == View.VISIBLE
+                            if (visibility == View.VISIBLE) {
+                                scheduleControllerAutoHide()
+                            } else {
+                                controllerAutoHideJob?.cancel()
+                            }
                         }
                     )
 
@@ -1646,6 +1666,12 @@ fun ExoPlayJetScreen(
         LaunchedEffect(showChannelPanel) {
             if (showChannelPanel) {
                 focusRequester.requestFocus()
+            }
+        }
+
+        LaunchedEffect(isControllerVisible, showChannelPanel, showResizeOverlay, showNumericOverlay) {
+            if (isTv && (isControllerVisible || showChannelPanel || showResizeOverlay || showNumericOverlay)) {
+                scheduleControllerAutoHide()
             }
         }
 
