@@ -117,6 +117,7 @@ class MainActivity : ComponentActivity() {
     private var showOperationDialog by mutableStateOf(false)
 
     private var isSwitchDarkMode by mutableStateOf(false)
+    private var serverStartRequestedAt by mutableStateOf(0L)
 
     override fun onStart() {
         super.onStart()
@@ -1008,6 +1009,7 @@ class MainActivity : ComponentActivity() {
     private fun onJTVServerRun() {
         // Check server status
         val port = preferenceManager.myPrefs.jtvGoServerPort
+        serverStartRequestedAt = System.currentTimeMillis()
         CoroutineScope(Dispatchers.IO).launch {
             checkServerStatus(
                 port = port,
@@ -1073,6 +1075,14 @@ class MainActivity : ComponentActivity() {
                 onServerDown = {
                     CoroutineScope(Dispatchers.Main).launch {
                         isGlowBox = false
+                        val startupGraceMs = 15_000L
+                        val startupAgeMs = System.currentTimeMillis() - serverStartRequestedAt
+                        if (startupAgeMs in 0 until startupGraceMs) {
+                            isServerRunning = true
+                            outputText = "Server starting..."
+                            return@launch
+                        }
+
                         val shouldAutoStartServer =
                             preferenceManager.myPrefs.autoStartServer || preferenceManager.myPrefs.startTvAutomatically
                         if (shouldAutoStartServer) {

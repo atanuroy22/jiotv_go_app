@@ -76,6 +76,7 @@ import java.util.concurrent.TimeUnit
 
 private const val TV_STARTUP_TIMEOUT_MS = 5_000L
 private const val TV_STARTUP_POLL_DELAY_MS = 250L
+private const val TV_AUTOPLAY_SETTLE_DELAY_MS = 900L
 private const val TV_STARTUP_MAX_FALLBACK_CHANNELS = 4
 private const val TV_STREAM_CONNECT_TIMEOUT_MS = 1_250L
 private const val TV_STREAM_READ_TIMEOUT_MS = 1_250L
@@ -391,6 +392,8 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                 showLoading = false
                 return false
             }
+
+            delay(TV_AUTOPLAY_SETTLE_DELAY_MS)
 
             val candidates = channelsToUse.take(TV_STARTUP_MAX_FALLBACK_CHANNELS)
             for ((candidateIndex, candidate) in candidates.withIndex()) {
