@@ -82,8 +82,8 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
-
 class MainActivity : ComponentActivity() {
+
     companion object {
         private const val TAG = "JTVGo::MainActivity"
         // True until the binary has been started at least once in this process lifetime
@@ -278,6 +278,19 @@ class MainActivity : ComponentActivity() {
             val arguments = emptyArray<String>()
             runBinary(
                 activity = this,
+                arguments = arguments,
+                onRunSuccess = {
+                    onJTVServerRun()
+                },
+                onOutput = { output ->
+                    Log.d(TAG, output)
+                    outputText = output
+                },
+                forceStart = forceStart
+            )
+            isFirstAppOpen = false
+        }
+    }
 
     private fun startAutoServerMonitor() {
         if (autoServerMonitorJob?.isActive == true) return
@@ -309,19 +322,6 @@ class MainActivity : ComponentActivity() {
 
                 delay(12_000L)
             }
-        }
-    }
-                arguments = arguments,
-                onRunSuccess = {
-                    onJTVServerRun()
-                },
-                onOutput = { output ->
-                    Log.d(TAG, output)
-                    outputText = output
-                },
-                forceStart = forceStart
-            )
-            isFirstAppOpen = false
         }
     }
 
@@ -572,7 +572,20 @@ class MainActivity : ComponentActivity() {
                             "Cast" -> CastScreen(context = this@MainActivity)
                             "Zone" -> ZoneScreen(
                                 context = this@MainActivity,
-                                onNavigate = { title -> currentScreen = title })
+                                onNavigate = { title -> currentScreen = title },
+                                isServerRunning = isServerRunning,
+                                onServerStartClick = {
+                                    runBinary(
+                                        activity = this@MainActivity,
+                                        arguments = emptyArray(),
+                                        onRunSuccess = {
+                                            onJTVServerRun()
+                                        },
+                                        onOutput = { output ->
+                                            outputText = output
+                                        }
+                                    )
+                                })
                         }
 
                         // Show the redirect popup

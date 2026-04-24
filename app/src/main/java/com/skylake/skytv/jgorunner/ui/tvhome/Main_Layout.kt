@@ -328,7 +328,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
         var lastProbeReason: String? = null
         var startRequested = false
         var forcedRestartRequested = false
-        val readiness: TvStartupReadiness? = withTimeoutOrNull(TV_STARTUP_TIMEOUT_MS) {
+        val readiness: TvStartupReadiness? = withTimeoutOrNull<TvStartupReadiness>(TV_STARTUP_TIMEOUT_MS) {
             var attempt = 0
             while (true) {
                 if (!startRequested) {
@@ -358,6 +358,8 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
 
                 delay(TV_STARTUP_POLL_DELAY_MS)
             }
+
+            error("TV startup readiness timeout block completed unexpectedly")
         }
 
         return readiness ?: TvStartupReadiness(
