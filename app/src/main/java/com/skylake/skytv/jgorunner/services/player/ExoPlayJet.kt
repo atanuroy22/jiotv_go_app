@@ -23,6 +23,7 @@ import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.activities.WebPlayerActivity
 import com.skylake.skytv.jgorunner.core.data.JTVConfigurationManager
 import com.skylake.skytv.jgorunner.data.SkySharedPref
+import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 import com.skylake.skytv.jgorunner.ui.screens.ExoPlayJetScreen
 import com.skylake.skytv.jgorunner.ui.theme.JGOTheme
 import com.skylake.skytv.jgorunner.ui.tvhome.ChannelResponse
@@ -410,6 +411,9 @@ class ExoPlayJet : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        if (isFinishing || !isChangingConfigurations) {
+            AppStartTracker.shouldPlayChannel = false
+        }
         if (!PlayerCommandBus.isInPipMode || isFinishing) {
             PlayerCommandBus.requestStopPlayback()
         }
