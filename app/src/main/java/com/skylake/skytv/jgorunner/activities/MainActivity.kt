@@ -296,22 +296,35 @@ class MainActivity : ComponentActivity() {
         if (autoServerMonitorJob?.isActive == true) return
 
         autoServerMonitorJob = CoroutineScope(Dispatchers.IO).launch {
+            var consecutiveMisses = 0
+            var lastRestartAttemptAt = 0L
             while (true) {
                 val shouldAutoStartServer =
                     preferenceManager.myPrefs.autoStartServer || preferenceManager.myPrefs.startTvAutomatically
 
                 if (!shouldAutoStartServer) {
+                    consecutiveMisses = 0
                     delay(12_000L)
                     continue
                 }
 
                 if (!BinaryService.isRunning) {
-                    Log.d(TAG, "Auto server monitor detected stopped service; requesting restart")
+                    consecutiveMisses++
+                } else {
+                    consecutiveMisses = 0
+                }
+
+                val now = System.currentTimeMillis()
+                val cooldownElapsed = now - lastRestartAttemptAt >= 45_000L
+                if (consecutiveMisses >= 2 && cooldownElapsed) {
+                    Log.d(TAG, "Auto server monitor detected consecutive misses; requesting restart")
+                    lastRestartAttemptAt = now
                     runBinary(
                         activity = this@MainActivity,
                         arguments = emptyArray(),
                         onRunSuccess = {
                             onJTVServerRun()
+                            consecutiveMisses = 0
                         },
                         onOutput = { output ->
                             Log.d(TAG, output)

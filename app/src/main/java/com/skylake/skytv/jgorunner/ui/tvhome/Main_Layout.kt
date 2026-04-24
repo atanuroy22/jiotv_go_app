@@ -74,8 +74,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
-private const val TV_STARTUP_TIMEOUT_MS = 8_000L
-private const val TV_STARTUP_POLL_DELAY_MS = 350L
+private const val TV_STARTUP_TIMEOUT_MS = 5_000L
+private const val TV_STARTUP_POLL_DELAY_MS = 250L
 private const val TV_STARTUP_MAX_FALLBACK_CHANNELS = 4
 private const val TV_STREAM_CONNECT_TIMEOUT_MS = 1_250L
 private const val TV_STREAM_READ_TIMEOUT_MS = 1_250L
@@ -83,6 +83,22 @@ private const val TV_STREAM_CALL_TIMEOUT_MS = 1_750L
 private const val TV_PREFLIGHT_CONNECT_TIMEOUT_MS = 650L
 private const val TV_PREFLIGHT_READ_TIMEOUT_MS = 650L
 private const val TV_PREFLIGHT_CALL_TIMEOUT_MS = 900L
+
+private val startupProbeClient = OkHttpClient.Builder()
+    .connectTimeout(TV_STREAM_CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+    .readTimeout(TV_STREAM_READ_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+    .callTimeout(TV_STREAM_CALL_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+    .followRedirects(true)
+    .followSslRedirects(true)
+    .build()
+
+private val preflightProbeClient = OkHttpClient.Builder()
+    .connectTimeout(TV_PREFLIGHT_CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+    .readTimeout(TV_PREFLIGHT_READ_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+    .callTimeout(TV_PREFLIGHT_CALL_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+    .followRedirects(true)
+    .followSslRedirects(true)
+    .build()
 
 private data class TvStartupReadiness(
     val ready: Boolean,
@@ -98,18 +114,10 @@ private sealed class TvStartupOutcome {
 
 private suspend fun probeStreamEndpoint(
     url: String,
-    connectTimeoutMs: Long = TV_STREAM_CONNECT_TIMEOUT_MS,
-    readTimeoutMs: Long = TV_STREAM_READ_TIMEOUT_MS,
-    callTimeoutMs: Long = TV_STREAM_CALL_TIMEOUT_MS
+    isPreflightProbe: Boolean = false
 ): Boolean {
     return withContext(Dispatchers.IO) {
-        val client = OkHttpClient.Builder()
-            .connectTimeout(connectTimeoutMs, TimeUnit.MILLISECONDS)
-            .readTimeout(readTimeoutMs, TimeUnit.MILLISECONDS)
-            .callTimeout(callTimeoutMs, TimeUnit.MILLISECONDS)
-            .followRedirects(true)
-            .followSslRedirects(true)
-            .build()
+        val client = if (isPreflightProbe) preflightProbeClient else startupProbeClient
 
         fun execute(method: String): Int? {
             val request = Request.Builder()
@@ -327,7 +335,6 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
 
         var lastProbeReason: String? = null
         var startRequested = false
-        var forcedRestartRequested = false
         val readiness: TvStartupReadiness? = withTimeoutOrNull<TvStartupReadiness>(TV_STARTUP_TIMEOUT_MS) {
             var attempt = 0
             while (true) {
@@ -347,14 +354,6 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                 }
 
                 lastProbeReason = "Attempt $attempt did not return a playable HTTP response"
-
-                if (!forcedRestartRequested && attempt >= 12) {
-                    forcedRestartRequested = true
-                    requestBinaryStart(
-                        forceStart = true,
-                        reason = "endpoint still unready after $attempt probes"
-                    )
-                }
 
                 delay(TV_STARTUP_POLL_DELAY_MS)
             }
@@ -401,9 +400,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                 )
                 if (!probeStreamEndpoint(
                         url = candidate.channel_url,
-                        connectTimeoutMs = TV_PREFLIGHT_CONNECT_TIMEOUT_MS,
-                        readTimeoutMs = TV_PREFLIGHT_READ_TIMEOUT_MS,
-                        callTimeoutMs = TV_PREFLIGHT_CALL_TIMEOUT_MS
+                    isPreflightProbe = true
                     )) {
                     Log.w(
                         "TVAutoplay",
@@ -612,12 +609,12 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
         }
     }
 
-    // Auto-retry loading channels: first wait 5s, then retry every 10s until channels arrive.
+    // Auto-retry loading channels: first wait briefly, then retry until channels arrive.
     LaunchedEffect(fetched, filteredChannels.value) {
         if (fetched && filteredChannels.value.isEmpty() && !autoRetryLoopRunning) {
             autoRetryLoopRunning = true
             try {
-                var waitSeconds = 5
+                var waitSeconds = 2
                 while (filteredChannels.value.isEmpty()) {
                     for (i in waitSeconds downTo 1) {
                         if (filteredChannels.value.isNotEmpty()) break
@@ -631,7 +628,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                     }
 
                     performReloadAttempt()
-                    waitSeconds = 10
+                    waitSeconds = 5
                 }
             } finally {
                 autoRetryLoopRunning = false

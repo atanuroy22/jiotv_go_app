@@ -8,6 +8,7 @@ import android.content.res.Configuration
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.Gravity
 import android.view.View
@@ -109,6 +110,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
 import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
@@ -2072,16 +2074,24 @@ fun initializePlayer(
         .setPrioritizeTimeOverSizeThresholds(true)
         .build()
 
-    val player = ExoPlayer.Builder(context)
+    val renderersFactory = DefaultRenderersFactory(context)
+        .setEnableDecoderFallback(true)
+
+    val player = ExoPlayer.Builder(context, renderersFactory)
         .setMediaSourceFactory(mediaSourceFactory)
         .setLoadControl(loadControl)
         .build()
     retryCountRef.value = 0
     val retryHandler = Handler(Looper.getMainLooper())
     val stallHandler = Handler(Looper.getMainLooper())
+    val blackFrameHandler = Handler(Looper.getMainLooper())
     val fastStallThresholdMs = 1_800L
+    val blackFrameThresholdMs = 2_500L
     var stallRecoveries = 0
     val maxStallRecoveries = 8
+    var hasRenderedVideoFrame = false
+    var blackScreenRecoveries = 0
+    var lastBlackScreenRecoveryAt = 0L
 
     fun prepareAndPlay(seekToPosition: Long = 0L) {
         val normalizedUrl = normalizePlaybackUrl(context, getCurrentVideoUrl())
@@ -2120,6 +2130,24 @@ fun initializePlayer(
             }
         }
 
+        private val blackFrameRunnable = Runnable {
+            if (!player.playWhenReady || player.playbackState != Player.STATE_READY) return@Runnable
+            if (hasRenderedVideoFrame) return@Runnable
+            if (player.videoFormat == null) return@Runnable
+            if (blackScreenRecoveries >= 3) return@Runnable
+
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastBlackScreenRecoveryAt < 2_500L) return@Runnable
+            lastBlackScreenRecoveryAt = now
+            blackScreenRecoveries += 1
+
+            try {
+                // Recovery for TV devices where audio starts but video renderer gets stuck.
+                prepareAndPlay(player.currentPosition)
+            } catch (_: Exception) {
+            }
+        }
+
         override fun onPlayerError(error: PlaybackException) {
             val attempt = retryCountRef.value + 1
             retryCountRef.value = attempt
@@ -2151,6 +2179,8 @@ fun initializePlayer(
         override fun onPlaybackStateChanged(state: Int) {
             when (state) {
                 Player.STATE_BUFFERING -> {
+                    hasRenderedVideoFrame = false
+                    blackFrameHandler.removeCallbacks(blackFrameRunnable)
                     if (player.playWhenReady) {
                         stallHandler.removeCallbacks(bufferingStallRunnable)
                         stallHandler.postDelayed(bufferingStallRunnable, fastStallThresholdMs)
@@ -2162,17 +2192,30 @@ fun initializePlayer(
                     stallRecoveries = 0
                     retryCountRef.value = 0
                     stallHandler.removeCallbacks(bufferingStallRunnable)
+                    blackFrameHandler.removeCallbacks(blackFrameRunnable)
+                    blackFrameHandler.postDelayed(blackFrameRunnable, blackFrameThresholdMs)
                 }
 
                 Player.STATE_IDLE, Player.STATE_ENDED -> {
                     stallHandler.removeCallbacks(bufferingStallRunnable)
+                    blackFrameHandler.removeCallbacks(blackFrameRunnable)
                 }
             }
+        }
+
+        override fun onRenderedFirstFrame() {
+            hasRenderedVideoFrame = true
+            blackScreenRecoveries = 0
+            blackFrameHandler.removeCallbacks(blackFrameRunnable)
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             if (isPlaying) {
                 stallHandler.removeCallbacks(bufferingStallRunnable)
+                if (!hasRenderedVideoFrame) {
+                    blackFrameHandler.removeCallbacks(blackFrameRunnable)
+                    blackFrameHandler.postDelayed(blackFrameRunnable, blackFrameThresholdMs)
+                }
             } else if (player.playWhenReady && player.playbackState == Player.STATE_BUFFERING && !isBufferingLong) {
                 stallHandler.removeCallbacks(bufferingStallRunnable)
                 stallHandler.postDelayed(bufferingStallRunnable, fastStallThresholdMs)
