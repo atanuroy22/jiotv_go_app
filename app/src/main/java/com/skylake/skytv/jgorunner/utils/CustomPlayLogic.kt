@@ -36,20 +36,12 @@ fun setupCustomPlaybackLogic(
     // Remove any listener registered for this player by a previous channel
     activeListeners.remove(exoPlayer)?.let { exoPlayer.removeListener(it) }
 
-    var hasSeeked = false
-
     val listener = object : Player.Listener {
 
         override fun onPlaybackStateChanged(state: Int) {
-            if (state == Player.STATE_READY && !hasSeeked && videoUrl.containsAnyId()) {
-                exoPlayer.seekTo(14_500)
-                hasSeeked = true
-            }
-
             if (state == Player.STATE_ENDED) {
-                hasSeeked = false
                 onReplay?.invoke() ?: run {
-                    exoPlayer.seekTo(14_500)
+                    exoPlayer.seekToDefaultPosition()
                     exoPlayer.playWhenReady = true
                 }
             }
