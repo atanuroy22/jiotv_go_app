@@ -576,6 +576,24 @@ fun ExoPlayJetScreen(
         )
     }
 
+    fun startPlaybackAfterViewAttach(playbackUrl: String, seekToPosition: Long = 0L) {
+        val normalizedUrl = normalizePlaybackUrl(context, playbackUrl)
+        if (normalizedUrl.isBlank()) return
+
+        val startPlayback = {
+            val mediaItem = buildMediaItemForPlaybackUrl(normalizedUrl)
+            exoPlayer.setMediaItem(mediaItem)
+            exoPlayer.prepare()
+            if (seekToPosition > 0L) {
+                exoPlayer.seekTo(seekToPosition)
+            }
+            exoPlayer.playWhenReady = true
+            setupCustomPlaybackLogic(exoPlayer, normalizedUrl)
+        }
+
+        exoPlayerView?.post { startPlayback() } ?: startPlayback()
+    }
+
     // --- Resize Config ---
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
@@ -724,12 +742,7 @@ fun ExoPlayJetScreen(
                 return@LaunchedEffect
             }
 
-            val mediaItem = buildMediaItemForPlaybackUrl(currentUrl)
-            exoPlayer.setMediaItem(mediaItem)
-            exoPlayer.prepare()
-            exoPlayer.playWhenReady = true
-
-            setupCustomPlaybackLogic(exoPlayer, currentUrl)
+            startPlaybackAfterViewAttach(currentUrl)
         } catch (_: Exception) {
             Toast.makeText(context, "Stream not supported", Toast.LENGTH_SHORT).show()
             try {
@@ -1834,10 +1847,7 @@ fun ExoPlayJetScreen(
             if (url.isBlank()) return@LaunchedEffect
             val isDrmRoute = isLikelyDrmRoute(rawUrl) || isLikelyDrmRoute(url)
             if (isDrmRoute) return@LaunchedEffect
-            val mediaItem = buildMediaItemForPlaybackUrl(url)
-            exoPlayer.setMediaItem(mediaItem)
-            exoPlayer.prepare()
-            exoPlayer.playWhenReady = true
+            startPlaybackAfterViewAttach(url)
         }
     }
 
@@ -2144,8 +2154,6 @@ fun initializePlayer(
         }
         player.playWhenReady = true
     }
-
-    prepareAndPlay()
 
     // Always Retry
     player.addListener(object : Player.Listener {
