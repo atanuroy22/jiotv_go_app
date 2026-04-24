@@ -32,7 +32,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -59,9 +58,6 @@ import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.ui.screens.restartAppV1
 import com.skylake.skytv.jgorunner.ui.tvhome.components.TvScreenMenu
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 
 @OptIn(ExperimentalGlideComposeApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -80,21 +76,6 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int) {
 
     var showDialog by remember { mutableStateOf(false) }
     var autoplayLaunched by remember { mutableStateOf(false) }
-    var autoplayResumeToken by remember { mutableIntStateOf(0) }
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                autoplayLaunched = false
-                autoplayResumeToken++
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
 
     var selectedCategories2 by remember {
         mutableStateOf(preferenceManager.myPrefs.lastSelectedCategoriesExp?.let {
@@ -176,7 +157,7 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int) {
 
 
 
-    LaunchedEffect(filteredChannels, autoplayResumeToken) {
+    LaunchedEffect(filteredChannels) {
         if (preferenceManager.myPrefs.startTvAutomatically &&
             !autoplayLaunched &&
             filteredChannels.isNotEmpty()
