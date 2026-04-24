@@ -86,8 +86,6 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         private const val TAG = "JTVGo::MainActivity"
-        // True until the binary has been started at least once in this process lifetime
-        var isFirstAppOpen = true
     }
 
     private var selectedBinaryName by mutableStateOf("JioTV+")
@@ -270,10 +268,9 @@ class MainActivity : ComponentActivity() {
         val shouldAutoStartServer =
             preferenceManager.myPrefs.autoStartServer || preferenceManager.myPrefs.startTvAutomatically
         if (shouldAutoStartServer) {
-            val forceStart = BinaryService.isRunning && isFirstAppOpen
             Log.d(
                 TAG,
-                "Starting server automatically (forceStart=$forceStart, running=${BinaryService.isRunning})"
+                "Starting server automatically (running=${BinaryService.isRunning})"
             )
             val arguments = emptyArray<String>()
             runBinary(
@@ -286,9 +283,8 @@ class MainActivity : ComponentActivity() {
                     Log.d(TAG, output)
                     outputText = output
                 },
-                forceStart = forceStart
+                forceStart = false
             )
-            isFirstAppOpen = false
         }
     }
 

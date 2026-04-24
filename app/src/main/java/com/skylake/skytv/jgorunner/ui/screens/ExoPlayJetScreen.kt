@@ -341,10 +341,10 @@ fun ExoPlayJetScreen(
     }
 
     fun scheduleControllerAutoHide() {
-        if (!isTv || PlayerCommandBus.isInPipMode) return
+        if (PlayerCommandBus.isInPipMode) return
         controllerAutoHideJob?.cancel()
         controllerAutoHideJob = scope.launch {
-            delay(1_800)
+            delay(if (isTv) 1_800 else 3_000)
             exoPlayerView?.hideController()
             isControllerVisible = false
             showChannelPanel = false
@@ -1622,21 +1622,27 @@ fun ExoPlayJetScreen(
                     .padding(16.dp),
                 contentAlignment = Alignment.TopEnd
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                AnimatedVisibility(
+                    visible = !PlayerCommandBus.isInPipMode && (isTv || isZoneShakaControllerVisible || showChannelPanel),
+                    enter = fadeIn(),
+                    exit = fadeOut()
                 ) {
-                    IconButton(
-                        onClick = {
-                            showChannelPanel = channelList != null && !showChannelPanel
-                            panelSelectedIndex = currentIndex.coerceAtLeast(0)
-                        }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.AutoAwesomeMotion,
-                            contentDescription = "Channels",
-                            tint = Color.White.copy(alpha = 0.9f)
-                        )
+                        IconButton(
+                            onClick = {
+                                showChannelPanel = channelList != null && !showChannelPanel
+                                panelSelectedIndex = currentIndex.coerceAtLeast(0)
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.AutoAwesomeMotion,
+                                contentDescription = "Channels",
+                                tint = Color.White.copy(alpha = 0.9f)
+                            )
+                        }
                     }
                 }
             }
@@ -1670,7 +1676,7 @@ fun ExoPlayJetScreen(
         }
 
         LaunchedEffect(isControllerVisible, showChannelPanel, showResizeOverlay, showNumericOverlay) {
-            if (isTv && (isControllerVisible || showChannelPanel || showResizeOverlay || showNumericOverlay)) {
+            if (isControllerVisible || showChannelPanel || showResizeOverlay || showNumericOverlay) {
                 scheduleControllerAutoHide()
             }
         }
@@ -2111,13 +2117,21 @@ fun initializePlayer(
     val retryHandler = Handler(Looper.getMainLooper())
     val stallHandler = Handler(Looper.getMainLooper())
     val blackFrameHandler = Handler(Looper.getMainLooper())
-    val fastStallThresholdMs = 1_800L
-    val blackFrameThresholdMs = 2_500L
+    val fastStallThresholdMs = 5_000L
+    val blackFrameThresholdMs = 6_500L
     var stallRecoveries = 0
-    val maxStallRecoveries = 8
+    val maxStallRecoveries = 4
     var hasRenderedVideoFrame = false
     var blackScreenRecoveries = 0
     var lastBlackScreenRecoveryAt = 0L
+    var lastRecoveryAt = 0L
+
+    fun shouldRecover(minGapMs: Long = 3_500L): Boolean {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastRecoveryAt < minGapMs) return false
+        lastRecoveryAt = now
+        return true
+    }
 
     fun prepareAndPlay(seekToPosition: Long = 0L) {
         val normalizedUrl = normalizePlaybackUrl(context, getCurrentVideoUrl())
@@ -2140,6 +2154,7 @@ fun initializePlayer(
             if (!player.playWhenReady || player.playbackState != Player.STATE_BUFFERING) return@Runnable
             isBufferingLong = true
             if (stallRecoveries >= maxStallRecoveries) return@Runnable
+            if (!shouldRecover()) return@Runnable
             stallRecoveries += 1
 
             val currentUrl = getCurrentVideoUrl()
@@ -2164,6 +2179,7 @@ fun initializePlayer(
 
             val now = SystemClock.elapsedRealtime()
             if (now - lastBlackScreenRecoveryAt < 2_500L) return@Runnable
+            if (!shouldRecover()) return@Runnable
             lastBlackScreenRecoveryAt = now
             blackScreenRecoveries += 1
 
@@ -2185,6 +2201,7 @@ fun initializePlayer(
             retryHandler.removeCallbacksAndMessages(null)
             retryHandler.postDelayed(
                 {
+                    if (!shouldRecover(2_000L)) return@postDelayed
                     try {
                         // Do NOT call player.stop() — stop() clears the video surface
                         // causing a black screen. Instead, set the media item and call
@@ -2205,7 +2222,6 @@ fun initializePlayer(
         override fun onPlaybackStateChanged(state: Int) {
             when (state) {
                 Player.STATE_BUFFERING -> {
-                    hasRenderedVideoFrame = false
                     blackFrameHandler.removeCallbacks(blackFrameRunnable)
                     if (player.playWhenReady) {
                         stallHandler.removeCallbacks(bufferingStallRunnable)
