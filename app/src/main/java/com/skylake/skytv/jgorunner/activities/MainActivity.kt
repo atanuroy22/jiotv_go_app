@@ -1076,18 +1076,23 @@ class MainActivity : ComponentActivity() {
                         val shouldAutoStartServer =
                             preferenceManager.myPrefs.autoStartServer || preferenceManager.myPrefs.startTvAutomatically
                         if (shouldAutoStartServer) {
-                            outputText = "Server restarting..."
-                            runBinary(
-                                activity = this@MainActivity,
-                                arguments = emptyArray(),
-                                onRunSuccess = {
-                                    onJTVServerRun()
-                                },
-                                onOutput = { output ->
-                                    outputText = output
-                                },
-                                forceStart = BinaryService.isRunning
-                            )
+                            if (!BinaryService.isRunning) {
+                                outputText = "Server starting..."
+                                runBinary(
+                                    activity = this@MainActivity,
+                                    arguments = emptyArray(),
+                                    onRunSuccess = {
+                                        onJTVServerRun()
+                                    },
+                                    onOutput = { output ->
+                                        outputText = output
+                                    },
+                                    forceStart = false
+                                )
+                            } else {
+                                isServerRunning = true
+                                outputText = "Server is starting..."
+                            }
                         } else {
                             isServerRunning = false
                             Toast.makeText(this@MainActivity, "Server is down", Toast.LENGTH_SHORT)
