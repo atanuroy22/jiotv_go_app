@@ -527,17 +527,10 @@ class MainActivity : ComponentActivity() {
 //                                    startActivity(intent)
                                 },
                                 onExitButtonClick = {
-                                    stopBinary(
-                                        context = this@MainActivity,
-                                        onBinaryStopped = {
-                                            isGlowBox = false
-                                            isServerRunning = false
-                                            outputText = "Server stopped"
-                                            finish()
-                                            Process.killProcess(Process.myPid())
-                                            exitProcess(0)
-                                        }
-                                    )
+                                    isGlowBox = false
+                                    showRedirectPopup = false
+                                    shouldLaunchIPTV = false
+                                    finishAffinity()
                                 },
                             )
 
@@ -1079,10 +1072,27 @@ class MainActivity : ComponentActivity() {
                 },
                 onServerDown = {
                     CoroutineScope(Dispatchers.Main).launch {
-                        isServerRunning = false
                         isGlowBox = false
-                        Toast.makeText(this@MainActivity, "Server is down", Toast.LENGTH_SHORT)
-                            .show()
+                        val shouldAutoStartServer =
+                            preferenceManager.myPrefs.autoStartServer || preferenceManager.myPrefs.startTvAutomatically
+                        if (shouldAutoStartServer) {
+                            outputText = "Server restarting..."
+                            runBinary(
+                                activity = this@MainActivity,
+                                arguments = emptyArray(),
+                                onRunSuccess = {
+                                    onJTVServerRun()
+                                },
+                                onOutput = { output ->
+                                    outputText = output
+                                },
+                                forceStart = BinaryService.isRunning
+                            )
+                        } else {
+                            isServerRunning = false
+                            Toast.makeText(this@MainActivity, "Server is down", Toast.LENGTH_SHORT)
+                                .show()
+                        }
                     }
                 },
             )
@@ -1166,8 +1176,27 @@ class MainActivity : ComponentActivity() {
     private val binaryStoppedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == BinaryService.ACTION_BINARY_STOPPED) {
-                isServerRunning = false
-                outputText = "Server stopped"
+                val shouldAutoStartServer =
+                    preferenceManager.myPrefs.autoStartServer || preferenceManager.myPrefs.startTvAutomatically
+                if (shouldAutoStartServer) {
+                    isServerRunning = false
+                    outputText = "Server restarting..."
+                    runBinary(
+                        activity = this@MainActivity,
+                        arguments = emptyArray(),
+                        onRunSuccess = {
+                            onJTVServerRun()
+                            outputText = "Server restarted"
+                        },
+                        onOutput = { output ->
+                            outputText = output
+                        },
+                        forceStart = false
+                    )
+                } else {
+                    isServerRunning = false
+                    outputText = "Server stopped"
+                }
             }
         }
     }
