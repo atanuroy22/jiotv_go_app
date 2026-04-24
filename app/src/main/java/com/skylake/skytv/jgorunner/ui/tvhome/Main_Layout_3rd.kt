@@ -56,7 +56,6 @@ import com.google.gson.reflect.TypeToken
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
-import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 import com.skylake.skytv.jgorunner.ui.screens.restartAppV1
 import com.skylake.skytv.jgorunner.ui.tvhome.components.TvScreenMenu
 
@@ -76,6 +75,7 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int) {
     val epgDebugVar by remember { mutableStateOf(preferenceManager.myPrefs.epgDebug) }
 
     var showDialog by remember { mutableStateOf(false) }
+    var autoplayLaunched by remember { mutableStateOf(false) }
 
     var selectedCategories2 by remember {
         mutableStateOf(preferenceManager.myPrefs.lastSelectedCategoriesExp?.let {
@@ -159,7 +159,7 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int) {
 
     LaunchedEffect(filteredChannels) {
         if (preferenceManager.myPrefs.startTvAutomatically &&
-            !AppStartTracker.shouldPlayChannel &&
+            !autoplayLaunched &&
             filteredChannels.isNotEmpty()
         ) {
             val firstChannel = filteredChannels.first()
@@ -180,7 +180,7 @@ fun Main_Layout_3rd(context: Context, reloadTrigger: Int) {
             }
             context.startActivity(intent)
 
-            AppStartTracker.shouldPlayChannel = true
+            autoplayLaunched = true
         }
     }
 

@@ -63,7 +63,6 @@ import com.skylake.skytv.jgorunner.core.execution.runBinary
 import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.BinaryService
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
-import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 import com.skylake.skytv.jgorunner.utils.withQuality
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -180,6 +179,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
     var startupRetryToken by rememberSaveable { mutableIntStateOf(0) }
     var startupLaunchSessionKey by rememberSaveable { mutableStateOf<String?>(null) }
     var startupLaunchInProgress by remember { mutableStateOf(false) }
+    var autoplayLaunched by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
     remember { FocusRequester() }
@@ -458,8 +458,6 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                 preferenceManager.myPrefs.currChannelUrl = candidate.channel_url
                 preferenceManager.myPrefs.recentChannels = Gson().toJson(recentChannels)
                 preferenceManager.savePreferences()
-
-                AppStartTracker.shouldPlayChannel = true
                 startupOutcome = TvStartupOutcome.Idle
                 showLoading = false
                 Log.d("TVAutoplay", "Autoplay launched channel index=$candidateIndex")
@@ -573,7 +571,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
             fetched = true
         }
 
-        val canAutoplay = !AppStartTracker.shouldPlayChannel
+        val canAutoplay = !autoplayLaunched
 
         if (preferenceManager.myPrefs.startTvAutomatically && canAutoplay) {
             var channelsForAutoplay = filteredChannels.value
@@ -582,9 +580,13 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
             }
 
             if (channelsForAutoplay.isNotEmpty()) {
-                launchFirstChannel(channelsForAutoplay, sessionKey)
+                if (launchFirstChannel(channelsForAutoplay, sessionKey)) {
+                    autoplayLaunched = true
+                }
             } else {
-                watchdogAutoplay(channelsForAutoplay, sessionKey)
+                if (watchdogAutoplay(channelsForAutoplay, sessionKey)) {
+                    autoplayLaunched = true
+                }
             }
         } else {
             showLoading = false
