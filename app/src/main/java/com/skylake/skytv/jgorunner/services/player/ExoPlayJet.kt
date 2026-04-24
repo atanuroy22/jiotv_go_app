@@ -396,14 +396,14 @@ class ExoPlayJet : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        if (!PlayerCommandBus.isInPipMode) {
+        if (!DeviceUtils.isTvDevice(this) && !PlayerCommandBus.isInPipMode) {
             PlayerCommandBus.requestStopPlayback()
         }
     }
 
     override fun onPause() {
         super.onPause()
-        if (!PlayerCommandBus.isEnteringPip && !PlayerCommandBus.isInPipMode) {
+        if (!DeviceUtils.isTvDevice(this) && !PlayerCommandBus.isEnteringPip && !PlayerCommandBus.isInPipMode) {
             PlayerCommandBus.requestStopPlayback()
         }
     }

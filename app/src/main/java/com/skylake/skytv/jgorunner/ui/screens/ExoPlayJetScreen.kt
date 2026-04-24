@@ -787,9 +787,14 @@ fun ExoPlayJetScreen(
                 if (useZoneDrmWebPlayer) {
                     zoneWebView?.onPause()
                 } else {
-                    exoPlayer.stop()
-                    exoPlayer.clearMediaItems()
-                    exoPlayer.playWhenReady = false
+                    if (isTv) {
+                        exoPlayer.playWhenReady = false
+                        exoPlayer.pause()
+                    } else {
+                        exoPlayer.stop()
+                        exoPlayer.clearMediaItems()
+                        exoPlayer.playWhenReady = false
+                    }
                 }
             } catch (_: Exception) {
             }
@@ -1384,6 +1389,7 @@ fun ExoPlayJetScreen(
         } else AndroidView(
             factory = {
                 PlayerView(it).apply {
+                    setEnableComposeSurfaceSyncWorkaround(true)
                     useController = true
                     setShowNextButton(false)
                     setShowPreviousButton(false)
@@ -1801,16 +1807,6 @@ fun ExoPlayJetScreen(
         }
     }
 
-    // Clear sentinel on leaving the player so future autoplay sessions can trigger again
-    DisposableEffect(Unit) {
-        onDispose {
-            try {
-                preferenceManager.myPrefs.currChannelUrl = ""
-                preferenceManager.savePreferences()
-            } catch (_: Exception) {
-            }
-        }
-    }
 }
 
 @Composable

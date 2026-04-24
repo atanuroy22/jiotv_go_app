@@ -434,6 +434,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                         recentChannels.removeAt(recentChannels.size - 1)
                     }
                 }
+                preferenceManager.myPrefs.currChannelUrl = candidate.channel_url
                 preferenceManager.myPrefs.recentChannels = Gson().toJson(recentChannels)
                 preferenceManager.savePreferences()
 
