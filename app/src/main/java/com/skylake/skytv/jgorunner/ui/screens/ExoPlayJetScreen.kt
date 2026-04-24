@@ -580,7 +580,13 @@ fun ExoPlayJetScreen(
         val normalizedUrl = normalizePlaybackUrl(context, playbackUrl)
         if (normalizedUrl.isBlank()) return
 
-        val startPlayback = {
+        scope.launch {
+            var attempts = 0
+            while (exoPlayerView?.isAttachedToWindow != true && attempts < 80) {
+                delay(25)
+                attempts++
+            }
+
             val mediaItem = buildMediaItemForPlaybackUrl(normalizedUrl)
             exoPlayer.setMediaItem(mediaItem)
             exoPlayer.prepare()
@@ -590,8 +596,6 @@ fun ExoPlayJetScreen(
             exoPlayer.playWhenReady = true
             setupCustomPlaybackLogic(exoPlayer, normalizedUrl)
         }
-
-        exoPlayerView?.post { startPlayback() } ?: startPlayback()
     }
 
     // --- Resize Config ---
@@ -959,13 +963,9 @@ fun ExoPlayJetScreen(
                 }
 
                 if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft && tvNAV != "2" && !useZoneDrmWebPlayer) {
-                    if (isControllerVisible) {
-                        return@onPreviewKeyEvent false
-                    } else {
-                        panelSelectedIndex = currentIndex
-                        showChannelPanel = channelList != null
-                        return@onPreviewKeyEvent true
-                    }
+                    panelSelectedIndex = currentIndex
+                    showChannelPanel = channelList != null
+                    return@onPreviewKeyEvent true
                 }
 
                 if (event.type == KeyEventType.KeyDown) {
@@ -1045,19 +1045,15 @@ fun ExoPlayJetScreen(
                         return@onPreviewKeyEvent true
                     }
 
-                    if (isControllerVisible) {
+                    if (useZoneDrmWebPlayer) {
                         return@onPreviewKeyEvent false
-                    } else {
-                        if (useZoneDrmWebPlayer) {
-                            return@onPreviewKeyEvent false
-                        }
-                        val androidKeyEvent = android.view.KeyEvent(
-                            android.view.KeyEvent.ACTION_UP,
-                            android.view.KeyEvent.KEYCODE_DPAD_CENTER
-                        )
-                        val handled = exoPlayerView?.dispatchKeyEvent(androidKeyEvent) == true
-                        return@onPreviewKeyEvent handled
                     }
+                    val androidKeyEvent = android.view.KeyEvent(
+                        android.view.KeyEvent.ACTION_UP,
+                        android.view.KeyEvent.KEYCODE_DPAD_CENTER
+                    )
+                    val handled = exoPlayerView?.dispatchKeyEvent(androidKeyEvent) == true
+                    return@onPreviewKeyEvent handled
                 }
 
                 if (event.type == KeyEventType.KeyUp) {
@@ -1420,193 +1416,16 @@ fun ExoPlayJetScreen(
             factory = {
                 PlayerView(it).apply {
                     setEnableComposeSurfaceSyncWorkaround(true)
-                    useController = true
+                    useController = false
                     setShowNextButton(false)
                     setShowPreviousButton(false)
                     setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
                     // Keep the last rendered frame frozen on screen during buffering,
                     // retries, and player resets — this is the primary fix for black screens.
                     setKeepContentOnPlayerReset(true)
-                    controllerAutoShow = false
-                    controllerShowTimeoutMs = if (isTv) 1_800 else 3_000
                     setResizeMode(resizeModes[resizeModeIndex].first)
                     player = exoPlayer
                     exoPlayerView = this
-
-                    setControllerVisibilityListener(
-                        PlayerView.ControllerVisibilityListener { visibility ->
-                            isControllerVisible = visibility == View.VISIBLE
-                            if (visibility == View.VISIBLE) {
-                                scheduleControllerAutoHide()
-                            } else {
-                                controllerAutoHideJob?.cancel()
-                            }
-                        }
-                    )
-
-                    // Inject resize btn
-                    post {
-                        try {
-                            val controller =
-                                findViewById<View>(androidx.media3.ui.R.id.exo_controller) as? ViewGroup
-                                    ?: return@post
-
-                            //---
-                            val nextBtn = controller.findViewById<ImageButton>(androidx.media3.ui.R.id.exo_next)
-                            val prevBtn = controller.findViewById<ImageButton>(androidx.media3.ui.R.id.exo_prev)
-
-                            nextBtn?.setImageResource(R.drawable.ic_skip_next_24)
-                            prevBtn?.setImageResource(R.drawable.ic_skip_previous_24)
-                            nextBtn?.visibility = View.VISIBLE
-                            prevBtn?.visibility = View.VISIBLE
-                            nextBtn?.isEnabled = true
-                            prevBtn?.isEnabled = true
-
-
-                            nextBtn?.setOnClickListener {
-                                try {
-                                    val intent = Intent(context, PipActionReceiver::class.java).apply {
-                                        action = PipActionReceiver.ACTION_NEXT
-                                    }
-                                    context.sendBroadcast(intent)
-                                } catch (e: Exception) {
-                                    Log.e("ExoCustom", "Failed to send NEXT: ${e.message}")
-                                }
-                            }
-
-                            prevBtn?.setOnClickListener {
-                                try {
-                                    val intent = Intent(context, PipActionReceiver::class.java).apply {
-                                        action = PipActionReceiver.ACTION_PREV
-                                    }
-                                    context.sendBroadcast(intent)
-                                } catch (e: Exception) {
-                                    Log.e("ExoCustom", "Failed to send PREV: ${e.message}")
-                                }
-                            }
-
-                            Log.d("ExoCustom", "ExoPlayer next/prev hooked to PipActionReceiver")
-                            //---
-                            var targetBar: ViewGroup? = null
-                            val candidateIds = listOf(
-                                androidx.media3.ui.R.id.exo_basic_controls,
-                                androidx.media3.ui.R.id.exo_bottom_bar,
-                                androidx.media3.ui.R.id.exo_controls_background
-                            )
-                            for (cid in candidateIds) {
-                                val v = controller.findViewById<View>(cid)
-                                if (v is ViewGroup) {
-                                    targetBar = v; break
-                                }
-                            }
-                            if (targetBar == null) {
-                                fun deepest(group: ViewGroup): ViewGroup {
-                                    var best = group
-                                    (0 until group.childCount).forEach { i ->
-                                        val c = group.getChildAt(i)
-                                        if (c is ViewGroup) {
-                                            val d = deepest(c)
-                                            if (d.childCount > best.childCount) best = d
-                                        }
-                                    }
-                                    return best
-                                }
-                                targetBar = deepest(controller)
-                            }
-
-                            // PiP button (left of resize) — phones/tablets only
-                            val isTV = try {
-                                val pm = context.packageManager
-                                pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)
-                            } catch (_: Exception) {
-                                false
-                            }
-                            val supportsPip = try {
-                                (context as? Activity)?.packageManager?.hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE) == true
-                            } catch (_: Exception) {
-                                false
-                            }
-
-                            val pipButton = ImageButton(context).apply {
-                                setBackgroundResource(android.R.color.transparent)
-                                setImageResource(R.drawable.ic_pip_24)
-                                contentDescription = "Picture-in-Picture"
-                                imageAlpha = 230
-                                val pad = (4 * resources.displayMetrics.density).toInt()
-                                setPadding(pad, pad, pad, pad)
-                                setOnClickListener {
-                                    try {
-                                        (context as? Activity)?.let { act ->
-                                            // Mark entering PiP so onPause doesn't pause playback
-                                            PlayerCommandBus.isEnteringPip = true
-                                            val params =
-                                                android.app.PictureInPictureParams.Builder()
-                                                    .setAspectRatio(android.util.Rational(16, 9))
-                                                    .build()
-                                            act.enterPictureInPictureMode(params)
-                                        }
-                                    } catch (e: Exception) {
-                                        Log.w(TAG, "Failed PiP enter: ${e.message}")
-                                    }
-                                }
-                                val params = LinearLayout.LayoutParams(
-                                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                                    ViewGroup.LayoutParams.WRAP_CONTENT
-                                )
-                                params.gravity = Gravity.CENTER_VERTICAL
-                                layoutParams = params
-                            }
-
-                            val resizeButton = ImageButton(context).apply {
-                                setBackgroundResource(android.R.color.transparent)
-                                setImageResource(R.drawable.ic_aspect_ratio_24)
-                                contentDescription = "Resize mode"
-                                imageAlpha = 220
-                                val pad = (4 * resources.displayMetrics.density).toInt()
-                                setPadding(pad, pad, pad, pad)
-                                setOnClickListener {
-                                    resizeModeIndex = (resizeModeIndex + 1) % resizeModes.size
-                                    val mode = resizeModes[resizeModeIndex]
-                                    exoPlayerView?.setResizeMode(mode.first)
-                                    exoPlayerView?.requestLayout()
-                                    resizeOverlayLabel = mode.second
-                                    showResizeOverlay = true
-                                    resizeOverlayJob?.cancel()
-                                    resizeOverlayJob = scope.launch {
-                                        delay(1200)
-                                        showResizeOverlay = false
-                                    }
-                                }
-                                val params = LinearLayout.LayoutParams(
-                                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                                    ViewGroup.LayoutParams.WRAP_CONTENT
-                                )
-                                params.gravity = Gravity.CENTER_VERTICAL
-                                params.marginStart = (8 * resources.displayMetrics.density).toInt()
-                                layoutParams = params
-                            }
-
-                            val count = targetBar.childCount
-                            val insertIndex = if (count > 0) count - 1 else count
-                            if (!isTv && !isTV && supportsPip && pipEnabled) {
-                                try {
-                                    // Add PiP first, then resize so PiP sits left of resize
-                                    targetBar.addView(pipButton, insertIndex)
-                                } catch (_: Exception) {
-                                    targetBar.addView(pipButton)
-                                }
-                            }
-                            try {
-                                targetBar.addView(resizeButton, insertIndex + 1)
-                            } catch (_: Exception) {
-                                targetBar.addView(resizeButton)
-                            }
-
-                            hookExoControllerButtons(this@apply, context)
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Failed to position resize button: ${e.message}")
-                        }
-                    }
                 }
             },
             modifier = Modifier
@@ -1688,14 +1507,14 @@ fun ExoPlayJetScreen(
             }
         }
 
-        LaunchedEffect(isControllerVisible, showChannelPanel, showResizeOverlay, showNumericOverlay) {
-            if (isControllerVisible || showChannelPanel || showResizeOverlay || showNumericOverlay) {
+        LaunchedEffect(showChannelPanel, showResizeOverlay, showNumericOverlay) {
+            if (showChannelPanel || showResizeOverlay || showNumericOverlay) {
                 scheduleControllerAutoHide()
             }
         }
 
         AnimatedVisibility(
-            visible = !PlayerCommandBus.isInPipMode && ((showChannelOverlay && channelList != null) || isControllerVisible),
+            visible = !PlayerCommandBus.isInPipMode && (showChannelOverlay && channelList != null),
             enter = fadeIn(),
             exit = fadeOut()
         ) {
@@ -1705,7 +1524,7 @@ fun ExoPlayJetScreen(
                 currentProgramName = currentProgramName
             )
             CurrentTimeOverlay(
-                visible = !PlayerCommandBus.isInPipMode && ((showChannelOverlay && channelList != null) || isControllerVisible)
+                visible = !PlayerCommandBus.isInPipMode && (showChannelOverlay && channelList != null)
             )
         }
 
@@ -1724,24 +1543,6 @@ fun ExoPlayJetScreen(
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 22.sp
-                )
-            }
-        }
-
-        if (!PlayerCommandBus.isInPipMode && isControllerVisible && !useZoneDrmWebPlayer) {
-            IconButton(
-                onClick = {
-                    panelSelectedIndex = currentIndex
-                    showChannelPanel = channelList != null && !showChannelPanel
-                },
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(0.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.AutoAwesomeMotion,
-                    contentDescription = "Toggle channel list",
-                    tint = Color.White.copy(alpha = 0.5f)
                 )
             }
         }
