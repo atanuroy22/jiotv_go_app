@@ -21,6 +21,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,6 +43,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -77,7 +81,12 @@ import kotlin.random.Random
 @SuppressLint("NewApi")
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
+fun ZoneScreen(
+    context: Context,
+    onNavigate: (String) -> Unit,
+    isServerRunning: Boolean,
+    onServerStartClick: () -> Unit
+) {
 
     data class TabItem(val text: String, val icon: ImageVector)
 
@@ -114,6 +123,7 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
         mutableIntStateOf(savedTabIndex.coerceIn(0, (tabs.size - 1).coerceAtLeast(0)))
     }
     val tabFocusRequester = remember { FocusRequester() }
+    val serverStatusFocusRequester = remember { FocusRequester() }
 
     // Snackbar state
     val snackbarHostState = remember { SnackbarHostState() }
@@ -164,6 +174,13 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
     LaunchedEffect(tabs.size) {
         if (selectedTabIndex !in 0 until tabs.size) {
             selectedTabIndex = 0
+        }
+    }
+
+    LaunchedEffect(isRemoteNavigation) {
+        if (isRemoteNavigation) {
+            kotlinx.coroutines.delay(120)
+            serverStatusFocusRequester.requestFocus()
         }
     }
 
@@ -224,16 +241,35 @@ fun ZoneScreen(context: Context, onNavigate: (String) -> Unit) {
                     )
                 }
 
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                val serverButtonColor = if (isServerRunning) {
+                    Color(0xFF2E7D32)
+                } else {
+                    Color(0xFFC62828)
+                }
+
+                Button(
+                    onClick = {
+                        if (!isServerRunning) {
+                            onServerStartClick()
+                        }
+                    },
+                    enabled = true,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = serverButtonColor,
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier
+                        .focusRequester(serverStatusFocusRequester)
+                        .focusable()
+                ) {
                     Text(
-                        text = "JioTV+",
-                        fontSize = 12.sp,
+                        text = if (isServerRunning) "running" else "stopped",
+                        fontSize = 11.sp,
                         fontFamily = customFontFamily,
-                        color = MaterialTheme.colorScheme.onBackground,
                         style = TextStyle(
                             shadow = Shadow(
                                 color = glowColor.value,
-                                blurRadius = 30f
+                                blurRadius = 18f
                             )
                         )
                     )

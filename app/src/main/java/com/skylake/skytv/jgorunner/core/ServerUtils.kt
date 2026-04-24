@@ -30,16 +30,18 @@ suspend fun checkServerStatus(
     for (attempt in 0 until maxAttempts) {
         try {
             Log.d("ServerLoginCheck", "Attempt #${attempt + 1}: Checking server status at $url")
-            val connection = (withContext(Dispatchers.IO) {
-                url.openConnection()
-            } as HttpURLConnection).apply {
-                requestMethod = "HEAD"
-                connectTimeout = 5000 // 5 seconds timeout
-                readTimeout = 5000 // 5 seconds timeout
+            lastResponseCode = withContext(Dispatchers.IO) {
+                val connection = (url.openConnection() as HttpURLConnection).apply {
+                    requestMethod = "HEAD"
+                    connectTimeout = 5000 // 5 seconds timeout
+                    readTimeout = 5000 // 5 seconds timeout
+                }
+                try {
+                    connection.responseCode
+                } finally {
+                    connection.disconnect()
+                }
             }
-
-            lastResponseCode = connection.responseCode
-            connection.disconnect()
 
             when (lastResponseCode) {
                 HttpURLConnection.HTTP_OK -> {

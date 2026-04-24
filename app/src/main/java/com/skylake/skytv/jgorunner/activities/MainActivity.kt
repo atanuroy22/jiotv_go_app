@@ -82,12 +82,10 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
-
 class MainActivity : ComponentActivity() {
+
     companion object {
         private const val TAG = "JTVGo::MainActivity"
-        // True until the binary has been started at least once in this process lifetime
-        var isFirstAppOpen = true
     }
 
     private var selectedBinaryName by mutableStateOf("JioTV+")
@@ -95,7 +93,7 @@ class MainActivity : ComponentActivity() {
 
     // SharedPreferences for saving binary selection
     private var outputText by mutableStateOf("ℹ️ Output logs")
-    private var currentScreen by mutableStateOf("Home") // Manage current screen
+    private var currentScreen by mutableStateOf("Zone") // Default to the new TV UI
 
     private val executor = Executors.newSingleThreadExecutor()
     private var showBinaryUpdatePopup by mutableStateOf(false)
@@ -111,6 +109,7 @@ class MainActivity : ComponentActivity() {
     private var showRedirectPopup by mutableStateOf(false)
     private var shouldLaunchIPTV by mutableStateOf(false)
     private var countdownJob: Job? = null
+    private var autoServerMonitorJob: Job? = null
 
     private var downloadProgress by mutableStateOf<DownloadProgress?>(null)
     private var isSwitchOnForAutoStartForeground by mutableStateOf(false)
@@ -118,12 +117,24 @@ class MainActivity : ComponentActivity() {
     private var showOperationDialog by mutableStateOf(false)
 
     private var isSwitchDarkMode by mutableStateOf(false)
+    private var serverStartRequestedAt by mutableStateOf(0L)
 
     override fun onStart() {
         super.onStart()
         runOnceAfterAppUpgrade()
         preferenceManager = SkySharedPref.getInstance(this)
+
+        // One-time default migration: if auto-start was never explicitly saved,
+        // enable it so server starts automatically on app open by default.
+        val rawPrefs = getSharedPreferences("SkySharedPref", MODE_PRIVATE)
+        if (!rawPrefs.contains("auto_start_server")) {
+            preferenceManager.myPrefs.autoStartServer = true
+            preferenceManager.savePreferences()
+        }
+
         BinaryUpdater.init(this)
+
+        startAutoServerMonitor()
 
 // DEL----------------------------------------------------------
 
@@ -135,11 +146,14 @@ class MainActivity : ComponentActivity() {
 
         val appPackageName = preferenceManager.myPrefs.iptvAppPackageName
 
-        if (!appPackageName.isNullOrEmpty()) {
-            if (appPackageName == "tvzone") {
-                preferenceManager.myPrefs.autoStartIPTV = false
-                currentScreen = "Zone"
-            }
+        val isTvZoneSelected = appPackageName.equals("tvzone", ignoreCase = true)
+        val shouldOpenZoneOnStart = isTvZoneSelected || preferenceManager.myPrefs.startTvAutomatically
+
+        if (isTvZoneSelected) {
+            preferenceManager.myPrefs.autoStartIPTV = false
+        }
+        if (shouldOpenZoneOnStart) {
+            currentScreen = "Zone"
         }
 
         if (preferenceManager.myPrefs.jtvGoBinaryVersion?.contains(
@@ -194,6 +208,20 @@ class MainActivity : ComponentActivity() {
         jtvConfigManager.saveJTVConfiguration()
         isServerRunning = BinaryService.isRunning
 
+        if (preferenceManager.myPrefs.setupPending) {
+            val binaryName = preferenceManager.myPrefs.jtvGoBinaryName
+            val binaryFileReady = !binaryName.isNullOrBlank() && File(filesDir, binaryName).exists()
+            val configPath = preferenceManager.myPrefs.jtvConfigLocation
+            val configFileReady = !configPath.isNullOrBlank() && File(configPath).exists()
+            val canSkipSetup = (isServerRunning || binaryFileReady) && configFileReady
+
+            if (canSkipSetup) {
+                Log.d(TAG, "Skipping setup wizard: binary and config are already ready")
+                preferenceManager.myPrefs.setupPending = false
+                preferenceManager.savePreferences()
+            }
+        }
+
         if (!preferenceManager.myPrefs.enableCustomChannels && wasServerRunning && hadCustomChannelsConfigured) {
             stopBinary(context = this, onBinaryStopped = {
                 isServerRunning = false
@@ -219,10 +247,15 @@ class MainActivity : ComponentActivity() {
 
             countdownJob?.cancel()
             countdownJob = null
-            preferenceManager.myPrefs.autoStartServer = false
             preferenceManager.savePreferences()
             finish()
             return
+        }
+
+        // Keep startup landing consistent for TVZone users.
+        // If startup is still on Home after setup checks, route to Zone.
+        if (shouldOpenZoneOnStart && currentScreen == "Home") {
+            currentScreen = "Zone"
         }
 
         if (isServerRunning) {
@@ -231,18 +264,15 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Check if server should start automatically
-        val isFlagSetForAutoStartServer = preferenceManager.myPrefs.autoStartServer
-        if (isFlagSetForAutoStartServer && (!BinaryService.isRunning || isFirstAppOpen)) {
-            Log.d(TAG, "Starting server automatically (forceStart=$isFirstAppOpen)")
-            if (isFirstAppOpen) {
-                // Clear channel cache so a fresh fetch is done after server starts
-                try {
-                    getSharedPreferences("channel_cache", MODE_PRIVATE).edit()
-                        .remove("channels_json")
-                        .apply()
-                } catch (_: Exception) {}
-            }
+        // Check if server should start automatically.
+        // Treat TV autoplay as an implicit server-autostart request to avoid flag drift.
+        val shouldAutoStartServer =
+            preferenceManager.myPrefs.autoStartServer || preferenceManager.myPrefs.startTvAutomatically
+        if (shouldAutoStartServer) {
+            Log.d(
+                TAG,
+                "Starting server automatically (running=${BinaryService.isRunning})"
+            )
             val arguments = emptyArray<String>()
             runBinary(
                 activity = this,
@@ -254,9 +284,54 @@ class MainActivity : ComponentActivity() {
                     Log.d(TAG, output)
                     outputText = output
                 },
-                forceStart = isFirstAppOpen
+                forceStart = false
             )
-            isFirstAppOpen = false
+        }
+    }
+
+    private fun startAutoServerMonitor() {
+        if (autoServerMonitorJob?.isActive == true) return
+
+        autoServerMonitorJob = CoroutineScope(Dispatchers.IO).launch {
+            var consecutiveMisses = 0
+            var lastRestartAttemptAt = 0L
+            while (true) {
+                val shouldAutoStartServer =
+                    preferenceManager.myPrefs.autoStartServer || preferenceManager.myPrefs.startTvAutomatically
+
+                if (!shouldAutoStartServer) {
+                    consecutiveMisses = 0
+                    delay(12_000L)
+                    continue
+                }
+
+                if (!BinaryService.isRunning) {
+                    consecutiveMisses++
+                } else {
+                    consecutiveMisses = 0
+                }
+
+                val now = System.currentTimeMillis()
+                val cooldownElapsed = now - lastRestartAttemptAt >= 45_000L
+                if (consecutiveMisses >= 2 && cooldownElapsed) {
+                    Log.d(TAG, "Auto server monitor detected consecutive misses; requesting restart")
+                    lastRestartAttemptAt = now
+                    runBinary(
+                        activity = this@MainActivity,
+                        arguments = emptyArray(),
+                        onRunSuccess = {
+                            onJTVServerRun()
+                            consecutiveMisses = 0
+                        },
+                        onOutput = { output ->
+                            Log.d(TAG, output)
+                        },
+                        forceStart = false
+                    )
+                }
+
+                delay(12_000L)
+            }
         }
     }
 
@@ -387,19 +462,6 @@ class MainActivity : ComponentActivity() {
             )
         }
 
-
-        val sharedPref = getSharedPreferences("channel_cache", MODE_PRIVATE)
-        try {
-            with(sharedPref.edit()) {
-                remove("channels_json")
-                apply()
-                Log.d("DIXf", "Cleared channel cache")
-            }
-        } catch (e: Exception) {
-            Log.e("DIXf", "Error message", e)
-        }
-
-
         // Register the OnBackPressedCallback
         onBackPressedDispatcher.addCallback(this, backPressedCallback)
 
@@ -466,17 +528,10 @@ class MainActivity : ComponentActivity() {
 //                                    startActivity(intent)
                                 },
                                 onExitButtonClick = {
-                                    stopBinary(
-                                        context = this@MainActivity,
-                                        onBinaryStopped = {
-                                            isGlowBox = false
-                                            isServerRunning = false
-                                            outputText = "Server stopped"
-                                            finish()
-                                            Process.killProcess(Process.myPid())
-                                            exitProcess(0)
-                                        }
-                                    )
+                                    isGlowBox = false
+                                    showRedirectPopup = false
+                                    shouldLaunchIPTV = false
+                                    finishAffinity()
                                 },
                             )
 
@@ -520,7 +575,20 @@ class MainActivity : ComponentActivity() {
                             "Cast" -> CastScreen(context = this@MainActivity)
                             "Zone" -> ZoneScreen(
                                 context = this@MainActivity,
-                                onNavigate = { title -> currentScreen = title })
+                                onNavigate = { title -> currentScreen = title },
+                                isServerRunning = isServerRunning,
+                                onServerStartClick = {
+                                    runBinary(
+                                        activity = this@MainActivity,
+                                        arguments = emptyArray(),
+                                        onRunSuccess = {
+                                            onJTVServerRun()
+                                        },
+                                        onOutput = { output ->
+                                            outputText = output
+                                        }
+                                    )
+                                })
                         }
 
                         // Show the redirect popup
@@ -710,6 +778,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        autoServerMonitorJob?.cancel()
+        autoServerMonitorJob = null
         backPressedCallback.remove()
         unregisterReceiver(binaryStoppedReceiver)
     }
@@ -939,6 +1009,7 @@ class MainActivity : ComponentActivity() {
     private fun onJTVServerRun() {
         // Check server status
         val port = preferenceManager.myPrefs.jtvGoServerPort
+        serverStartRequestedAt = System.currentTimeMillis()
         CoroutineScope(Dispatchers.IO).launch {
             checkServerStatus(
                 port = port,
@@ -1003,10 +1074,40 @@ class MainActivity : ComponentActivity() {
                 },
                 onServerDown = {
                     CoroutineScope(Dispatchers.Main).launch {
-                        isServerRunning = false
                         isGlowBox = false
-                        Toast.makeText(this@MainActivity, "Server is down", Toast.LENGTH_SHORT)
-                            .show()
+                        val startupGraceMs = 15_000L
+                        val startupAgeMs = System.currentTimeMillis() - serverStartRequestedAt
+                        if (startupAgeMs in 0 until startupGraceMs) {
+                            isServerRunning = true
+                            outputText = "Server starting..."
+                            return@launch
+                        }
+
+                        val shouldAutoStartServer =
+                            preferenceManager.myPrefs.autoStartServer || preferenceManager.myPrefs.startTvAutomatically
+                        if (shouldAutoStartServer) {
+                            if (!BinaryService.isRunning) {
+                                outputText = "Server starting..."
+                                runBinary(
+                                    activity = this@MainActivity,
+                                    arguments = emptyArray(),
+                                    onRunSuccess = {
+                                        onJTVServerRun()
+                                    },
+                                    onOutput = { output ->
+                                        outputText = output
+                                    },
+                                    forceStart = false
+                                )
+                            } else {
+                                isServerRunning = true
+                                outputText = "Server is starting..."
+                            }
+                        } else {
+                            isServerRunning = false
+                            Toast.makeText(this@MainActivity, "Server is down", Toast.LENGTH_SHORT)
+                                .show()
+                        }
                     }
                 },
             )
@@ -1090,8 +1191,27 @@ class MainActivity : ComponentActivity() {
     private val binaryStoppedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == BinaryService.ACTION_BINARY_STOPPED) {
-                isServerRunning = false
-                outputText = "Server stopped"
+                val shouldAutoStartServer =
+                    preferenceManager.myPrefs.autoStartServer || preferenceManager.myPrefs.startTvAutomatically
+                if (shouldAutoStartServer) {
+                    isServerRunning = false
+                    outputText = "Server restarting..."
+                    runBinary(
+                        activity = this@MainActivity,
+                        arguments = emptyArray(),
+                        onRunSuccess = {
+                            onJTVServerRun()
+                            outputText = "Server restarted"
+                        },
+                        onOutput = { output ->
+                            outputText = output
+                        },
+                        forceStart = false
+                    )
+                } else {
+                    isServerRunning = false
+                    outputText = "Server stopped"
+                }
             }
         }
     }

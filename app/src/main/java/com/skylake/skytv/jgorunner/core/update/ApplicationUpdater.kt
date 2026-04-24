@@ -9,6 +9,7 @@ import android.content.IntentFilter
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.provider.Settings
 import android.util.Log
 import androidx.core.net.toUri
 import kotlinx.coroutines.CoroutineScope
@@ -63,7 +64,8 @@ object ApplicationUpdater {
         onProgress: (DownloadProgress) -> Unit
     ) {
         Log.d("$TAG-DL","URL: $downloadUrl, PATH: $fileName")
-        val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val appContext = context.applicationContext
+        val downloadManager = appContext.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 
         // Configure the request
         val request = DownloadManager.Request(downloadUrl.toUri()).apply {
@@ -76,7 +78,12 @@ object ApplicationUpdater {
         }
 
         // Enqueue the download
-        val downloadId = downloadManager.enqueue(request)
+        val downloadId = try {
+            downloadManager.enqueue(request)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to enqueue app update download: ${e.message}", e)
+            return
+        }
 
         CoroutineScope(Dispatchers.Main).launch {
             var isDownloading = true
@@ -118,20 +125,24 @@ object ApplicationUpdater {
                 // Check if this is the download we're waiting for
                 if (id == downloadId) {
                     val fileUri = downloadManager.getUriForDownloadedFile(downloadId)
-                    launchInstaller(context, fileUri)
-                    context.unregisterReceiver(this) // Unregister receiver after completion
+                    launchInstaller(appContext, fileUri)
+                    try {
+                        appContext.unregisterReceiver(this) // Unregister receiver after completion
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Receiver already unregistered or context changed: ${e.message}")
+                    }
                 }
             }
         }
 
         // Register the receiver
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(
+            appContext.registerReceiver(
                 onCompleteReceiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-                Context.RECEIVER_EXPORTED
+                Context.RECEIVER_NOT_EXPORTED
             )
         } else {
-            context.registerReceiver(
+            appContext.registerReceiver(
                 onCompleteReceiver,
                 IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
             )
@@ -144,13 +155,48 @@ object ApplicationUpdater {
             return
         }
 
-        val intent = Intent(Intent.ACTION_VIEW).apply {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
+            try {
+                val settingsIntent = Intent(
+                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:${context.packageName}")
+                ).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(settingsIntent)
+                Log.w(TAG, "Unknown sources install permission not granted. Opened settings.")
+                return
+            } catch (e: Exception) {
+                Log.e(TAG, "Unable to open unknown app sources settings: ${e.message}", e)
+            }
+        }
+
+        val installIntent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+            data = fileUri
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        val viewIntent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(fileUri, "application/vnd.android.package-archive")
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
 
         try {
-            context.startActivity(intent)
+            val packageManager = context.packageManager
+            val selectedIntent = when {
+                installIntent.resolveActivity(packageManager) != null -> installIntent
+                viewIntent.resolveActivity(packageManager) != null -> viewIntent
+                else -> null
+            }
+
+            if (selectedIntent == null) {
+                Log.e(TAG, "No activity found to install APK on this device.")
+                return
+            }
+
+            context.startActivity(selectedIntent)
         } catch (e: Exception) {
             Log.e("AppUpdate", "Error launching installer: ${e.message}")
         }

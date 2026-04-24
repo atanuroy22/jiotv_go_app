@@ -52,9 +52,8 @@ class BinaryService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int { //
         // Check if intent is null
         if (intent == null) {
-            Log.e("BinaryService", "Received null intent in onStartCommand!")
-            stopService() //
-            return START_NOT_STICKY
+            Log.w("BinaryService", "Received null intent in onStartCommand; keeping service alive")
+            return START_STICKY
         }
 
         // Create the notification for the service

@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +34,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -58,12 +60,97 @@ import com.bumptech.glide.integration.compose.GlideImage
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.skylake.skytv.jgorunner.activities.ChannelInfo
+import com.skylake.skytv.jgorunner.core.execution.runBinary
 import com.skylake.skytv.jgorunner.data.SkySharedPref
+import com.skylake.skytv.jgorunner.services.BinaryService
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
-import com.skylake.skytv.jgorunner.ui.screens.AppStartTracker
 import com.skylake.skytv.jgorunner.utils.withQuality
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withContext
+import java.util.concurrent.TimeUnit
+
+private const val TV_STARTUP_TIMEOUT_MS = 5_000L
+private const val TV_STARTUP_POLL_DELAY_MS = 250L
+private const val TV_AUTOPLAY_SETTLE_DELAY_MS = 900L
+private const val TV_STARTUP_MAX_FALLBACK_CHANNELS = 4
+private const val TV_STREAM_CONNECT_TIMEOUT_MS = 1_250L
+private const val TV_STREAM_READ_TIMEOUT_MS = 1_250L
+private const val TV_STREAM_CALL_TIMEOUT_MS = 1_750L
+private const val TV_PREFLIGHT_CONNECT_TIMEOUT_MS = 650L
+private const val TV_PREFLIGHT_READ_TIMEOUT_MS = 650L
+private const val TV_PREFLIGHT_CALL_TIMEOUT_MS = 900L
+
+private val startupProbeClient = OkHttpClient.Builder()
+    .connectTimeout(TV_STREAM_CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+    .readTimeout(TV_STREAM_READ_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+    .callTimeout(TV_STREAM_CALL_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+    .followRedirects(true)
+    .followSslRedirects(true)
+    .build()
+
+private val preflightProbeClient = OkHttpClient.Builder()
+    .connectTimeout(TV_PREFLIGHT_CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+    .readTimeout(TV_PREFLIGHT_READ_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+    .callTimeout(TV_PREFLIGHT_CALL_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+    .followRedirects(true)
+    .followSslRedirects(true)
+    .build()
+
+private data class TvStartupReadiness(
+    val ready: Boolean,
+    val reason: String? = null
+)
+
+private sealed class TvStartupOutcome {
+    data object Idle : TvStartupOutcome()
+    data object Checking : TvStartupOutcome()
+    data class Timeout(val reason: String) : TvStartupOutcome()
+    data class Failure(val reason: String) : TvStartupOutcome()
+}
+
+private suspend fun probeStreamEndpoint(
+    url: String,
+    isPreflightProbe: Boolean = false
+): Boolean {
+    return withContext(Dispatchers.IO) {
+        val client = if (isPreflightProbe) preflightProbeClient else startupProbeClient
+
+        fun execute(method: String): Int? {
+            val request = Request.Builder()
+                .url(url)
+                .method(method, null)
+                .build()
+
+            return client.newCall(request).execute().use { response ->
+                response.code
+            }
+        }
+
+        try {
+            val headCode = execute("HEAD")
+            if (headCode != null && headCode in 200..299) {
+                return@withContext true
+            }
+
+            if (headCode == 405 || headCode == 501) {
+                val getCode = execute("GET")
+                return@withContext getCode != null && getCode in 200..299
+            }
+
+            false
+        } catch (_: Exception) {
+            false
+        }
+    }
+}
 
 @SuppressLint("MutableCollectionMutableState")
 @OptIn(ExperimentalGlideComposeApi::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -77,6 +164,10 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
         mutableIntStateOf(preferenceManager.myPrefs.jtvGoServerPort)
     }
     val basefinURL = "http://localhost:$localPORT"
+    val channelCachePrefsName = "channel_cache"
+    val channelCacheJsonKey = "channels_json"
+    val channelCacheUpdatedAtKey = "channels_cache_updated_at_ms"
+    val channelCacheTtlMs = 12L * 60L * 60L * 1000L
     var fetched by remember { mutableStateOf(false) }
 
     var selectedChannel by remember { mutableStateOf<Channel?>(null) }
@@ -87,7 +178,14 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
     var reloadAttemptCount by rememberSaveable { mutableIntStateOf(0) }
     var waitingDots by remember { mutableStateOf("") }
     var autoLoadCountdown by remember { mutableIntStateOf(5) }
-    var autoLoadTriggered by remember { mutableStateOf(false) }
+    var autoRetryLoopRunning by remember { mutableStateOf(false) }
+    var startupOutcome by remember { mutableStateOf<TvStartupOutcome>(TvStartupOutcome.Idle) }
+    var startupRetryToken by rememberSaveable { mutableIntStateOf(0) }
+    var startupLaunchSessionKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var startupLaunchInProgress by remember { mutableStateOf(false) }
+    var autoplayLaunched by remember { mutableStateOf(false) }
+    var autoplayResumeToken by remember { mutableIntStateOf(0) }
+    val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
 
     remember { FocusRequester() }
@@ -110,6 +208,19 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
 
     val savedCategoryIds = preferenceManager.myPrefs.filterCI
         ?.split(",")?.mapNotNull { it.toIntOrNull() }?.toMutableSet() ?: mutableSetOf()
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                autoplayLaunched = false
+                autoplayResumeToken++
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 //    var selectedCategoryIds by remember { mutableStateOf(savedCategoryIds) }
     var selectedCategoryIds by rememberSaveable { mutableStateOf(savedCategoryIds.toSet()) }
     val languageNameById = mapOf(
@@ -199,13 +310,13 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
     }
 
 
-    // Helper functions for enhanced autoplay
     suspend fun fetchFromBackend(): List<Channel> {
         return try {
             ChannelUtils.fetchChannels("$basefinURL/channels")?.let { response ->
                 channelsResponse.value = response
-                context.getSharedPreferences("channel_cache", Context.MODE_PRIVATE).edit().apply {
-                    putString("channels_json", Gson().toJson(response))
+                context.getSharedPreferences(channelCachePrefsName, Context.MODE_PRIVATE).edit().apply {
+                    putString(channelCacheJsonKey, Gson().toJson(response))
+                    putLong(channelCacheUpdatedAtKey, System.currentTimeMillis())
                     apply()
                 }
                 val filtered = applyMainFilters(response)
@@ -217,69 +328,231 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
         }
     }
 
-    suspend fun watchdogAutoplay(channels: List<Channel>) {
-        repeat(5) {
-            if (preferenceManager.myPrefs.currChannelUrl.isNullOrEmpty()) {
-                val channelsToUse = channels.ifEmpty { fetchFromBackend() }
-                if (channelsToUse.isNotEmpty()) {
-                    try {
-                        val firstChannel = channelsToUse.first()
-                        val (channelWindow, relativeIndex) = buildChannelInfoWindow(
-                            context = context,
-                            channels = channelsToUse,
-                            basefinURL = basefinURL,
-                            centerIndex = 0
-                        )
-                        val intent = Intent(context, ExoPlayJet::class.java).apply {
-                            putExtra("zone", "TV")
-                            if (firstChannel.channel_id.all { it.isDigit() }) putExtra("channel_list_kind", "jio")
-                            putExtra("current_channel_index", relativeIndex)
-                            putParcelableArrayListExtra("channel_list_data", channelWindow)
-                            putExtra("video_url", firstChannel.channel_url)
-                            putExtra(
-                                "logo_url",
-                                if (firstChannel.logoUrl.startsWith("http")) firstChannel.logoUrl else "http://localhost:$localPORT/jtvimage/${firstChannel.logoUrl}"
-                            )
-                            putExtra("ch_name", firstChannel.channel_name)
-                        }
+    suspend fun ensureServerReady(): TvStartupReadiness {
+        val port = preferenceManager.myPrefs.jtvGoServerPort
+        val url = "http://localhost:$port/live/143.m3u8"
 
-                        if (context !is Activity) {
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                        context.startActivity(intent)
+        val activity = context as? ComponentActivity
+            ?: return TvStartupReadiness(false, "TV autoplay requires an activity context")
 
-                        AppStartTracker.shouldPlayChannel = true
-                        return
-                    } catch (_: Exception) {
+        suspend fun requestBinaryStart(forceStart: Boolean, reason: String) {
+            Log.d(
+                "TVAutoplay",
+                "Service start requested (forceStart=$forceStart). reason=$reason"
+            )
+            withContext(Dispatchers.Main) {
+                runBinary(
+                    activity = activity,
+                    arguments = emptyArray(),
+                    onRunSuccess = {
+                        Log.d("TVAutoplay", "Binary service start acknowledged")
+                    },
+                    onOutput = { },
+                    forceStart = forceStart
+                )
+            }
+        }
+
+        var lastProbeReason: String? = null
+        var startRequested = false
+        val readiness: TvStartupReadiness? = withTimeoutOrNull<TvStartupReadiness>(TV_STARTUP_TIMEOUT_MS) {
+            var attempt = 0
+            while (true) {
+                if (!startRequested) {
+                    requestBinaryStart(
+                        forceStart = false,
+                        reason = "initial readiness gate request"
+                    )
+                    startRequested = true
+                }
+
+                attempt++
+                Log.d("TVAutoplay", "HTTP ready probe attempt=$attempt url=$url")
+                if (probeStreamEndpoint(url)) {
+                    Log.d("TVAutoplay", "HTTP ready true after attempt=$attempt")
+                    return@withTimeoutOrNull TvStartupReadiness(ready = true)
+                }
+
+                lastProbeReason = "Attempt $attempt did not return a playable HTTP response"
+
+                delay(TV_STARTUP_POLL_DELAY_MS)
+            }
+
+            error("TV startup readiness timeout block completed unexpectedly")
+        }
+
+        return readiness ?: TvStartupReadiness(
+            ready = false,
+            reason = lastProbeReason ?: "Timed out after ${TV_STARTUP_TIMEOUT_MS / 1000}s waiting for $url"
+        )
+    }
+
+    suspend fun launchFirstChannel(channelsToUse: List<Channel>, sessionKey: String): Boolean {
+        if (channelsToUse.isEmpty()) {
+            return false
+        }
+
+        if (startupLaunchInProgress || startupLaunchSessionKey == sessionKey) {
+            Log.d("TVAutoplay", "Skipping autoplay launch for session=$sessionKey")
+            return false
+        }
+
+        startupLaunchInProgress = true
+        startupLaunchSessionKey = sessionKey
+        return try {
+            startupOutcome = TvStartupOutcome.Checking
+            showLoading = true
+
+            val readiness = ensureServerReady()
+            if (!readiness.ready) {
+                val reason = readiness.reason ?: "Server readiness timed out"
+                Log.w("TVAutoplay", reason)
+                startupOutcome = TvStartupOutcome.Timeout(reason)
+                showLoading = false
+                return false
+            }
+
+            delay(TV_AUTOPLAY_SETTLE_DELAY_MS)
+
+            val candidates = channelsToUse.take(TV_STARTUP_MAX_FALLBACK_CHANNELS)
+            for ((candidateIndex, candidate) in candidates.withIndex()) {
+                Log.d(
+                    "TVAutoplay",
+                    "Autoplay attempt index=${candidateIndex + 1}/${candidates.size} channel=${candidate.channel_name}"
+                )
+                if (!probeStreamEndpoint(
+                        url = candidate.channel_url,
+                    isPreflightProbe = true
+                    )) {
+                    Log.w(
+                        "TVAutoplay",
+                        "Skipping candidate index=$candidateIndex due to preflight failure"
+                    )
+                    continue
+                }
+                val (channelWindow, relativeIndex) = buildChannelInfoWindow(
+                    context = context,
+                    channels = channelsToUse,
+                    basefinURL = basefinURL,
+                    centerIndex = candidateIndex
+                )
+                val intent = Intent(context, ExoPlayJet::class.java).apply {
+                    putExtra("zone", "TV")
+                    if (candidate.channel_id.all { it.isDigit() }) putExtra("channel_list_kind", "jio")
+                    putExtra("current_channel_index", relativeIndex)
+                    putParcelableArrayListExtra("channel_list_data", channelWindow)
+                    putExtra("video_url", candidate.channel_url)
+                    putExtra(
+                        "logo_url",
+                        if (candidate.logoUrl.startsWith("http")) candidate.logoUrl else "http://localhost:$localPORT/jtvimage/${candidate.logoUrl}"
+                    )
+                    putExtra("ch_name", candidate.channel_name)
+                }
+
+                if (context !is Activity) {
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+
+                withContext(Dispatchers.Main) {
+                    context.startActivity(intent)
+                }
+
+                val recentChannelsJson = preferenceManager.myPrefs.recentChannels
+                val type = object : TypeToken<List<Channel>>() {}.type
+                val recentChannels: MutableList<Channel> =
+                    Gson().fromJson(recentChannelsJson, type) ?: mutableListOf()
+
+                val existingIndex = recentChannels.indexOfFirst { it.channel_id == candidate.channel_id }
+
+                if (existingIndex != -1) {
+                    val existingChannel = recentChannels[existingIndex]
+                    recentChannels.removeAt(existingIndex)
+                    recentChannels.add(0, existingChannel)
+                } else {
+                    recentChannels.add(0, candidate)
+                    if (recentChannels.size > 25) {
+                        recentChannels.removeAt(recentChannels.size - 1)
                     }
                 }
+                preferenceManager.myPrefs.currChannelUrl = candidate.channel_url
+                preferenceManager.myPrefs.recentChannels = Gson().toJson(recentChannels)
+                preferenceManager.savePreferences()
+                startupOutcome = TvStartupOutcome.Idle
+                showLoading = false
+                Log.d("TVAutoplay", "Autoplay launched channel index=$candidateIndex")
+                return true
             }
-            kotlinx.coroutines.delay(2000)
+
+            val failureReason = "All ${candidates.size} autoplay candidates failed preflight"
+            Log.w("TVAutoplay", failureReason)
+            startupOutcome = TvStartupOutcome.Failure(failureReason)
+            showLoading = false
+            false
+        } catch (_: Exception) {
+            val failureReason = "Autoplay launch failed unexpectedly"
+            startupOutcome = TvStartupOutcome.Failure(failureReason)
+            showLoading = false
+            false
+        } finally {
+            startupLaunchInProgress = false
         }
     }
 
-    // Fetch and filter channels (cache/network)
-    LaunchedEffect(reloadTrigger) {
-        val sharedPref = context.getSharedPreferences("channel_cache", Context.MODE_PRIVATE)
-        var useCache = true
-        var cachedChannels: ChannelResponse? = null
+    suspend fun watchdogAutoplay(channels: List<Channel>, sessionKey: String): Boolean {
+        repeat(5) {
+            val channelsToUse = channels.ifEmpty { fetchFromBackend() }
+            if (channelsToUse.isNotEmpty()) {
+                if (launchFirstChannel(channelsToUse, sessionKey)) {
+                    return true
+                }
+            }
+            delay(2000)
+        }
+        if (startupOutcome is TvStartupOutcome.Checking) {
+            startupOutcome = TvStartupOutcome.Failure("No playable channels became available during startup")
+        }
+        showLoading = false
+        return false
+    }
 
-        val cachedJson = sharedPref.getString("channels_json", null)
+    suspend fun performReloadAttempt(): List<Channel> {
+        reloadAttemptCount++
+        showLoading = true
+        val fetchedChannels = fetchFromBackend()
+        filteredChannels.value = fetchedChannels
+        showLoading = false
+        return fetchedChannels
+    }
+
+    // Fetch and filter channels (cache/network), then gate autoplay through one startup session.
+    LaunchedEffect(reloadTrigger, startupRetryToken, autoplayResumeToken) {
+        val sessionKey = "$reloadTrigger:$startupRetryToken:$autoplayResumeToken"
+        showLoading = true
+        val sharedPref = context.getSharedPreferences(channelCachePrefsName, Context.MODE_PRIVATE)
+        var cachedChannels: ChannelResponse? = null
+        var hasValidCachedChannels = false
+
+        val cachedJson = sharedPref.getString(channelCacheJsonKey, null)
+        val cacheUpdatedAt = sharedPref.getLong(channelCacheUpdatedAtKey, 0L)
+        val isCacheFresh = cacheUpdatedAt > 0L &&
+            (System.currentTimeMillis() - cacheUpdatedAt) <= channelCacheTtlMs
+
         if (!cachedJson.isNullOrEmpty()) {
             try {
                 cachedChannels = Gson().fromJson(cachedJson, ChannelResponse::class.java)
-                channelsResponse.value = cachedChannels
+                hasValidCachedChannels = cachedChannels != null
+                if (hasValidCachedChannels) {
+                    channelsResponse.value = cachedChannels
+                }
             } catch (_: Exception) {
                 sharedPref.edit {
-                    remove("channels_json")
+                    remove(channelCacheJsonKey)
+                    remove(channelCacheUpdatedAtKey)
                 }
-                useCache = false
             }
-        } else {
-            useCache = false
         }
 
-        if (useCache && cachedChannels != null) {
+        if (hasValidCachedChannels && isCacheFresh && cachedChannels != null) {
             val filtered = applyMainFilters(cachedChannels)
             filteredChannels.value = filtered
             fetched = true
@@ -294,7 +567,8 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                     if (response != null) {
                         val responseJsonString = Gson().toJson(response)
                         sharedPref.edit {
-                            putString("channels_json", responseJsonString)
+                            putString(channelCacheJsonKey, responseJsonString)
+                            putLong(channelCacheUpdatedAtKey, System.currentTimeMillis())
                         }
                         val filtered = applyMainFilters(response)
                         filteredChannels.value = filtered
@@ -307,71 +581,35 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                     kotlinx.coroutines.delay(300)
                 }
             }
+
+            // If refresh fails, keep app usable by falling back to stale cache.
+            if (!success && hasValidCachedChannels && cachedChannels != null) {
+                val filtered = applyMainFilters(cachedChannels)
+                filteredChannels.value = filtered
+            }
             fetched = true
         }
 
-        if (preferenceManager.myPrefs.startTvAutomatically) {
+        val canAutoplay = !autoplayLaunched
+
+        if (preferenceManager.myPrefs.startTvAutomatically && canAutoplay) {
             var channelsForAutoplay = filteredChannels.value
             if (channelsForAutoplay.isEmpty()) {
                 channelsForAutoplay = fetchFromBackend()
             }
 
-            if (!AppStartTracker.shouldPlayChannel && channelsForAutoplay.isNotEmpty()) {
-                val firstChannel = channelsForAutoplay.first()
-                val (channelWindow, relativeIndex) = buildChannelInfoWindow(
-                    context = context,
-                    channels = channelsForAutoplay,
-                    basefinURL = basefinURL,
-                    centerIndex = 0
-                )
-                val intent = Intent(context, ExoPlayJet::class.java).apply {
-                    putExtra("zone", "TV")
-                    if (firstChannel.channel_id.all { it.isDigit() }) putExtra("channel_list_kind", "jio")
-                    putExtra("current_channel_index", relativeIndex)
-                    putParcelableArrayListExtra("channel_list_data", channelWindow)
-                    putExtra("video_url", firstChannel.channel_url)
-                    putExtra(
-                        "logo_url",
-                        if (firstChannel.logoUrl.startsWith("http")) firstChannel.logoUrl else "http://localhost:$localPORT/jtvimage/${firstChannel.logoUrl}"
-                    )
-                    putExtra("ch_name", firstChannel.channel_name)
+            if (channelsForAutoplay.isNotEmpty()) {
+                if (launchFirstChannel(channelsForAutoplay, sessionKey)) {
+                    autoplayLaunched = true
                 }
-
-                kotlinx.coroutines.delay(1000)
-
-                if (context !is Activity) {
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(intent)
-
-
-                //Recent Channels
-                val recentChannelsJson = preferenceManager.myPrefs.recentChannels
-                val type = object : TypeToken<List<Channel>>() {}.type
-                val recentChannels: MutableList<Channel> =
-                    Gson().fromJson(recentChannelsJson, type) ?: mutableListOf()
-
-                val existingIndex =
-                    recentChannels.indexOfFirst { it.channel_id == firstChannel.channel_id }
-
-                if (existingIndex != -1) {
-                    val existingChannel = recentChannels[existingIndex]
-                    recentChannels.removeAt(existingIndex)
-                    recentChannels.add(0, existingChannel)
-                } else {
-                    recentChannels.add(0, firstChannel)
-                    if (recentChannels.size > 25) {
-                        recentChannels.removeAt(recentChannels.size - 1)
-                    }
-                }
-                preferenceManager.myPrefs.recentChannels = Gson().toJson(recentChannels)
-                preferenceManager.savePreferences()
             } else {
-                // Watchdog for reliability
-                watchdogAutoplay(channelsForAutoplay)
+                if (watchdogAutoplay(channelsForAutoplay, sessionKey)) {
+                    autoplayLaunched = true
+                }
             }
-
-            AppStartTracker.shouldPlayChannel = true
+        } else {
+            showLoading = false
+            startupOutcome = TvStartupOutcome.Idle
         }
 
     }
@@ -392,33 +630,29 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
         }
     }
 
-    // Auto-load cached channels after 5 seconds if not clicked
+    // Auto-retry loading channels: first wait briefly, then retry until channels arrive.
     LaunchedEffect(fetched, filteredChannels.value) {
-        if (fetched && filteredChannels.value.isEmpty() && !autoLoadTriggered) {
-            autoLoadTriggered = true
-            var countdownActive = true
-            
-            // Start countdown
-            for (i in 5 downTo 1) {
-                if (!countdownActive) break
-                autoLoadCountdown = i
-                // Create waiting dots animation
-                waitingDots = ""
-                for (j in 1..6) {
-                    if (!countdownActive) break
-                    waitingDots += "."
-                    delay(100)
+        if (fetched && filteredChannels.value.isEmpty() && !autoRetryLoopRunning) {
+            autoRetryLoopRunning = true
+            try {
+                var waitSeconds = 2
+                while (filteredChannels.value.isEmpty()) {
+                    for (i in waitSeconds downTo 1) {
+                        if (filteredChannels.value.isNotEmpty()) break
+                        autoLoadCountdown = i
+                        waitingDots = ".".repeat(((waitSeconds - i) % 3) + 1)
+                        delay(1000)
+                    }
+
+                    if (filteredChannels.value.isNotEmpty()) {
+                        break
+                    }
+
+                    performReloadAttempt()
+                    waitSeconds = 5
                 }
-                delay(600) // Complete the 1 second cycle
-            }
-            
-            // Auto-load from cache if countdown completed without being cancelled
-            if (countdownActive) {
-                reloadAttemptCount++
-                showLoading = true
-                val fetchedChannels = fetchFromBackend()
-                filteredChannels.value = fetchedChannels
-                showLoading = false
+            } finally {
+                autoRetryLoopRunning = false
             }
         }
     }
@@ -452,26 +686,95 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
         }
     }
 
-    LaunchedEffect(fetched) {
-        if (!fetched) {
-            delay(100)
-            if (!fetched) showLoading = true
+    // UI: Startup readiness, recovery and content.
+    val currentStartupOutcome = startupOutcome
+    if (currentStartupOutcome is TvStartupOutcome.Timeout || currentStartupOutcome is TvStartupOutcome.Failure) {
+        val reason = if (currentStartupOutcome is TvStartupOutcome.Timeout) {
+            currentStartupOutcome.reason
         } else {
-            showLoading = false
+            (currentStartupOutcome as TvStartupOutcome.Failure).reason
         }
-    }
-
-    // UI: Loading state
-    if (showLoading) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxSize()
         ) {
-            ContainedLoadingIndicator(modifier = Modifier.size(100.dp))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = if (currentStartupOutcome is TvStartupOutcome.Timeout) {
+                        "Startup timed out"
+                    } else {
+                        "Startup failed"
+                    },
+                    style = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold),
+                    color = Color.Red
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = reason,
+                    style = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Medium),
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                ElevatedCard(
+                    onClick = {
+                        startupOutcome = TvStartupOutcome.Checking
+                        showLoading = true
+                        startupRetryToken++
+                    }
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Refresh,
+                            contentDescription = "Retry startup"
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Retry startup")
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                ElevatedCard(
+                    onClick = {
+                        startupOutcome = TvStartupOutcome.Idle
+                        showLoading = !fetched
+                    }
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Done,
+                            contentDescription = "Open channel list"
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Open channel list")
+                    }
+                }
+            }
         }
-    }
-    // UI: Empty state
-    else if (fetched && filteredChannels.value.isEmpty()) {
+    } else if (showLoading || currentStartupOutcome is TvStartupOutcome.Checking) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                ContainedLoadingIndicator(modifier = Modifier.size(100.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = if (currentStartupOutcome is TvStartupOutcome.Checking) {
+                        "Waiting for server readiness..."
+                    } else {
+                        "Loading channels..."
+                    },
+                    style = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Medium),
+                    color = Color.White
+                )
+            }
+        }
+    } else if (fetched && filteredChannels.value.isEmpty()) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxSize()
@@ -485,17 +788,20 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(text = waitingDots, style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold))
                 Spacer(modifier = Modifier.height(10.dp))
-                Text(text = waitingDots, style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold))
-                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Auto-loading cached channels in ${autoLoadCountdown}s...",
+                    text = "Auto-retrying channel load in ${autoLoadCountdown}s...",
                     style = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Bold),
                     color = Color.Blue
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Click Reload to reload now, or wait for auto-load",
+                    text = "Click Reload to retry now, or wait for auto-retry",
                     style = TextStyle(fontSize = 14.sp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Retry attempts: $reloadAttemptCount",
+                    style = TextStyle(fontSize = 13.sp, color = Color.Gray)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -505,11 +811,8 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                 Spacer(modifier = Modifier.height(24.dp))
                 ElevatedCard(
                     onClick = {
-                        reloadAttemptCount++
-                        (context as? Activity)?.let { activity ->
-                            val intent = activity.intent
-                            activity.finish()
-                            activity.startActivity(intent)
+                        coroutineScope.launch {
+                            performReloadAttempt()
                         }
                     },
                     modifier = Modifier.padding(top = 8.dp)
@@ -528,9 +831,7 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                 }
             }
         }
-    }
-    // UI: Main content
-    else {
+    } else {
         // CATEGORY CHIPS
         LazyRow(
             modifier = Modifier

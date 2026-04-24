@@ -11,6 +11,13 @@ on:
       - develop
     paths:
       - "app/version.gradle"
+      - "app/src/**"
+      - "app/build.gradle"
+      - "build.gradle"
+      - "settings.gradle"
+      - "gradle.properties"
+      - "gradle/**"
+      - ".github/workflows/generate-apk-release.yml"
   workflow_dispatch:
 
 permissions:

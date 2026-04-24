@@ -350,6 +350,7 @@ fun SettingsScreen(
         try {
             context.getSharedPreferences("channel_cache", Context.MODE_PRIVATE).edit()
                 .remove("channels_json")
+                .remove("channels_cache_updated_at_ms")
                 .apply()
         } catch (_: Exception) {
         }
@@ -743,6 +744,7 @@ fun SettingsScreen(
         try {
             with(sharedPref.edit()) {
                 remove("channels_json")
+                remove("channels_cache_updated_at_ms")
                 apply()
                 Log.d("DIX-SetSec", "Cleared channel cache")
             }

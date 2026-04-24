@@ -22,12 +22,10 @@ fun runBinary(
 ) {
     // If already running and not forcing a restart, skip re-starting it
     if (BinaryService.isRunning && !forceStart) {
-        CoroutineScope(Dispatchers.IO).launch {
-            onRunSuccess()
-            withContext(Dispatchers.Main) {
-                BinaryService.instance?.binaryOutput?.observe(activity) { output ->
-                    onOutput(output)
-                }
+        onRunSuccess()
+        CoroutineScope(Dispatchers.Main).launch {
+            BinaryService.instance?.binaryOutput?.observe(activity) { output ->
+                onOutput(output)
             }
         }
         return
@@ -67,12 +65,9 @@ fun runBinary(
     } else {
         activity.startService(intent)
     }
+    onRunSuccess()
 
     CoroutineScope(Dispatchers.IO).launch {
-        // Wait until the binary service is running
-        while (!BinaryService.isRunning) delay(100)
-
-        onRunSuccess()
         withContext(Dispatchers.Main) {
             BinaryService.instance?.binaryOutput?.observe(activity) { output ->
                 onOutput(output)
@@ -101,9 +96,8 @@ private fun startBinaryService(
     } else {
         activity.startService(intent)
     }
+    onRunSuccess()
     CoroutineScope(Dispatchers.IO).launch {
-        while (!BinaryService.isRunning) delay(100)
-        onRunSuccess()
         withContext(Dispatchers.Main) {
             BinaryService.instance?.binaryOutput?.observe(activity) { output ->
                 onOutput(output)
