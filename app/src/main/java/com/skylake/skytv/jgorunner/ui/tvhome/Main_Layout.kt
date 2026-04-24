@@ -34,6 +34,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -64,6 +65,9 @@ import com.skylake.skytv.jgorunner.data.SkySharedPref
 import com.skylake.skytv.jgorunner.services.BinaryService
 import com.skylake.skytv.jgorunner.services.player.ExoPlayJet
 import com.skylake.skytv.jgorunner.utils.withQuality
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import kotlinx.coroutines.delay
@@ -180,6 +184,8 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
     var startupLaunchSessionKey by rememberSaveable { mutableStateOf<String?>(null) }
     var startupLaunchInProgress by remember { mutableStateOf(false) }
     var autoplayLaunched by remember { mutableStateOf(false) }
+    var autoplayResumeToken by remember { mutableIntStateOf(0) }
+    val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
 
     remember { FocusRequester() }
@@ -202,6 +208,19 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
 
     val savedCategoryIds = preferenceManager.myPrefs.filterCI
         ?.split(",")?.mapNotNull { it.toIntOrNull() }?.toMutableSet() ?: mutableSetOf()
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                autoplayLaunched = false
+                autoplayResumeToken++
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 //    var selectedCategoryIds by remember { mutableStateOf(savedCategoryIds) }
     var selectedCategoryIds by rememberSaveable { mutableStateOf(savedCategoryIds.toSet()) }
     val languageNameById = mapOf(
@@ -506,8 +525,8 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
     }
 
     // Fetch and filter channels (cache/network), then gate autoplay through one startup session.
-    LaunchedEffect(reloadTrigger, startupRetryToken) {
-        val sessionKey = "$reloadTrigger:$startupRetryToken"
+    LaunchedEffect(reloadTrigger, startupRetryToken, autoplayResumeToken) {
+        val sessionKey = "$reloadTrigger:$startupRetryToken:$autoplayResumeToken"
         showLoading = true
         val sharedPref = context.getSharedPreferences(channelCachePrefsName, Context.MODE_PRIVATE)
         var cachedChannels: ChannelResponse? = null
