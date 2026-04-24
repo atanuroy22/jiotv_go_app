@@ -307,8 +307,11 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
         val activity = context as? ComponentActivity
             ?: return TvStartupReadiness(false, "TV autoplay requires an activity context")
 
-        if (!BinaryService.isRunning) {
-            Log.d("TVAutoplay", "Service start requested before readiness probe")
+        suspend fun requestBinaryStart(forceStart: Boolean, reason: String) {
+            Log.d(
+                "TVAutoplay",
+                "Service start requested (forceStart=$forceStart). reason=$reason"
+            )
             withContext(Dispatchers.Main) {
                 runBinary(
                     activity = activity,
@@ -317,28 +320,44 @@ fun Main_Layout(context: Context, reloadTrigger: Int) {
                         Log.d("TVAutoplay", "Binary service start acknowledged")
                     },
                     onOutput = { },
-                    forceStart = false
+                    forceStart = forceStart
                 )
             }
         }
 
         var lastProbeReason: String? = null
+        var startRequested = false
+        var forcedRestartRequested = false
         val readiness: TvStartupReadiness? = withTimeoutOrNull(TV_STARTUP_TIMEOUT_MS) {
             var attempt = 0
             while (true) {
+                if (!startRequested) {
+                    requestBinaryStart(
+                        forceStart = false,
+                        reason = "initial readiness gate request"
+                    )
+                    startRequested = true
+                }
+
                 attempt++
                 Log.d("TVAutoplay", "HTTP ready probe attempt=$attempt url=$url")
                 if (probeStreamEndpoint(url)) {
                     Log.d("TVAutoplay", "HTTP ready true after attempt=$attempt")
                     return@withTimeoutOrNull TvStartupReadiness(ready = true)
                 }
+
                 lastProbeReason = "Attempt $attempt did not return a playable HTTP response"
+
+                if (!forcedRestartRequested && attempt >= 12) {
+                    forcedRestartRequested = true
+                    requestBinaryStart(
+                        forceStart = true,
+                        reason = "endpoint still unready after $attempt probes"
+                    )
+                }
+
                 delay(TV_STARTUP_POLL_DELAY_MS)
             }
-            TvStartupReadiness(
-                ready = false,
-                reason = lastProbeReason ?: "Timed out after ${TV_STARTUP_TIMEOUT_MS / 1000}s waiting for $url"
-            )
         }
 
         return readiness ?: TvStartupReadiness(

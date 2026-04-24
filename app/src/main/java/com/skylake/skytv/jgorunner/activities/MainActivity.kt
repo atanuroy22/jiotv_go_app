@@ -111,6 +111,7 @@ class MainActivity : ComponentActivity() {
     private var showRedirectPopup by mutableStateOf(false)
     private var shouldLaunchIPTV by mutableStateOf(false)
     private var countdownJob: Job? = null
+    private var autoServerMonitorJob: Job? = null
 
     private var downloadProgress by mutableStateOf<DownloadProgress?>(null)
     private var isSwitchOnForAutoStartForeground by mutableStateOf(false)
@@ -133,6 +134,8 @@ class MainActivity : ComponentActivity() {
         }
 
         BinaryUpdater.init(this)
+
+        startAutoServerMonitor()
 
 // DEL----------------------------------------------------------
 
@@ -266,11 +269,48 @@ class MainActivity : ComponentActivity() {
         // Treat TV autoplay as an implicit server-autostart request to avoid flag drift.
         val shouldAutoStartServer =
             preferenceManager.myPrefs.autoStartServer || preferenceManager.myPrefs.startTvAutomatically
-        if (shouldAutoStartServer && (!BinaryService.isRunning || isFirstAppOpen)) {
-            Log.d(TAG, "Starting server automatically (forceStart=$isFirstAppOpen)")
+        if (shouldAutoStartServer) {
+            val forceStart = BinaryService.isRunning && isFirstAppOpen
+            Log.d(
+                TAG,
+                "Starting server automatically (forceStart=$forceStart, running=${BinaryService.isRunning})"
+            )
             val arguments = emptyArray<String>()
             runBinary(
                 activity = this,
+
+    private fun startAutoServerMonitor() {
+        if (autoServerMonitorJob?.isActive == true) return
+
+        autoServerMonitorJob = CoroutineScope(Dispatchers.IO).launch {
+            while (true) {
+                val shouldAutoStartServer =
+                    preferenceManager.myPrefs.autoStartServer || preferenceManager.myPrefs.startTvAutomatically
+
+                if (!shouldAutoStartServer) {
+                    delay(12_000L)
+                    continue
+                }
+
+                if (!BinaryService.isRunning) {
+                    Log.d(TAG, "Auto server monitor detected stopped service; requesting restart")
+                    runBinary(
+                        activity = this@MainActivity,
+                        arguments = emptyArray(),
+                        onRunSuccess = {
+                            onJTVServerRun()
+                        },
+                        onOutput = { output ->
+                            Log.d(TAG, output)
+                        },
+                        forceStart = false
+                    )
+                }
+
+                delay(12_000L)
+            }
+        }
+    }
                 arguments = arguments,
                 onRunSuccess = {
                     onJTVServerRun()
@@ -279,7 +319,7 @@ class MainActivity : ComponentActivity() {
                     Log.d(TAG, output)
                     outputText = output
                 },
-                forceStart = isFirstAppOpen
+                forceStart = forceStart
             )
             isFirstAppOpen = false
         }
@@ -722,6 +762,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        autoServerMonitorJob?.cancel()
+        autoServerMonitorJob = null
         backPressedCallback.remove()
         unregisterReceiver(binaryStoppedReceiver)
     }
