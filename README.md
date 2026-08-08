@@ -2,7 +2,7 @@
 <h1 align="center">
   <br>
   <a href="#">
-    <img src="ic_launcher_alias2.webp" alt="Omni TV Icon" width="200">
+    <img src="pic/ic_launcher_alias2.webp" alt="Omni TV Icon" width="200">
   </a>
   <br>
   📺 Omni TV
