@@ -21,13 +21,6 @@
   <tr>
     <td><img src="pic/1.jpg" alt="App screenshot 1" height="320"/></td>
     <td><img src="pic/2.jpg" alt="App screenshot 2" height="320"/></td>
-  <!-- </tr>
-</table>
-
-<table>
-  <tr> -->
-    <td><img src="app/src/main/res/mipmap-hdpi/widget_preview_v1.png" alt="Widget preview v1" height="150"/></td>
-    <td><img src="app/src/main/res/mipmap-hdpi/widget_preview_v2.png" alt="Widget preview v2" height="150"/></td>
   </tr>
 </table>
 
