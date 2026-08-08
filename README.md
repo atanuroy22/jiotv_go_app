@@ -46,12 +46,12 @@
      </span>
    </p>
 
-2. **Pick your edition** — each release ships two APKs:
+2. **Pick your edition** — there have two versions:
 
    | APK | Contains | Notes |
    |---|---|---|
-   | `OmniTV-Lite-<version>.apk` | Omni UI + Movies | Smaller and faster. Installs cleanly on the latest Android. **Recommended for most users.** |
-   | `OmniTV-universal-<version>.apk` | Everything, incl. Free Jio, Chromecast | Shows a "built for an older version of Android". |
+   | `OmniTV-Lite-<version>.apk` | Omni UI + Movies | Smaller and faster. Installs cleanly on the latest Android. |
+   | `OmniTV-universal-<version>.apk` | Everything in lite + Jiotv_go_app features + Chromecast | "for an older version of Android". |
 
 ---
 ### ⚖️ Disclaimer
