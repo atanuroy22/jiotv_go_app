@@ -51,7 +51,7 @@
    | APK | Contains | Notes |
    |---|---|---|
    | `OmniTV-Lite-<version>.apk` | Omni UI + Movies | Smaller and faster. Installs cleanly on the latest Android. |
-   | `OmniTV-universal-<version>.apk` | Everything in lite + Jiotv_go_app features + Chromecast | "for an older version of Android". |
+   | `OmniTV-universal-<version>.apk` | Everything in lite + Jiotv_go_app features | For an older version of Android. |
 
 ---
 ### ⚖️ Disclaimer
