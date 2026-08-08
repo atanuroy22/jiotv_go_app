@@ -1,4 +1,4 @@
-# jiotv_go_app
+# Omni TV
 <h1 align="center">
   <br>
   <a href="#">
@@ -21,6 +21,7 @@
   <tr>
     <td><img src="pic/1.jpg" alt="App screenshot 1" height="320"/></td>
     <td><img src="pic/2.jpg" alt="App screenshot 2" height="320"/></td>
+    <td><img src="pic/3.jpg" alt="App screenshot 2" height="320"/></td>
   </tr>
 </table>
 
