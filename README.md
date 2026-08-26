@@ -1,11 +1,11 @@
-# Omni TV
+# JTV Go
 <h1 align="center">
   <br>
   <a href="#">
-    <img src="pic/ic_launcher_alias2.webp" alt="Omni TV Icon" width="200">
+    <img src="pic/ic_launcher_alias2.webp" alt="JTV Go Icon" width="200">
   </a>
   <br>
-  📺 Omni TV
+  📺 JTV Go
   <br>
 </h1>
 
@@ -19,9 +19,6 @@
 
 <table>
   <tr>
-    <td><img src="pic/1.jpg" alt="App screenshot 1" height="320"/></td>
-    <td><img src="pic/2.jpg" alt="App screenshot 2" height="320"/></td>
-    <td><img src="pic/3.jpg" alt="App screenshot 2" height="320"/></td>
   </tr>
 </table>
 
@@ -50,8 +47,7 @@
 
    | APK | Contains | Notes |
    |---|---|---|
-   | `OmniTV-Lite-<version>.apk` | Omni UI + Movies | Smaller and faster. Installs cleanly on the latest Android. |
-   | `OmniTV-universal-<version>.apk` | Everything in lite + Jiotv_go_app features | For an older version of Android. |
+   | `Jtv Go-universal-<version>.apk` | Jiotv_go_app features | For every Android device. |
 
 ---
 ### ⚖️ Disclaimer
