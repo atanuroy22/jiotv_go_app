@@ -47,7 +47,7 @@
 
    | APK | Contains | Notes |
    |---|---|---|
-   | `Jtv Go-universal-<version>.apk` | Jiotv_go_app features | For every Android device. |
+   | `Jtv Go-universal-<version>.apk` | Jiotv_go_app features | For every Android Mobile & TV. |
 
 ---
 ### ⚖️ Disclaimer
