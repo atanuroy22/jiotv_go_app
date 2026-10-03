@@ -12,7 +12,7 @@
 <p align="center">Enjoy streaming and optimal performance!</p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.0.3-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.0.5-blue" alt="Version">
   <img src="https://img.shields.io/badge/build-beta-FF8135" alt="Build Status">
   <img src="https://img.shields.io/badge/license-Proprietary%20%C2%B7%20All%20Rights%20Reserved-red" alt="License">
 </p>
