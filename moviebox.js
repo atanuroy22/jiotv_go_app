@@ -19,10 +19,10 @@ function getMovieBoxConfig() {
     return {
         baseUrl: "https://api.aoneroom.com",
         packageName: "com.community.oneroom",
-        versionName: "4.0.02.0831.03",
-        versionCode: 50020126,
+        versionName: "4.0.03.0922.03",
+        versionCode: 50020131,
         gatewaySecret: "76iRl07s0xSN9jqmEWAt79EBJZulIQIsV64FZr2O",
-        userAgent: "com.community.oneroom/4.0.02.0831.03"
+        userAgent: "com.community.oneroom/4.0.03.0922.03"
     };
 }
 
